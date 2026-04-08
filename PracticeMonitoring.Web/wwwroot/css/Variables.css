@@ -11,4 +11,8 @@
     --shadow: 0 20px 45px rgba(31, 41, 55, 0.12);
     --radius-lg: 22px;
     --radius-md: 14px;
+
+    /* Typography */
+    --font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    --font-size-base: 16px;
 }

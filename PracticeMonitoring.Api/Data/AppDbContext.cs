@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿    using Microsoft.EntityFrameworkCore;
 using PracticeMonitoring.Api.Entities;
 
 namespace PracticeMonitoring.Api.Data;
@@ -11,6 +11,8 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Specialty> Specialties => Set<Specialty>();
+    public DbSet<Group> Groups => Set<Group>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,12 +33,37 @@ public class AppDbContext : DbContext
             );
         });
 
+        modelBuilder.Entity<Specialty>(entity =>
+        {
+            entity.ToTable("specialties");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.HasIndex(x => x.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<Group>(entity =>
+        {
+            entity.ToTable("groups");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Course).IsRequired();
+
+            entity.HasOne(x => x.Specialty)
+                  .WithMany(x => x.Groups)
+                  .HasForeignKey(x => x.SpecialtyId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("users");
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.FullName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Surname).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.FirstName).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Patronymic).HasMaxLength(100);
             entity.Property(x => x.Email).IsRequired().HasMaxLength(200);
             entity.Property(x => x.PasswordHash).IsRequired();
 
@@ -45,6 +72,11 @@ public class AppDbContext : DbContext
             entity.HasOne(x => x.Role)
                   .WithMany(x => x.Users)
                   .HasForeignKey(x => x.RoleId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Group)
+                  .WithMany(x => x.Users)
+                  .HasForeignKey(x => x.GroupId)
                   .OnDelete(DeleteBehavior.Restrict);
         });
     }

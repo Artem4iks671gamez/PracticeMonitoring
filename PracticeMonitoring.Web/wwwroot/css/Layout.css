@@ -12,9 +12,12 @@ html {
 
 body {
     min-height: 100vh;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
     background: radial-gradient(circle at top left, rgba(78, 95, 198, 0.12), transparent 28%), radial-gradient(circle at bottom right, rgba(78, 95, 198, 0.10), transparent 24%), var(--page-bg);
     color: var(--text-color);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 header {

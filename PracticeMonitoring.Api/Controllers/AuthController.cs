@@ -40,12 +40,30 @@ public class AuthController : ControllerBase
         if (role is null)
             return BadRequest(new { message = "Указанная роль не существует." });
 
+        Group? group = null;
+        if (request.GroupId.HasValue)
+        {
+            group = await _context.Groups
+                .Include(g => g.Specialty)
+                .FirstOrDefaultAsync(g => g.Id == request.GroupId.Value);
+
+            if (group is null)
+                return BadRequest(new { message = "Выбранная группа не найдена." });
+        }
+
         var user = new User
         {
-            FullName = request.FullName.Trim(),
+            Surname = request.Surname.Trim(),
+            FirstName = request.Name.Trim(),
+            Patronymic = string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim(),
+            FullName = string.IsNullOrWhiteSpace(request.Patronymic)
+                ? $"{request.Surname.Trim()} {request.Name.Trim()}"
+                : $"{request.Surname.Trim()} {request.Name.Trim()} {request.Patronymic.Trim()}",
             Email = email,
             RoleId = role.Id,
-            Role = role
+            Role = role,
+            GroupId = group?.Id,
+            Group = group
         };
 
         user.PasswordHash = _passwordService.HashPassword(user, request.Password);
@@ -102,6 +120,7 @@ public class AuthController : ControllerBase
 
         var user = await _context.Users
             .Include(x => x.Role)
+            .Include(x => x.Group)
             .FirstOrDefaultAsync(x => x.Id == userId);
 
         if (user is null)

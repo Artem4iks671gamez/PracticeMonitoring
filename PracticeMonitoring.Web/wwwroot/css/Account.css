@@ -8,28 +8,28 @@
 
 .loginblock {
     width: 100%;
-    max-width: 460px;
+    max-width: 520px;
     background: var(--card-bg);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow);
-    padding: 36px 34px 28px;
-    border: 1px solid rgba(78, 95, 198, 0.10);
+    padding: 40px 36px 32px;
+    border: 1px solid rgba(78, 95, 198, 0.08);
 }
 
 .login-title {
     font-size: 34px;
-    font-weight: 700;
-    line-height: 1.1;
-    margin-bottom: 10px;
+    font-weight: 800;
+    line-height: 1.05;
+    margin-bottom: 6px;
     color: var(--text-color);
     text-align: center;
 }
 
 .login-subtitle {
-    font-size: 16px;
+    font-size: 15px;
     color: var(--muted-text);
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 26px;
 }
 
 .validation-error {
@@ -45,7 +45,7 @@
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
 }
 
 .form-group {
@@ -55,34 +55,41 @@
 }
 
 .form-label {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-color);
 }
 
+/* Inputs / Selects unified look */
 .form-input {
     width: 100%;
-    height: 50px;
+    height: 52px;
     padding: 0 16px;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     background-color: var(--input-bg);
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-color);
     outline: none;
-    transition: 0.2s ease;
+    transition: 0.18s ease;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
-    .form-input:focus {
-        border-color: var(--main-color);
-        background-color: #ffffff;
-        box-shadow: 0 0 0 4px rgba(78, 95, 198, 0.12);
-    }
+/* Focus */
+.form-input:focus {
+    border-color: var(--main-color);
+    background-color: #ffffff;
+    box-shadow: 0 6px 22px rgba(78, 95, 198, 0.12);
+}
 
-    .form-input::placeholder {
-        color: #9aa3b2;
-    }
+/* Placeholder */
+.form-input::placeholder {
+    color: #9aa3b2;
+}
 
+/* Button */
 .login-button {
     height: 52px;
     margin-top: 8px;
@@ -93,22 +100,85 @@
     font-size: 17px;
     font-weight: 700;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 
-    .login-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 24px rgba(78, 95, 198, 0.25);
-    }
+.login-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(78, 95, 198, 0.22);
+}
 
-    .login-button:active {
-        transform: translateY(0);
-    }
+.login-button:active {
+    transform: translateY(0);
+}
 
+/* Modern select reset + custom arrow */
+select.form-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    position: relative;
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 12px;
+    padding-right: 44px; /* место под стрелку */
+    border-radius: 12px;
+    height: 52px;
+    line-height: 1.1;
+}
+
+/* Remove default arrow in IE/Edge */
+select.form-input::-ms-expand {
+    display: none;
+}
+
+/* Custom SVG arrow (neutral color, adapts to text color) */
+select.form-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'%3E%3Cpath fill='%236b7280' d='M5.5 7.5L10 12l4.5-4.5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Optional: wrapper with custom pseudo-element for more control */
+.select-wrap {
+    position: relative;
+    display: block;
+}
+.select-wrap select.form-input {
+    padding-right: 44px;
+}
+.select-wrap::after {
+    content: "";
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M5.5 7.5L10 12l4.5-4.5'/%3E%3C/svg%3E");
+    background-size: 14px 14px;
+    background-repeat: no-repeat;
+}
+
+/* Keep consistent disabled look */
+select.form-input:disabled,
+select.form-input[disabled] {
+    opacity: 0.7;
+    filter: grayscale(6%);
+    cursor: not-allowed;
+    background-color: #f4f6fb;
+}
+
+/* Course display input: always disabled styling */
+#courseDisplay {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Small helper */
 .login-footer {
-    margin-top: 22px;
+    margin-top: 18px;
     text-align: center;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--muted-text);
 }
 
@@ -118,9 +188,9 @@
     text-decoration: none;
 }
 
-    .login-link:hover {
-        text-decoration: underline;
-    }
+.login-link:hover {
+    text-decoration: underline;
+}
 
 .field-validation-error {
     font-size: 13px;
@@ -128,16 +198,17 @@
     margin-top: 2px;
 }
 
+/* Responsive */
 @media (max-width: 520px) {
     .loginblock {
-        padding: 28px 20px 22px;
+        padding: 24px 18px 18px;
     }
 
     .login-title {
-        font-size: 28px;
+        font-size: 26px;
     }
 
     .login-subtitle {
-        font-size: 15px;
+        font-size: 14px;
     }
 }
