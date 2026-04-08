@@ -1,0 +1,14 @@
+﻿:root {
+    --main-color: rgb(78, 95, 198);
+    --main-color-dark: rgb(58, 73, 165);
+    --page-bg: #eef1f7;
+    --card-bg: #ffffff;
+    --text-color: #1f2937;
+    --muted-text: #6b7280;
+    --border-color: #d7dceb;
+    --input-bg: #f8faff;
+    --error-color: #d92d20;
+    --shadow: 0 20px 45px rgba(31, 41, 55, 0.12);
+    --radius-lg: 22px;
+    --radius-md: 14px;
+}

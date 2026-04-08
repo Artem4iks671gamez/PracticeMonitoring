@@ -1,0 +1,8 @@
+﻿<h2>Страница студента</h2>
+
+<p><strong>ФИО:</strong> @ViewBag.FullName</p>
+<p><strong>Роль:</strong> @ViewBag.Role</p>
+
+<form asp-controller="Account" asp-action="Logout" method="post">
+    <button type="submit">Выйти</button>
+</form>

@@ -1,0 +1,38 @@
+﻿* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    width: 100%;
+    min-height: 100%;
+    scroll-behavior: smooth;
+}
+
+body {
+    min-height: 100vh;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: radial-gradient(circle at top left, rgba(78, 95, 198, 0.12), transparent 28%), radial-gradient(circle at bottom right, rgba(78, 95, 198, 0.10), transparent 24%), var(--page-bg);
+    color: var(--text-color);
+}
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    height: 78px;
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    background-color: var(--main-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.logo_reu {
+    height: 54px;
+    width: auto;
+    display: block;
+}
