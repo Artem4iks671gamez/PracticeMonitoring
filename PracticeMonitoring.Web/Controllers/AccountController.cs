@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PracticeMonitoring.Web.Models;
 using PracticeMonitoring.Web.Models.Auth;
 using PracticeMonitoring.Web.Services;
 
@@ -30,7 +31,15 @@ public class AccountController : Controller
         if (!result.Success || result.Data is null)
         {
             ApplyApiErrorsToModelState(result.ValidationErrors);
-            ViewBag.Error = result.ErrorMessage ?? "Неверный логин или пароль.";
+
+            ViewBag.Error = result.StatusCode switch
+            {
+                400 => result.ErrorMessage ?? "Проверьте корректность введённых данных.",
+                401 => result.ErrorMessage ?? "Неверный email или пароль.",
+                403 => result.ErrorMessage ?? "Доступ запрещён.",
+                _ => result.ErrorMessage ?? "Не удалось выполнить вход."
+            };
+
             return View(model);
         }
 
@@ -64,7 +73,15 @@ public class AccountController : Controller
         if (!result.Success || result.Data is null)
         {
             ApplyApiErrorsToModelState(result.ValidationErrors);
-            ViewBag.Error = result.ErrorMessage ?? "Ошибка регистрации.";
+
+            ViewBag.Error = result.StatusCode switch
+            {
+                400 => result.ErrorMessage ?? "Проверьте данные формы регистрации.",
+                401 => result.ErrorMessage ?? "Недостаточно прав для выполнения операции.",
+                409 => result.ErrorMessage ?? "Пользователь с такими данными уже существует.",
+                _ => result.ErrorMessage ?? "Не удалось выполнить регистрацию."
+            };
+
             return View(model);
         }
 
@@ -84,7 +101,10 @@ public class AccountController : Controller
 
         var user = await _authApiService.GetCurrentUserAsync(token);
         if (user is null)
+        {
+            HttpContext.Session.Clear();
             return RedirectToAction("Login");
+        }
 
         return View(user);
     }

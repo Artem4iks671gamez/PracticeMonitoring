@@ -3,7 +3,6 @@ using PracticeMonitoring.Web.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
-
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSession(options =>
@@ -28,9 +27,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseSession();
 
 app.MapControllerRoute(
