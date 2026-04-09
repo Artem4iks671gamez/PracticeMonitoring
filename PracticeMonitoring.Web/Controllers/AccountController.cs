@@ -89,6 +89,12 @@ public class AccountController : Controller
         HttpContext.Session.SetString("FullName", result.Data.FullName);
         HttpContext.Session.SetString("Role", result.Data.Role);
 
+        if (result.Data.Role == "Admin")
+            return RedirectToAction("Index", "Admin");
+
+        if (result.Data.Role == "Student")
+            return RedirectToAction("Index", "Student");
+
         return RedirectToAction("Profile");
     }
 
