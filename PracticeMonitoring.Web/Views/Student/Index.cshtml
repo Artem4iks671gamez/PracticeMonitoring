@@ -20,9 +20,9 @@
         <div class="student-identity">
             <div class="student-identity-text">
                 <div class="student-role-line">@groupText</div>
-                <h1 class="student-fullname">@Model.FullName</h1>
+                <h1 class="student-fullname" id="headerFullName">@Model.FullName</h1>
                 <div class="student-specialty-line">@specialtyText</div>
-                <div class="student-email-line">@Model.Email</div>
+                <div class="student-email-line" id="headerEmail">@Model.Email</div>
             </div>
 
             <div class="student-avatar-block">
@@ -52,6 +52,16 @@
         </div>
     </section>
 
+    @if (TempData["ProfileSuccess"] is string successMessage)
+    {
+        <div class="student-alert student-alert-success">@successMessage</div>
+    }
+
+    @if (TempData["ProfileError"] is string errorMessage)
+    {
+        <div class="student-alert student-alert-error">@errorMessage</div>
+    }
+
     <section class="student-dashboard">
         <div class="dashboard-card dashboard-card-wide">
             <div class="dashboard-card-header">
@@ -74,6 +84,7 @@
                     <li><strong>Email:</strong> @Model.Email</li>
                     <li><strong>Группа:</strong> @(Model.GroupName ?? "Не указана")</li>
                     <li><strong>Специальность:</strong> @specialtyText</li>
+                    <li><strong>Тема:</strong> @(Model.Theme == "dark" ? "Тёмная" : "Светлая")</li>
                 </ul>
             </div>
 
@@ -86,20 +97,6 @@
                     руководителя, период и текущий статус.
                 </p>
             </div>
-
-            <div class="dashboard-card">
-                <div class="dashboard-card-header">
-                    <h3>Быстрые действия</h3>
-                </div>
-                <div class="dashboard-actions">
-                    <button type="button" class="student-secondary-button" id="openProfileSettingsButtonBottom">
-                        Изменить профиль
-                    </button>
-                    <button type="button" class="student-ghost-button" disabled>
-                        Загрузить документы
-                    </button>
-                </div>
-            </div>
         </div>
     </section>
 </div>
@@ -109,31 +106,43 @@
         <div class="profile-modal-header">
             <div>
                 <h2>Настройки профиля</h2>
-                <p>Базовая версия интерфейса редактирования</p>
+                <p>Измените основные данные, аватар и тему оформления</p>
             </div>
             <button type="button" class="profile-modal-close" id="closeProfileSettingsButton">×</button>
         </div>
 
-        <form class="profile-settings-form" id="profileSettingsForm">
+        <form class="profile-settings-form" id="profileSettingsForm" asp-controller="Student" asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="CurrentAvatarUrl" value="@Model.AvatarUrl" id="currentAvatarUrl" />
+
             <div class="profile-settings-grid">
                 <div class="form-group">
                     <label class="form-label" for="editSurname">Фамилия</label>
-                    <input id="editSurname" class="form-input" type="text" value="@Model.Surname" />
+                    <input id="editSurname" name="Surname" class="form-input" type="text" value="@Model.Surname" />
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="editName">Имя</label>
-                    <input id="editName" class="form-input" type="text" value="@Model.FirstName" />
+                    <label class="form-label" for="editFirstName">Имя</label>
+                    <input id="editFirstName" name="FirstName" class="form-input" type="text" value="@Model.FirstName" />
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="editPatronymic">Отчество</label>
-                    <input id="editPatronymic" class="form-input" type="text" value="@Model.Patronymic" />
+                    <input id="editPatronymic" name="Patronymic" class="form-input" type="text" value="@Model.Patronymic" />
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="editEmail">Email</label>
-                    <input id="editEmail" class="form-input" type="email" value="@Model.Email" />
+                    <input id="editEmail" name="Email" class="form-input" type="email" value="@Model.Email" />
+                </div>
+
+                <div class="form-group profile-theme-group">
+                    <label class="form-label" for="editTheme">Тема оформления</label>
+                    <select id="editTheme" name="Theme" class="form-input">
+                        <option value="light" selected="@(Model.Theme == "light")">Светлая</option>
+                        <option value="dark" selected="@(Model.Theme == "dark")">Тёмная</option>
+                    </select>
                 </div>
             </div>
 
@@ -153,8 +162,8 @@
                     <label for="avatarUpload" class="student-secondary-button upload-label">
                         Выбрать аватар
                     </label>
-                    <input id="avatarUpload" type="file" accept="image/*" hidden />
-                    <p>Пока это UI-версия с локальным preview. Сохранение на сервер добавим следующим этапом.</p>
+                    <input id="avatarUpload" name="AvatarFile" type="file" accept="image/*" hidden />
+                    <p>Поддерживается загрузка изображения с сохранением в профиль.</p>
                 </div>
             </div>
 

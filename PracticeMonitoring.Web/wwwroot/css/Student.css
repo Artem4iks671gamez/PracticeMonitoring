@@ -109,7 +109,7 @@
 }
 
 .student-secondary-button {
-    background: #ffffff;
+    background: var(--card-bg);
     color: var(--text-color);
     border: 1px solid var(--border-color);
 }
@@ -121,7 +121,7 @@
 }
 
 .student-ghost-button {
-    background: #f8faff;
+    background: var(--input-bg);
     color: var(--muted-text);
     border: 1px dashed var(--border-color);
 }
@@ -142,12 +142,12 @@
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
 }
 
 .dashboard-card {
-    background: #ffffff;
+    background: var(--card-bg);
     border-radius: 22px;
     border: 1px solid rgba(78, 95, 198, 0.08);
     box-shadow: 0 18px 36px rgba(31, 41, 55, 0.08);
@@ -191,10 +191,24 @@
     line-height: 1.55;
 }
 
-.dashboard-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.student-alert {
+    padding: 14px 16px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.student-alert-success {
+    background: rgba(2, 122, 72, 0.10);
+    color: var(--success-color);
+    border: 1px solid rgba(2, 122, 72, 0.15);
+}
+
+.student-alert-error {
+    background: rgba(217, 45, 32, 0.10);
+    color: var(--error-color);
+    border: 1px solid rgba(217, 45, 32, 0.15);
 }
 
 .profile-modal-backdrop {
@@ -215,7 +229,7 @@
 .profile-modal {
     width: 100%;
     max-width: 760px;
-    background: #ffffff;
+    background: var(--card-bg);
     border-radius: 26px;
     box-shadow: 0 28px 64px rgba(15, 23, 42, 0.24);
     border: 1px solid rgba(78, 95, 198, 0.10);
@@ -242,7 +256,7 @@
 
 .profile-modal-close {
     border: none;
-    background: #f8faff;
+    background: var(--input-bg);
     color: var(--text-color);
     width: 42px;
     height: 42px;
@@ -263,13 +277,17 @@
     gap: 16px 18px;
 }
 
+.profile-theme-group {
+    grid-column: 1 / -1;
+}
+
 .profile-avatar-settings {
     display: flex;
     align-items: center;
     gap: 18px;
     padding: 18px;
     border-radius: 18px;
-    background: #f8faff;
+    background: var(--input-bg);
     border: 1px solid rgba(78, 95, 198, 0.10);
 }
 

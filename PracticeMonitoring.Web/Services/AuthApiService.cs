@@ -25,7 +25,7 @@ public class AuthApiService
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync("api/Auth/register", content);
-        return await ReadAuthResponseAsync(response, "Ошибка регистрации.");
+        return await ReadAuthResponseAsync<AuthResponse>(response, "Ошибка регистрации.");
     }
 
     public async Task<AuthApiResult<AuthResponse>> LoginAsync(LoginViewModel model)
@@ -34,7 +34,7 @@ public class AuthApiService
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await _httpClient.PostAsync("api/Auth/login", content);
-        return await ReadAuthResponseAsync(response, "Ошибка входа.");
+        return await ReadAuthResponseAsync<AuthResponse>(response, "Ошибка входа.");
     }
 
     public async Task<CurrentUserViewModel?> GetCurrentUserAsync(string token)
@@ -51,9 +51,20 @@ public class AuthApiService
         return JsonSerializer.Deserialize<CurrentUserViewModel>(responseJson, _jsonOptions);
     }
 
-    private async Task<AuthApiResult<AuthResponse>> ReadAuthResponseAsync(HttpResponseMessage response, string fallbackError)
+    public async Task<AuthApiResult<CurrentUserViewModel>> UpdateProfileAsync(string token, UpdateProfileRequest requestModel)
     {
-        var result = new AuthApiResult<AuthResponse>
+        var json = JsonSerializer.Serialize(requestModel);
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/Profile/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.SendAsync(request);
+        return await ReadAuthResponseAsync<CurrentUserViewModel>(response, "Не удалось сохранить изменения профиля.");
+    }
+
+    private async Task<AuthApiResult<T>> ReadAuthResponseAsync<T>(HttpResponseMessage response, string fallbackError)
+    {
+        var result = new AuthApiResult<T>
         {
             Success = response.IsSuccessStatusCode,
             StatusCode = (int)response.StatusCode
@@ -63,7 +74,7 @@ public class AuthApiService
 
         if (response.IsSuccessStatusCode)
         {
-            result.Data = JsonSerializer.Deserialize<AuthResponse>(responseJson, _jsonOptions);
+            result.Data = JsonSerializer.Deserialize<T>(responseJson, _jsonOptions);
             return result;
         }
 
@@ -108,18 +119,27 @@ public class AuthApiService
                         result.ValidationErrors[property.Name] = messages.ToArray();
                     }
                 }
-
-                if (result.ValidationErrors.Count > 0 && string.IsNullOrWhiteSpace(result.ErrorMessage))
-                {
-                    result.ErrorMessage = fallbackError;
-                }
             }
         }
         catch
         {
-            // Оставляем fallbackError.
         }
 
         return result;
     }
+}
+
+public class UpdateProfileRequest
+{
+    public string Surname { get; set; } = string.Empty;
+
+    public string FirstName { get; set; } = string.Empty;
+
+    public string? Patronymic { get; set; }
+
+    public string Email { get; set; } = string.Empty;
+
+    public string? AvatarUrl { get; set; }
+
+    public string Theme { get; set; } = "light";
 }

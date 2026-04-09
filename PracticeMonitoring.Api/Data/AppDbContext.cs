@@ -1,11 +1,11 @@
-﻿    using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PracticeMonitoring.Api.Entities;
 
 namespace PracticeMonitoring.Api.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    public AppDbContext(DbContextOptions options) : base(options)
     {
     }
 
@@ -50,9 +50,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Course).IsRequired();
 
             entity.HasOne(x => x.Specialty)
-                  .WithMany(x => x.Groups)
-                  .HasForeignKey(x => x.SpecialtyId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany(x => x.Groups)
+                .HasForeignKey(x => x.SpecialtyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -66,18 +66,20 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Patronymic).HasMaxLength(100);
             entity.Property(x => x.Email).IsRequired().HasMaxLength(200);
             entity.Property(x => x.PasswordHash).IsRequired();
+            entity.Property(x => x.AvatarUrl).HasMaxLength(300);
+            entity.Property(x => x.Theme).IsRequired().HasMaxLength(20).HasDefaultValue("light");
 
             entity.HasIndex(x => x.Email).IsUnique();
 
             entity.HasOne(x => x.Role)
-                  .WithMany(x => x.Users)
-                  .HasForeignKey(x => x.RoleId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.Group)
-                  .WithMany(x => x.Users)
-                  .HasForeignKey(x => x.GroupId)
-                  .OnDelete(DeleteBehavior.Restrict);
+                .WithMany(x => x.Users)
+                .HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

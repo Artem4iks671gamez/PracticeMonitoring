@@ -63,7 +63,8 @@ public class AuthController : ControllerBase
             RoleId = role.Id,
             Role = role,
             GroupId = group?.Id,
-            Group = group
+            Group = group,
+            Theme = "light"
         };
 
         user.PasswordHash = _passwordService.HashPassword(user, request.Password);
@@ -140,7 +141,8 @@ public class AuthController : ControllerBase
             GroupName = user.Group?.Name,
             SpecialtyCode = user.Group?.Specialty?.Code,
             SpecialtyName = user.Group?.Specialty?.Name,
-            AvatarUrl = null
+            AvatarUrl = user.AvatarUrl,
+            Theme = user.Theme
         });
     }
 

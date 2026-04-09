@@ -1,13 +1,14 @@
 ﻿document.addEventListener('DOMContentLoaded', function () {
     const modalBackdrop = document.getElementById('profileModalBackdrop');
     const openButton = document.getElementById('openProfileSettingsButton');
-    const openButtonBottom = document.getElementById('openProfileSettingsButtonBottom');
     const closeButton = document.getElementById('closeProfileSettingsButton');
     const cancelButton = document.getElementById('cancelProfileSettingsButton');
     const avatarUpload = document.getElementById('avatarUpload');
     const modalAvatarPreview = document.getElementById('modalAvatarPreview');
     const headerAvatarPreview = document.getElementById('studentAvatarPreview');
     const settingsForm = document.getElementById('profileSettingsForm');
+    const themeSelect = document.getElementById('editTheme');
+    const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
 
     function openModal() {
         if (modalBackdrop) {
@@ -18,15 +19,22 @@
     function closeModal() {
         if (modalBackdrop) {
             modalBackdrop.classList.remove('open');
+            if (themeSelect) {
+                document.documentElement.setAttribute('data-theme', themeSelect.dataset.savedTheme || initialTheme);
+            }
         }
+    }
+
+    if (themeSelect) {
+        themeSelect.dataset.savedTheme = initialTheme;
+
+        themeSelect.addEventListener('change', function () {
+            document.documentElement.setAttribute('data-theme', themeSelect.value);
+        });
     }
 
     if (openButton) {
         openButton.addEventListener('click', openModal);
-    }
-
-    if (openButtonBottom) {
-        openButtonBottom.addEventListener('click', openModal);
     }
 
     if (closeButton) {
@@ -69,9 +77,14 @@
 
     if (settingsForm) {
         settingsForm.addEventListener('submit', function (e) {
-            e.preventDefault();
-            closeModal();
-            alert('UI для настроек профиля готов. Сохранение на сервер добавим следующим этапом.');
+            const confirmed = window.confirm(
+                'Вы уверены что хотите изменить данные профиля? Администратор системы получит сообщение о смене данных.'
+            );
+
+            if (!confirmed) {
+                e.preventDefault();
+                return;
+            }
         });
     }
 });

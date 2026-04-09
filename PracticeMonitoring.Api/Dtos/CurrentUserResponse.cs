@@ -25,4 +25,6 @@ public class CurrentUserResponse
     public string? SpecialtyName { get; set; }
 
     public string? AvatarUrl { get; set; }
+
+    public string Theme { get; set; } = "light";
 }

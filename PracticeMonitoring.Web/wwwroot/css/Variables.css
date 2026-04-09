@@ -8,11 +8,18 @@
     --border-color: #d7dceb;
     --input-bg: #f8faff;
     --error-color: #d92d20;
+    --success-color: #027a48;
     --shadow: 0 20px 45px rgba(31, 41, 55, 0.12);
     --radius-lg: 22px;
     --radius-md: 14px;
+}
 
-    /* Typography */
-    --font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    --font-size-base: 16px;
+html[data-theme="dark"] {
+    --page-bg: #111827;
+    --card-bg: #1f2937;
+    --text-color: #f9fafb;
+    --muted-text: #9ca3af;
+    --border-color: #374151;
+    --input-bg: #111827;
+    --shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
 }
