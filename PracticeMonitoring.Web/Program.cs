@@ -12,9 +12,12 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"]
+                 ?? throw new InvalidOperationException("ApiSettings:BaseUrl is not configured.");
+
 builder.Services.AddHttpClient<AuthApiService>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7178/");
+    client.BaseAddress = new Uri(apiBaseUrl);
 });
 
 var app = builder.Build();

@@ -1,6 +1,4 @@
-﻿const defaultApiBase = 'https://localhost:7178';
-const apiBaseRaw = (window && window.apiBaseUrl) ? window.apiBaseUrl : '';
-const apiBase = (apiBaseRaw || defaultApiBase).replace(/\/$/, '');
+﻿const apiBase = (window.apiBaseUrl || '').replace(/\/$/, '');
 
 console.info('[site.js] apiBase =', apiBase);
 
@@ -12,14 +10,12 @@ function buildCustomSelect(selectId) {
     const nativeSelect = document.getElementById(selectId);
     const custom = getCustomSelect(selectId);
 
-    if (!nativeSelect || !custom)
-        return;
+    if (!nativeSelect || !custom) return;
 
     const trigger = custom.querySelector('.custom-select-trigger');
     const menu = custom.querySelector('.custom-select-menu');
 
-    if (!trigger || !menu)
-        return;
+    if (!trigger || !menu) return;
 
     menu.innerHTML = '';
 
@@ -39,15 +35,12 @@ function buildCustomSelect(selectId) {
         item.addEventListener('click', () => {
             nativeSelect.value = opt.value;
             nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            trigger.textContent = opt.textContent;
 
             menu.querySelectorAll('.custom-select-option').forEach(x => x.classList.remove('selected'));
             item.classList.add('selected');
+            trigger.textContent = opt.textContent;
 
             custom.classList.remove('open');
-            custom.classList.remove('invalid');
-
-            clearSelectError(selectId);
         });
 
         menu.appendChild(item);
@@ -64,20 +57,16 @@ function initCustomSelect(selectId) {
     const nativeSelect = document.getElementById(selectId);
     const custom = getCustomSelect(selectId);
 
-    if (!nativeSelect || !custom)
-        return;
+    if (!nativeSelect || !custom) return;
 
     const trigger = custom.querySelector('.custom-select-trigger');
-    if (!trigger)
-        return;
+    if (!trigger) return;
 
     trigger.addEventListener('click', () => {
-        if (nativeSelect.disabled)
-            return;
+        if (nativeSelect.disabled) return;
 
         document.querySelectorAll('.custom-select.open').forEach(x => {
-            if (x !== custom)
-                x.classList.remove('open');
+            if (x !== custom) x.classList.remove('open');
         });
 
         custom.classList.toggle('open');
@@ -90,43 +79,11 @@ function initCustomSelect(selectId) {
     buildCustomSelect(selectId);
 }
 
-function getErrorElementId(selectId) {
-    if (selectId === 'specialtySelect') return 'specialtyError';
-    if (selectId === 'groupSelect') return 'groupError';
-    return null;
-}
-
-function clearSelectError(selectId) {
-    const custom = getCustomSelect(selectId);
-    const errorId = getErrorElementId(selectId);
-
-    if (custom) {
-        custom.classList.remove('invalid');
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-select')) {
+        document.querySelectorAll('.custom-select.open').forEach(x => x.classList.remove('open'));
     }
-
-    if (errorId) {
-        const errorElement = document.getElementById(errorId);
-        if (errorElement) {
-            errorElement.textContent = '';
-        }
-    }
-}
-
-function setSelectError(selectId, message) {
-    const custom = getCustomSelect(selectId);
-    const errorId = getErrorElementId(selectId);
-
-    if (custom) {
-        custom.classList.add('invalid');
-    }
-
-    if (errorId) {
-        const errorElement = document.getElementById(errorId);
-        if (errorElement) {
-            errorElement.textContent = message;
-        }
-    }
-}
+});
 
 async function loadSpecialties() {
     try {
@@ -149,25 +106,23 @@ async function loadSpecialties() {
             specialtySelect.appendChild(opt);
         });
 
+        buildCustomSelect('specialtySelect');
         setGroupDisabled(true);
         setCourseValue('');
-        buildCustomSelect('specialtySelect');
 
         specialtySelect.onchange = async function () {
             const val = specialtySelect.value;
 
-            clearSelectError('specialtySelect');
-
             if (!val) {
+                setGroupDisabled(true);
+                setCourseValue('');
+
                 const groupSelect = document.getElementById('groupSelect');
                 if (groupSelect) {
                     groupSelect.innerHTML = '<option value="">-- выберите группу --</option>';
                     buildCustomSelect('groupSelect');
                 }
 
-                setGroupDisabled(true);
-                setCourseValue('');
-                clearSelectError('groupSelect');
                 return;
             }
 
@@ -213,8 +168,6 @@ async function loadGroups(specialtyId) {
         buildCustomSelect('groupSelect');
 
         groupSelect.onchange = function () {
-            clearSelectError('groupSelect');
-
             const selected = groupSelect.options[groupSelect.selectedIndex];
             if (!selected || !selected.value) {
                 setCourseValue('');
@@ -248,50 +201,14 @@ function setCourseValue(val) {
     courseInput.disabled = true;
 }
 
-function initRegisterFormValidation() {
-    const form = document.getElementById('registerForm');
-    if (!form) return;
-
-    form.addEventListener('submit', function (e) {
-        const specialtySelect = document.getElementById('specialtySelect');
-        const groupSelect = document.getElementById('groupSelect');
-
-        let isValid = true;
-
-        clearSelectError('specialtySelect');
-        clearSelectError('groupSelect');
-
-        if (specialtySelect && !specialtySelect.value) {
-            setSelectError('specialtySelect', 'Выберите специальность.');
-            isValid = false;
-        }
-
-        if (groupSelect && !groupSelect.value) {
-            setSelectError('groupSelect', 'Выберите группу.');
-            isValid = false;
-        }
-
-        if (!isValid) {
-            e.preventDefault();
-        }
-    });
-}
-
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.custom-select')) {
-        document.querySelectorAll('.custom-select.open').forEach(x => x.classList.remove('open'));
-    }
-});
-
 document.addEventListener('DOMContentLoaded', function () {
-    initCustomSelect('specialtySelect');
-    initCustomSelect('groupSelect');
-    initRegisterFormValidation();
-
     setGroupDisabled(true);
     setCourseValue('');
 
-    if (document.getElementById('specialtySelect')) {
+    initCustomSelect('specialtySelect');
+    initCustomSelect('groupSelect');
+
+    if (window.loadSpecialties) {
         loadSpecialties();
     }
 });

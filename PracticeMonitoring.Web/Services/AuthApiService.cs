@@ -1,8 +1,8 @@
-﻿using PracticeMonitoring.Web.Models;
-using PracticeMonitoring.Web.Models.Auth;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using PracticeMonitoring.Web.Models;
+using PracticeMonitoring.Web.Models.Auth;
 
 namespace PracticeMonitoring.Web.Services;
 
@@ -39,10 +39,10 @@ public class AuthApiService
 
     public async Task<CurrentUserViewModel?> GetCurrentUserAsync(string token)
     {
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/Auth/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await _httpClient.GetAsync("api/Auth/me");
+        var response = await _httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)
             return null;
@@ -117,7 +117,7 @@ public class AuthApiService
         }
         catch
         {
-            
+            // Оставляем fallbackError.
         }
 
         return result;
