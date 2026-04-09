@@ -53,6 +53,7 @@
                     <div class="custom-select-menu"></div>
                 </div>
 
+                <span asp-validation-for="SpecialtyId" class="field-validation-error"></span>
                 <span class="field-validation-error" id="specialtyError"></span>
             </div>
 
@@ -68,6 +69,7 @@
                     <div class="custom-select-menu"></div>
                 </div>
 
+                <span asp-validation-for="GroupId" class="field-validation-error"></span>
                 <span class="field-validation-error" id="groupError"></span>
             </div>
 
@@ -80,6 +82,12 @@
                 <label asp-for="Password" class="form-label">Пароль</label>
                 <input asp-for="Password" type="password" class="form-input" placeholder="Введите пароль" autocomplete="new-password" />
                 <span asp-validation-for="Password" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="ConfirmPassword" class="form-label">Подтвердите пароль</label>
+                <input asp-for="ConfirmPassword" type="password" class="form-input" placeholder="Повторите пароль" autocomplete="new-password" />
+                <span asp-validation-for="ConfirmPassword" class="field-validation-error"></span>
             </div>
 
             <button type="submit" class="login-button">Зарегистрироваться</button>
