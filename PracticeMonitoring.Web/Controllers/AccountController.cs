@@ -26,7 +26,7 @@ public class AccountController : Controller
             return View(model);
 
         var result = await _authApiService.LoginAsync(model);
-
+        
         if (result is null)
         {
             ViewBag.Error = "Неверный логин или пароль";

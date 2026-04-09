@@ -36,18 +36,36 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Специальность</label>
-                <select id="specialtySelect" name="SpecialtyId" class="form-input"></select>
+                <label class="form-label" for="specialtySelect">Специальность</label>
+
+                <select id="specialtySelect" name="SpecialtyId" class="native-select-hidden">
+                    <option value="">-- выберите специальность --</option> 
+                </select>
+
+                <div class="custom-select" data-target="specialtySelect">
+                    <button type="button" class="custom-select-trigger">-- выберите специальность --</button>
+                    <div class="custom-select-menu"></div>
+                    <span asp-validation-for="SpecialtyId" class="field-validation-error"></span>
+                </div>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Группа</label>
-                <select id="groupSelect" name="GroupId" class="form-input"></select>
+                <label class="form-label" for="groupSelect">Группа</label>
+
+                <select id="groupSelect" name="GroupId" class="native-select-hidden">
+                    <option value="">-- выберите группу --</option>
+                </select>
+
+                <div class="custom-select" data-target="groupSelect">
+                    <button type="button" class="custom-select-trigger">-- выберите группу --</button>
+                    <span asp-validation-for="GroupId" class="field-validation-error"></span>
+                    <div class="custom-select-menu"></div>
+                </div>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Курс</label>
-                <input id="courseDisplay" readonly class="form-input" />
+                <label class="form-label" for="courseDisplay">Курс</label>
+                <input id="courseDisplay" readonly class="form-input" placeholder="Курс определится автоматически" />
             </div>
 
             <div class="form-group">
@@ -68,10 +86,4 @@
 
 @section Scripts {
     <script src="~/js/site.js"></script>
-    <script>
-        // Инициация загрузки специальностей при загрузке страницы
-        document.addEventListener("DOMContentLoaded", function () {
-            if (window.loadSpecialties) loadSpecialties();
-        });
-    </script>
 }
