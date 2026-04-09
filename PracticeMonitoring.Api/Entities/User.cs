@@ -27,4 +27,6 @@ public class User
     public string? AvatarUrl { get; set; }
 
     public string Theme { get; set; } = "light";
+
+    public bool IsActive { get; set; } = true;
 }

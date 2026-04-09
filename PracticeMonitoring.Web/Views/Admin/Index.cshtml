@@ -1,4 +1,4 @@
-﻿@model PracticeMonitoring.Web.Models.Admin.AdminLogsPageViewModel
+﻿@model PracticeMonitoring.Web.Models.Admin.AdminUsersPageViewModel
 
 @{
     ViewData["Title"] = "Админ-панель";
@@ -8,7 +8,7 @@
     <section class="admin-header-card">
         <div>
             <div class="admin-badge">Панель администратора</div>
-            <h1 class="admin-title">Журнал системы</h1>
+            <h1 class="admin-title">Управление системой</h1>
             <p class="admin-subtitle">Администратор: @Model.AdminFullName</p>
         </div>
 
@@ -19,19 +19,75 @@
 
     <section class="admin-tabs-card">
         <div class="admin-tabs">
-            <button type="button" class="admin-tab-button active" data-tab="registered-users-tab">
-                Зарегистрированные пользователи
-            </button>
-            <button type="button" class="admin-tab-button" data-tab="admin-actions-tab">
-                Изменения администраторами
-            </button>
-            <button type="button" class="admin-tab-button" data-tab="user-profile-changes-tab">
-                Изменения данных пользователями
-            </button>
+            <button type="button" class="admin-tab-button active" data-tab="accounts-tab">Аккаунты</button>
+            <button type="button" class="admin-tab-button" data-tab="registered-users-tab">Зарегистрированные пользователи</button>
+            <button type="button" class="admin-tab-button" data-tab="admin-actions-tab">Изменения администраторами</button>
+            <button type="button" class="admin-tab-button" data-tab="user-profile-changes-tab">Изменения данных пользователями</button>
         </div>
 
         <div class="admin-console-wrapper">
-            <div class="admin-console active" id="registered-users-tab">
+            <div class="admin-panel active" id="accounts-tab">
+                <div class="accounts-toolbar">
+                    <button type="button" class="admin-primary-button" data-create-role="Admin">Создать администратора</button>
+                    <button type="button" class="admin-primary-button" data-create-role="Supervisor">Создать руководителя практики</button>
+                    <button type="button" class="admin-primary-button" data-create-role="DepartmentStaff">Создать работника отдела</button>
+                </div>
+
+                <div class="accounts-scroll-list">
+                    @foreach (var user in Model.Users)
+                    {
+                        var avatarInitials = user.FullName.Length >= 2 ? user.FullName[..2].ToUpper() : user.FullName.ToUpper();
+
+                        <div class="account-row"
+                             data-user-id="@user.Id"
+                             data-full-name="@user.FullName"
+                             data-email="@user.Email"
+                             data-role="@user.Role"
+                             data-active="@user.IsActive.ToString().ToLower()"
+                             data-avatar-url="@user.AvatarUrl"
+                             data-group-id="@user.GroupId"
+                             data-group-name="@user.GroupName"
+                             data-course="@user.Course"
+                             data-specialty-id="@user.SpecialtyId"
+                             data-specialty-code="@user.SpecialtyCode"
+                             data-specialty-name="@user.SpecialtyName">
+                            <div class="account-row-avatar">
+                                @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                                {
+                                    <img src="@user.AvatarUrl" alt="Аватар пользователя" />
+                                }
+                                else
+                                {
+                                    <span>@avatarInitials</span>
+                                }
+                            </div>
+
+                            <div class="account-row-main">
+                                <div class="account-row-top">
+                                    <div class="account-row-name">@user.FullName</div>
+                                    <div class="account-row-role">@user.Role</div>
+                                </div>
+                                <div class="account-row-meta">@user.Email</div>
+                                <div class="account-row-meta">
+                                    @(string.IsNullOrWhiteSpace(user.SpecialtyCode) ? "Специальность не указана" : $"{user.SpecialtyCode} {user.SpecialtyName}")
+                                </div>
+                                <div class="account-row-meta">
+                                    Группа: @(user.GroupName ?? "—"), курс: @(user.Course?.ToString() ?? "—")
+                                </div>
+                            </div>
+
+                            <div class="account-row-side">
+                                <span class="account-status @(user.IsActive ? "account-status-active" : "account-status-inactive")">
+                                    @(user.IsActive ? "Активен" : "Неактивен")
+                                </span>
+                                <button type="button" class="admin-secondary-button edit-account-button">Редактировать</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="admin-console" id="registered-users-tab">
                 @if (Model.RegisteredUsersLogs.Count == 0)
                 {
                     <div class="admin-console-empty">Пока нет записей.</div>
@@ -59,9 +115,7 @@
                     {
                         <div class="admin-console-line">
                             <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                            <span class="admin-console-text">
-                                <strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description
-                            </span>
+                            <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description</span>
                         </div>
                     }
                 }
@@ -78,15 +132,85 @@
                     {
                         <div class="admin-console-line">
                             <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                            <span class="admin-console-text">
-                                <strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description
-                            </span>
+                            <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description</span>
                         </div>
                     }
                 }
             </div>
         </div>
     </section>
+</div>
+
+<div class="admin-modal-backdrop" id="accountModalBackdrop">
+    <div class="admin-modal">
+        <div class="admin-modal-header">
+            <div>
+                <h2 id="accountModalTitle">Редактирование аккаунта</h2>
+                <p>Изменение данных пользователя и управление активностью.</p>
+            </div>
+            <button type="button" class="admin-modal-close" id="closeAccountModalButton">×</button>
+        </div>
+
+        <form class="admin-form-grid" id="accountModalForm">
+            <div class="form-group">
+                <label class="form-label" for="adminSurname">Фамилия</label>
+                <input class="form-input" id="adminSurname" type="text" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminFirstName">Имя</label>
+                <input class="form-input" id="adminFirstName" type="text" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminPatronymic">Отчество</label>
+                <input class="form-input" id="adminPatronymic" type="text" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminEmail">Email</label>
+                <input class="form-input" id="adminEmail" type="email" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminRole">Роль</label>
+                <select class="form-input" id="adminRole">
+                    <option value="Student">Student</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Supervisor">Supervisor</option>
+                    <option value="DepartmentStaff">DepartmentStaff</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminSpecialtyView">Специальность</label>
+                <input class="form-input" id="adminSpecialtyView" type="text" readonly />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminGroupView">Группа</label>
+                <input class="form-input" id="adminGroupView" type="text" readonly />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adminCourseView">Курс</label>
+                <input class="form-input" id="adminCourseView" type="text" readonly />
+            </div>
+
+            <div class="form-group admin-form-full">
+                <label class="form-label" for="adminAvatarUpload">Аватар</label>
+                <input class="form-input" id="adminAvatarUpload" type="file" accept="image/*" />
+            </div>
+        </form>
+
+        <div class="admin-avatar-preview" id="adminAvatarPreview"></div>
+
+        <div class="admin-modal-actions">
+            <button type="button" class="admin-ghost-button" id="removeAvatarButton">Удалить аватар</button>
+            <button type="button" class="admin-secondary-button" id="toggleActiveButton">Деактивировать</button>
+            <button type="button" class="admin-primary-button" id="saveAccountButton">Сохранить</button>
+        </div>
+    </div>
 </div>
 
 @section Scripts {

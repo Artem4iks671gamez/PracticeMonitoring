@@ -69,6 +69,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PasswordHash).IsRequired();
             entity.Property(x => x.AvatarUrl).HasMaxLength(300);
             entity.Property(x => x.Theme).IsRequired().HasMaxLength(20).HasDefaultValue("light");
+            entity.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
 
             entity.HasIndex(x => x.Email).IsUnique();
 
