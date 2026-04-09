@@ -1,8 +1,175 @@
-﻿<h2>Страница студента</h2>
+﻿@model PracticeMonitoring.Web.Models.Auth.CurrentUserViewModel
 
-<p><strong>ФИО:</strong> @ViewBag.FullName</p>
-<p><strong>Роль:</strong> @ViewBag.Role</p>
+@{
+    ViewData["Title"] = "Профиль студента";
 
-<form asp-controller="Account" asp-action="Logout" method="post">
-    <button type="submit">Выйти</button>
-</form>
+    var groupText = !string.IsNullOrWhiteSpace(Model.GroupName)
+        ? $"Студент группы {Model.GroupName}"
+        : "Студент";
+
+    var specialtyText = !string.IsNullOrWhiteSpace(Model.SpecialtyCode) || !string.IsNullOrWhiteSpace(Model.SpecialtyName)
+        ? $"{Model.SpecialtyCode} {Model.SpecialtyName}".Trim()
+        : "Специальность пока не указана";
+
+    var avatarInitials =
+        $"{(string.IsNullOrWhiteSpace(Model.Surname) ? "" : Model.Surname[0])}{(string.IsNullOrWhiteSpace(Model.FirstName) ? "" : Model.FirstName[0])}";
+}
+
+<div class="student-shell">
+    <section class="student-topbar">
+        <div class="student-identity">
+            <div class="student-identity-text">
+                <div class="student-role-line">@groupText</div>
+                <h1 class="student-fullname">@Model.FullName</h1>
+                <div class="student-specialty-line">@specialtyText</div>
+                <div class="student-email-line">@Model.Email</div>
+            </div>
+
+            <div class="student-avatar-block">
+                <div class="student-avatar" id="studentAvatarPreview">
+                    @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
+                    {
+                        <img src="@Model.AvatarUrl" alt="Аватар студента" />
+                    }
+                    else
+                    {
+                        <span>@avatarInitials</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="student-actions">
+            <button type="button" class="student-secondary-button" id="openProfileSettingsButton">
+                Настройки профиля
+            </button>
+
+            <form asp-controller="Account" asp-action="Logout" method="post">
+                <button type="submit" class="student-danger-button">
+                    Выйти
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <section class="student-dashboard">
+        <div class="dashboard-card dashboard-card-wide">
+            <div class="dashboard-card-header">
+                <h2>Главная панель</h2>
+                <span>Базовая версия</span>
+            </div>
+            <p>
+                Здесь позже можно разместить статус практики, дедлайны, уведомления,
+                текущие задания, документы и журнал активности.
+            </p>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>Мой профиль</h3>
+                </div>
+                <ul class="dashboard-list">
+                    <li><strong>ФИО:</strong> @Model.FullName</li>
+                    <li><strong>Email:</strong> @Model.Email</li>
+                    <li><strong>Группа:</strong> @(Model.GroupName ?? "Не указана")</li>
+                    <li><strong>Специальность:</strong> @specialtyText</li>
+                </ul>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>Практика</h3>
+                </div>
+                <p class="dashboard-empty">
+                    Раздел пока пуст. Позже здесь можно отобразить место практики,
+                    руководителя, период и текущий статус.
+                </p>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h3>Быстрые действия</h3>
+                </div>
+                <div class="dashboard-actions">
+                    <button type="button" class="student-secondary-button" id="openProfileSettingsButtonBottom">
+                        Изменить профиль
+                    </button>
+                    <button type="button" class="student-ghost-button" disabled>
+                        Загрузить документы
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="profile-modal-backdrop" id="profileModalBackdrop">
+    <div class="profile-modal">
+        <div class="profile-modal-header">
+            <div>
+                <h2>Настройки профиля</h2>
+                <p>Базовая версия интерфейса редактирования</p>
+            </div>
+            <button type="button" class="profile-modal-close" id="closeProfileSettingsButton">×</button>
+        </div>
+
+        <form class="profile-settings-form" id="profileSettingsForm">
+            <div class="profile-settings-grid">
+                <div class="form-group">
+                    <label class="form-label" for="editSurname">Фамилия</label>
+                    <input id="editSurname" class="form-input" type="text" value="@Model.Surname" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editName">Имя</label>
+                    <input id="editName" class="form-input" type="text" value="@Model.FirstName" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editPatronymic">Отчество</label>
+                    <input id="editPatronymic" class="form-input" type="text" value="@Model.Patronymic" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editEmail">Email</label>
+                    <input id="editEmail" class="form-input" type="email" value="@Model.Email" />
+                </div>
+            </div>
+
+            <div class="profile-avatar-settings">
+                <div class="profile-avatar-settings-preview" id="modalAvatarPreview">
+                    @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
+                    {
+                        <img src="@Model.AvatarUrl" alt="Аватар студента" />
+                    }
+                    else
+                    {
+                        <span>@avatarInitials</span>
+                    }
+                </div>
+
+                <div class="profile-avatar-settings-controls">
+                    <label for="avatarUpload" class="student-secondary-button upload-label">
+                        Выбрать аватар
+                    </label>
+                    <input id="avatarUpload" type="file" accept="image/*" hidden />
+                    <p>Пока это UI-версия с локальным preview. Сохранение на сервер добавим следующим этапом.</p>
+                </div>
+            </div>
+
+            <div class="profile-modal-actions">
+                <button type="button" class="student-ghost-button" id="cancelProfileSettingsButton">
+                    Отмена
+                </button>
+                <button type="submit" class="student-primary-button">
+                    Сохранить изменения
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/student-profile.js"></script>
+}
