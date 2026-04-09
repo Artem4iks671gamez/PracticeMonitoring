@@ -115,6 +115,12 @@
             @Html.AntiForgeryToken()
 
             <input type="hidden" name="CurrentAvatarUrl" value="@Model.AvatarUrl" id="currentAvatarUrl" />
+            <input type="hidden" id="initialSurname" value="@Model.Surname" />
+            <input type="hidden" id="initialFirstName" value="@Model.FirstName" />
+            <input type="hidden" id="initialPatronymic" value="@Model.Patronymic" />
+            <input type="hidden" id="initialEmail" value="@Model.Email" />
+            <input type="hidden" id="initialTheme" value="@Model.Theme" />
+            <input type="hidden" id="initialAvatarUrl" value="@Model.AvatarUrl" />
 
             <div class="profile-settings-grid">
                 <div class="form-group">
@@ -138,11 +144,17 @@
                 </div>
 
                 <div class="form-group profile-theme-group">
-                    <label class="form-label" for="editTheme">Тема оформления</label>
-                    <select id="editTheme" name="Theme" class="form-input">
+                    <label class="form-label" for="themeSelect">Тема оформления</label>
+
+                    <select id="themeSelect" name="Theme" class="native-select-hidden">
                         <option value="light" selected="@(Model.Theme == "light")">Светлая</option>
                         <option value="dark" selected="@(Model.Theme == "dark")">Тёмная</option>
                     </select>
+
+                    <div class="custom-select custom-theme-select" data-target="themeSelect">
+                        <button type="button" class="custom-select-trigger">@(Model.Theme == "dark" ? "Тёмная" : "Светлая")</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
                 </div>
             </div>
 
@@ -163,7 +175,7 @@
                         Выбрать аватар
                     </label>
                     <input id="avatarUpload" name="AvatarFile" type="file" accept="image/*" hidden />
-                    <p>Поддерживается загрузка изображения с сохранением в профиль.</p>
+                    <p>Можно изменить фото профиля и сразу увидеть предпросмотр.</p>
                 </div>
             </div>
 
@@ -176,6 +188,27 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="confirm-modal-backdrop" id="confirmModalBackdrop">
+    <div class="confirm-modal">
+        <div class="confirm-modal-header">
+            <h3>Подтвердите действие</h3>
+        </div>
+
+        <p class="confirm-modal-text">
+            Вы уверены что хотите изменить данные профиля? Администратор системы получит сообщение о смене данных.
+        </p>
+
+        <div class="confirm-modal-actions">
+            <button type="button" class="student-ghost-button" id="cancelConfirmButton">
+                Отмена
+            </button>
+            <button type="button" class="student-primary-button" id="approveConfirmButton">
+                Подтвердить
+            </button>
+        </div>
     </div>
 </div>
 
