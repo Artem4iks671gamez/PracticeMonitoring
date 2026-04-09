@@ -24,7 +24,7 @@ public class AdminController : Controller
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction("Login", "Account");
 
-        var model = new AdminUsersPageViewModel
+        var model = new AdminLogsPageViewModel
         {
             AdminFullName = HttpContext.Session.GetString("FullName") ?? "Администратор",
             RegisteredUsersLogs = await _adminApiService.GetRegisteredUsersLogsAsync(token),

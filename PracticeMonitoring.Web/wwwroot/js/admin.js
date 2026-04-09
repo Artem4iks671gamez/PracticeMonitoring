@@ -1,127 +1,140 @@
 ﻿document.addEventListener('DOMContentLoaded', function () {
-    const buttons = document.querySelectorAll('.admin-tab-button');
-    const consoles = document.querySelectorAll('.admin-console');
+    const navButtons = document.querySelectorAll('.admin-nav-button');
     const panels = document.querySelectorAll('.admin-panel');
 
-    buttons.forEach(button => {
+    navButtons.forEach(button => {
         button.addEventListener('click', function () {
-            const targetId = button.dataset.tab;
+            const targetId = button.dataset.panel;
 
-            buttons.forEach(x => x.classList.remove('active'));
-            consoles.forEach(x => x.classList.remove('active'));
+            navButtons.forEach(x => x.classList.remove('active'));
             panels.forEach(x => x.classList.remove('active'));
 
             button.classList.add('active');
 
-            const consoleTarget = document.getElementById(targetId);
-            if (consoleTarget) consoleTarget.classList.add('active');
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.classList.add('active');
+            }
         });
     });
 
-    const modalBackdrop = document.getElementById('accountModalBackdrop');
-    const closeModalButton = document.getElementById('closeAccountModalButton');
-    const accountModalTitle = document.getElementById('accountModalTitle');
+    const subtabButtons = document.querySelectorAll('.admin-subtab-button');
+    const consoles = document.querySelectorAll('.admin-console');
 
-    const adminSurname = document.getElementById('adminSurname');
-    const adminFirstName = document.getElementById('adminFirstName');
-    const adminPatronymic = document.getElementById('adminPatronymic');
-    const adminEmail = document.getElementById('adminEmail');
-    const adminRole = document.getElementById('adminRole');
-    const adminSpecialtyView = document.getElementById('adminSpecialtyView');
-    const adminGroupView = document.getElementById('adminGroupView');
-    const adminCourseView = document.getElementById('adminCourseView');
-    const adminAvatarUpload = document.getElementById('adminAvatarUpload');
-    const adminAvatarPreview = document.getElementById('adminAvatarPreview');
-    const toggleActiveButton = document.getElementById('toggleActiveButton');
+    subtabButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const targetId = button.dataset.console;
 
-    let currentMode = 'edit';
-    let currentUserId = null;
-    let currentActive = true;
+            subtabButtons.forEach(x => x.classList.remove('active'));
+            consoles.forEach(x => x.classList.remove('active'));
 
-    function openModal() {
-        if (modalBackdrop) modalBackdrop.classList.add('open');
-    }
+            button.classList.add('active');
 
-    function closeModal() {
-        if (modalBackdrop) modalBackdrop.classList.remove('open');
-    }
-
-    closeModalButton?.addEventListener('click', closeModal);
-    modalBackdrop?.addEventListener('click', e => {
-        if (e.target === modalBackdrop) closeModal();
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.classList.add('active');
+            }
+        });
     });
 
-    function fillAvatar(url, fullName) {
-        if (!adminAvatarPreview) return;
+    const searchInput = document.getElementById('accountsSearchInput');
+    const roleFilterSelect = document.getElementById('roleFilterSelect');
+    const statusFilterSelect = document.getElementById('statusFilterSelect');
+    const sortSelect = document.getElementById('sortSelect');
+    const accountsList = document.getElementById('accountsList');
+    const accountsCountLabel = document.getElementById('accountsCountLabel');
 
-        if (url) {
-            adminAvatarPreview.innerHTML = `<img src="${url}" alt="avatar">`;
-        } else {
-            const initials = (fullName || '??').substring(0, 2).toUpperCase();
-            adminAvatarPreview.textContent = initials;
+    function getCards() {
+        return Array.from(document.querySelectorAll('.account-card'));
+    }
+
+    function cardSearchText(card) {
+        return [
+            card.dataset.fullName,
+            card.dataset.email,
+            card.dataset.role,
+            card.dataset.groupName,
+            card.dataset.specialtyCode,
+            card.dataset.specialtyName,
+            card.dataset.course
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+    }
+
+    function applyAccountsFilters() {
+        const searchValue = (searchInput?.value || '').trim().toLowerCase();
+        const roleValue = roleFilterSelect?.value || 'all';
+        const statusValue = statusFilterSelect?.value || 'all';
+        const sortValue = sortSelect?.value || 'name-asc';
+
+        let cards = getCards();
+
+        cards.forEach(card => {
+            const matchesSearch = !searchValue || cardSearchText(card).includes(searchValue);
+            const matchesRole = roleValue === 'all' || (card.dataset.role || '') === roleValue;
+            const isActive = (card.dataset.active || 'false') === 'true';
+            const matchesStatus =
+                statusValue === 'all' ||
+                (statusValue === 'active' && isActive) ||
+                (statusValue === 'inactive' && !isActive);
+
+            const visible = matchesSearch && matchesRole && matchesStatus;
+            card.style.display = visible ? '' : 'none';
+        });
+
+        cards = cards.filter(card => card.style.display !== 'none');
+
+        cards.sort((a, b) => {
+            const nameA = (a.dataset.fullName || '').toLowerCase();
+            const nameB = (b.dataset.fullName || '').toLowerCase();
+            const roleA = (a.dataset.role || '').toLowerCase();
+            const roleB = (b.dataset.role || '').toLowerCase();
+            const activeA = (a.dataset.active || 'false') === 'true';
+            const activeB = (b.dataset.active || 'false') === 'true';
+
+            switch (sortValue) {
+                case 'name-desc':
+                    return nameB.localeCompare(nameA, 'ru');
+                case 'role-asc':
+                    return roleA.localeCompare(roleB, 'ru') || nameA.localeCompare(nameB, 'ru');
+                case 'status-desc':
+                    if (activeA === activeB) return nameA.localeCompare(nameB, 'ru');
+                    return activeA ? -1 : 1;
+                case 'name-asc':
+                default:
+                    return nameA.localeCompare(nameB, 'ru');
+            }
+        });
+
+        cards.forEach(card => accountsList.appendChild(card));
+
+        if (accountsCountLabel) {
+            accountsCountLabel.textContent = `Показано аккаунтов: ${cards.length}`;
         }
     }
 
-    document.querySelectorAll('.edit-account-button').forEach(button => {
-        button.addEventListener('click', function () {
-            const row = button.closest('.account-row');
-            if (!row) return;
+    searchInput?.addEventListener('input', applyAccountsFilters);
+    roleFilterSelect?.addEventListener('change', applyAccountsFilters);
+    statusFilterSelect?.addEventListener('change', applyAccountsFilters);
+    sortSelect?.addEventListener('change', applyAccountsFilters);
 
-            currentMode = 'edit';
-            currentUserId = row.dataset.userId;
-            currentActive = row.dataset.active === 'true';
+    applyAccountsFilters();
 
-            accountModalTitle.textContent = 'Редактирование аккаунта';
-            adminSurname.value = splitFullName(row.dataset.fullName).surname;
-            adminFirstName.value = splitFullName(row.dataset.fullName).firstName;
-            adminPatronymic.value = splitFullName(row.dataset.fullName).patronymic;
-            adminEmail.value = row.dataset.email || '';
-            adminRole.value = row.dataset.role || 'Student';
-            adminSpecialtyView.value = [row.dataset.specialtyCode, row.dataset.specialtyName].filter(Boolean).join(' ');
-            adminGroupView.value = row.dataset.groupName || '';
-            adminCourseView.value = row.dataset.course || '';
-            toggleActiveButton.textContent = currentActive ? 'Деактивировать' : 'Активировать';
+    const adminThemeToggle = document.getElementById('adminThemeToggle');
+    const storageKey = 'admin-theme-preference';
 
-            fillAvatar(row.dataset.avatarUrl || '', row.dataset.fullName || '');
-            openModal();
-        });
-    });
-
-    document.querySelectorAll('[data-create-role]').forEach(button => {
-        button.addEventListener('click', function () {
-            currentMode = 'create';
-            currentUserId = null;
-            currentActive = true;
-
-            const role = button.dataset.createRole;
-            accountModalTitle.textContent = `Создание пользователя (${role})`;
-
-            adminSurname.value = '';
-            adminFirstName.value = '';
-            adminPatronymic.value = '';
-            adminEmail.value = '';
-            adminRole.value = role;
-            adminSpecialtyView.value = '';
-            adminGroupView.value = '';
-            adminCourseView.value = '';
-            toggleActiveButton.textContent = 'Деактивировать';
-
-            fillAvatar('', '??');
-            openModal();
-        });
-    });
-
-    toggleActiveButton?.addEventListener('click', function () {
-        currentActive = !currentActive;
-        toggleActiveButton.textContent = currentActive ? 'Деактивировать' : 'Активировать';
-    });
-
-    function splitFullName(fullName) {
-        const parts = (fullName || '').trim().split(/\s+/);
-        return {
-            surname: parts[0] || '',
-            firstName: parts[1] || '',
-            patronymic: parts.slice(2).join(' ')
-        };
+    const savedTheme = localStorage.getItem(storageKey);
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', savedTheme);
     }
+
+    adminThemeToggle?.addEventListener('click', function () {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        localStorage.setItem(storageKey, nextTheme);
+    });
 });

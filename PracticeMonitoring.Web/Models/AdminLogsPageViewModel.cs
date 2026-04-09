@@ -1,4 +1,6 @@
-﻿namespace PracticeMonitoring.Web.Models.Admin;
+﻿using System.Collections.Generic;
+
+namespace PracticeMonitoring.Web.Models.Admin;
 
 public class AdminLogsPageViewModel
 {
@@ -9,4 +11,6 @@ public class AdminLogsPageViewModel
     public List<AdminLogItemViewModel> AdminActionsLogs { get; set; } = new();
 
     public List<AdminLogItemViewModel> UserProfileChangesLogs { get; set; } = new();
+
+    public List<AdminUserItemViewModel> Users { get; set; } = new();
 }

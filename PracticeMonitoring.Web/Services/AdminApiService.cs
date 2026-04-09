@@ -1,5 +1,4 @@
 ﻿using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using PracticeMonitoring.Web.Models.Admin;
 
@@ -37,7 +36,8 @@ public class AdminApiService
             return new List<AdminUserItemViewModel>();
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<AdminUserItemViewModel>>(json, _jsonOptions) ?? new List<AdminUserItemViewModel>();
+        return JsonSerializer.Deserialize<List<AdminUserItemViewModel>>(json, _jsonOptions)
+               ?? new List<AdminUserItemViewModel>();
     }
 
     private async Task<List<AdminLogItemViewModel>> GetLogsAsync(string url, string token)
@@ -50,6 +50,7 @@ public class AdminApiService
             return new List<AdminLogItemViewModel>();
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<AdminLogItemViewModel>>(json, _jsonOptions) ?? new List<AdminLogItemViewModel>();
+        return JsonSerializer.Deserialize<List<AdminLogItemViewModel>>(json, _jsonOptions)
+               ?? new List<AdminLogItemViewModel>();
     }
 }

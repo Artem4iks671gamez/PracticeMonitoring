@@ -1,216 +1,268 @@
-﻿@model PracticeMonitoring.Web.Models.Admin.AdminUsersPageViewModel
+﻿@model PracticeMonitoring.Web.Models.Admin.AdminLogsPageViewModel
 
 @{
     ViewData["Title"] = "Админ-панель";
 }
 
 <div class="admin-shell">
-    <section class="admin-header-card">
+    <section class="admin-hero-card">
         <div>
             <div class="admin-badge">Панель администратора</div>
             <h1 class="admin-title">Управление системой</h1>
             <p class="admin-subtitle">Администратор: @Model.AdminFullName</p>
         </div>
 
-        <form asp-controller="Account" asp-action="Logout" method="post">
-            <button type="submit" class="admin-danger-button">Выйти</button>
-        </form>
+        <div class="admin-hero-actions">
+            <button type="button" class="admin-theme-toggle" id="adminThemeToggle">
+                Переключить тему
+            </button>
+
+            <form asp-controller="Account" asp-action="Logout" method="post">
+                <button type="submit" class="admin-danger-button">Выйти</button>
+            </form>
+        </div>
     </section>
 
-    <section class="admin-tabs-card">
-        <div class="admin-tabs">
-            <button type="button" class="admin-tab-button active" data-tab="accounts-tab">Аккаунты</button>
-            <button type="button" class="admin-tab-button" data-tab="registered-users-tab">Зарегистрированные пользователи</button>
-            <button type="button" class="admin-tab-button" data-tab="admin-actions-tab">Изменения администраторами</button>
-            <button type="button" class="admin-tab-button" data-tab="user-profile-changes-tab">Изменения данных пользователями</button>
-        </div>
+    <section class="admin-workspace">
+        <aside class="admin-sidebar-card">
+            <div class="admin-sidebar-title">Навигация</div>
 
-        <div class="admin-console-wrapper">
-            <div class="admin-panel active" id="accounts-tab">
-                <div class="accounts-toolbar">
-                    <button type="button" class="admin-primary-button" data-create-role="Admin">Создать администратора</button>
-                    <button type="button" class="admin-primary-button" data-create-role="Supervisor">Создать руководителя практики</button>
-                    <button type="button" class="admin-primary-button" data-create-role="DepartmentStaff">Создать работника отдела</button>
+            <div class="admin-sidebar-nav">
+                <button type="button" class="admin-nav-button active" data-panel="accounts-panel">
+                    Аккаунты
+                </button>
+
+                <button type="button" class="admin-nav-button" data-panel="logs-panel">
+                    Журнал
+                </button>
+            </div>
+
+            <div class="admin-sidebar-divider"></div>
+
+            <div class="admin-sidebar-title">Действия</div>
+
+            <div class="admin-sidebar-actions">
+                <button type="button" class="admin-primary-button admin-action-button" data-create-role="Admin">
+                    Создать администратора
+                </button>
+
+                <button type="button" class="admin-primary-button admin-action-button" data-create-role="Supervisor">
+                    Создать руководителя практики
+                </button>
+
+                <button type="button" class="admin-primary-button admin-action-button" data-create-role="DepartmentStaff">
+                    Создать работника отдела
+                </button>
+            </div>
+        </aside>
+
+        <section class="admin-main-card">
+            <div class="admin-panel active" id="accounts-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h2>Аккаунты пользователей</h2>
+                        <p>Поиск, фильтрация, сортировка и быстрый просмотр профилей.</p>
+                    </div>
                 </div>
 
-                <div class="accounts-scroll-list">
+                <div class="accounts-toolbar-grid">
+                    <div class="accounts-search-wrap">
+                        <input type="text"
+                               id="accountsSearchInput"
+                               class="form-input accounts-search-input"
+                               placeholder="Поиск по ФИО, email, роли, группе, специальности..." />
+                    </div>
+
+                    <div class="accounts-filter-wrap">
+                        <select id="roleFilterSelect" class="form-input accounts-filter-select">
+                            <option value="all">Все роли</option>
+                            <option value="Admin">Администратор</option>
+                            <option value="Student">Студент</option>
+                            <option value="Supervisor">Руководитель практики</option>
+                            <option value="DepartmentStaff">Работник отдела</option>
+                        </select>
+                    </div>
+
+                    <div class="accounts-filter-wrap">
+                        <select id="statusFilterSelect" class="form-input accounts-filter-select">
+                            <option value="all">Любой статус</option>
+                            <option value="active">Только активные</option>
+                            <option value="inactive">Только неактивные</option>
+                        </select>
+                    </div>
+
+                    <div class="accounts-filter-wrap">
+                        <select id="sortSelect" class="form-input accounts-filter-select">
+                            <option value="name-asc">Сортировка: ФИО А-Я</option>
+                            <option value="name-desc">Сортировка: ФИО Я-А</option>
+                            <option value="role-asc">Сортировка: роль А-Я</option>
+                            <option value="status-desc">Сортировка: активные выше</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="accounts-summary-bar">
+                    <span id="accountsCountLabel">Всего аккаунтов: @Model.Users.Count</span>
+                </div>
+
+                <div class="accounts-scroll-list" id="accountsList">
                     @foreach (var user in Model.Users)
                     {
-                        var avatarInitials = user.FullName.Length >= 2 ? user.FullName[..2].ToUpper() : user.FullName.ToUpper();
+                        var avatarInitials = string.Join("", user.FullName
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Take(2)
+                        .Select(x => x[0]))
+                        .ToUpper();
 
-                        <div class="account-row"
-                             data-user-id="@user.Id"
-                             data-full-name="@user.FullName"
-                             data-email="@user.Email"
-                             data-role="@user.Role"
-                             data-active="@user.IsActive.ToString().ToLower()"
-                             data-avatar-url="@user.AvatarUrl"
-                             data-group-id="@user.GroupId"
-                             data-group-name="@user.GroupName"
-                             data-course="@user.Course"
-                             data-specialty-id="@user.SpecialtyId"
-                             data-specialty-code="@user.SpecialtyCode"
-                             data-specialty-name="@user.SpecialtyName">
-                            <div class="account-row-avatar">
-                                @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
-                                {
-                                    <img src="@user.AvatarUrl" alt="Аватар пользователя" />
-                                }
-                                else
-                                {
-                                    <span>@avatarInitials</span>
-                                }
+                        var specialtyText = string.IsNullOrWhiteSpace(user.SpecialtyCode)
+                        ? "Специальность не указана"
+                        : $"{user.SpecialtyCode} {user.SpecialtyName}".Trim();
+
+                        <article class="account-card"
+                                 data-user-id="@user.Id"
+                                 data-full-name="@user.FullName"
+                                 data-email="@user.Email"
+                                 data-role="@user.Role"
+                                 data-active="@user.IsActive.ToString().ToLower()"
+                                 data-avatar-url="@user.AvatarUrl"
+                                 data-group-id="@user.GroupId"
+                                 data-group-name="@user.GroupName"
+                                 data-course="@user.Course"
+                                 data-specialty-id="@user.SpecialtyId"
+                                 data-specialty-code="@user.SpecialtyCode"
+                                 data-specialty-name="@user.SpecialtyName">
+                            <div class="account-card-top">
+                                <div class="account-card-avatar">
+                                    @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                                    {
+                                        <img src="@user.AvatarUrl" alt="Аватар пользователя" />
+                                    }
+                                    else
+                                    {
+                                        <span>@avatarInitials</span>
+                                    }
+                                </div>
+
+                                <div class="account-card-headline">
+                                    <div class="account-card-title-row">
+                                        <h3 class="account-card-name">@user.FullName</h3>
+                                        <span class="account-role-chip">@user.Role</span>
+                                    </div>
+
+                                    <div class="account-card-email">@user.Email</div>
+                                </div>
+
+                                <div class="account-card-status-area">
+                                    <span class="account-status @(user.IsActive ? "account-status-active" : "account-status-inactive")">
+                                        @(user.IsActive ? "Активен" : "Неактивен")
+                                    </span>
+                                </div>
                             </div>
 
-                            <div class="account-row-main">
-                                <div class="account-row-top">
-                                    <div class="account-row-name">@user.FullName</div>
-                                    <div class="account-row-role">@user.Role</div>
+                            <div class="account-card-divider"></div>
+
+                            <div class="account-card-details">
+                                <div class="account-detail-pill">
+                                    <span class="account-detail-label">Специальность</span>
+                                    <span class="account-detail-value">@specialtyText</span>
                                 </div>
-                                <div class="account-row-meta">@user.Email</div>
-                                <div class="account-row-meta">
-                                    @(string.IsNullOrWhiteSpace(user.SpecialtyCode) ? "Специальность не указана" : $"{user.SpecialtyCode} {user.SpecialtyName}")
+
+                                <div class="account-detail-pill">
+                                    <span class="account-detail-label">Группа</span>
+                                    <span class="account-detail-value">@(user.GroupName ?? "—")</span>
                                 </div>
-                                <div class="account-row-meta">
-                                    Группа: @(user.GroupName ?? "—"), курс: @(user.Course?.ToString() ?? "—")
+
+                                <div class="account-detail-pill">
+                                    <span class="account-detail-label">Курс</span>
+                                    <span class="account-detail-value">@(user.Course?.ToString() ?? "—")</span>
                                 </div>
                             </div>
 
-                            <div class="account-row-side">
-                                <span class="account-status @(user.IsActive ? "account-status-active" : "account-status-inactive")">
-                                    @(user.IsActive ? "Активен" : "Неактивен")
-                                </span>
-                                <button type="button" class="admin-secondary-button edit-account-button">Редактировать</button>
+                            <div class="account-card-actions">
+                                <button type="button" class="admin-secondary-button edit-account-button">
+                                    Редактировать
+                                </button>
                             </div>
-                        </div>
+                        </article>
                     }
                 </div>
             </div>
 
-            <div class="admin-console" id="registered-users-tab">
-                @if (Model.RegisteredUsersLogs.Count == 0)
-                {
-                    <div class="admin-console-empty">Пока нет записей.</div>
-                }
-                else
-                {
-                    @foreach (var log in Model.RegisteredUsersLogs)
-                    {
-                        <div class="admin-console-line">
-                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                            <span class="admin-console-text">@log.Description</span>
-                        </div>
-                    }
-                }
-            </div>
+            <div class="admin-panel" id="logs-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h2>Журнал системы</h2>
+                        <p>Выберите тип событий для просмотра.</p>
+                    </div>
+                </div>
 
-            <div class="admin-console" id="admin-actions-tab">
-                @if (Model.AdminActionsLogs.Count == 0)
-                {
-                    <div class="admin-console-empty">Пока нет записей.</div>
-                }
-                else
-                {
-                    @foreach (var log in Model.AdminActionsLogs)
-                    {
-                        <div class="admin-console-line">
-                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                            <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description</span>
-                        </div>
-                    }
-                }
-            </div>
+                <div class="admin-subtabs">
+                    <button type="button" class="admin-subtab-button active" data-console="registered-users-tab">
+                        Зарегистрированные пользователи
+                    </button>
+                    <button type="button" class="admin-subtab-button" data-console="admin-actions-tab">
+                        Изменения администраторами
+                    </button>
+                    <button type="button" class="admin-subtab-button" data-console="user-profile-changes-tab">
+                        Изменения данных пользователями
+                    </button>
+                </div>
 
-            <div class="admin-console" id="user-profile-changes-tab">
-                @if (Model.UserProfileChangesLogs.Count == 0)
-                {
-                    <div class="admin-console-empty">Пока нет записей.</div>
-                }
-                else
-                {
-                    @foreach (var log in Model.UserProfileChangesLogs)
-                    {
-                        <div class="admin-console-line">
-                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                            <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description</span>
-                        </div>
-                    }
-                }
+                <div class="admin-console-wrapper">
+                    <div class="admin-console active" id="registered-users-tab">
+                        @if (Model.RegisteredUsersLogs.Count == 0)
+                        {
+                            <div class="admin-console-empty">Пока нет записей.</div>
+                        }
+                        else
+                        {
+                            @foreach (var log in Model.RegisteredUsersLogs)
+                            {
+                                <div class="admin-console-line">
+                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                    <span class="admin-console-text">@log.Description</span>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="admin-console" id="admin-actions-tab">
+                        @if (Model.AdminActionsLogs.Count == 0)
+                        {
+                            <div class="admin-console-empty">Пока нет записей.</div>
+                        }
+                        else
+                        {
+                            @foreach (var log in Model.AdminActionsLogs)
+                            {
+                                <div class="admin-console-line">
+                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                    <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description</span>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="admin-console" id="user-profile-changes-tab">
+                        @if (Model.UserProfileChangesLogs.Count == 0)
+                        {
+                            <div class="admin-console-empty">Пока нет записей.</div>
+                        }
+                        else
+                        {
+                            @foreach (var log in Model.UserProfileChangesLogs)
+                            {
+                                <div class="admin-console-line">
+                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                    <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
     </section>
-</div>
-
-<div class="admin-modal-backdrop" id="accountModalBackdrop">
-    <div class="admin-modal">
-        <div class="admin-modal-header">
-            <div>
-                <h2 id="accountModalTitle">Редактирование аккаунта</h2>
-                <p>Изменение данных пользователя и управление активностью.</p>
-            </div>
-            <button type="button" class="admin-modal-close" id="closeAccountModalButton">×</button>
-        </div>
-
-        <form class="admin-form-grid" id="accountModalForm">
-            <div class="form-group">
-                <label class="form-label" for="adminSurname">Фамилия</label>
-                <input class="form-input" id="adminSurname" type="text" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminFirstName">Имя</label>
-                <input class="form-input" id="adminFirstName" type="text" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminPatronymic">Отчество</label>
-                <input class="form-input" id="adminPatronymic" type="text" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminEmail">Email</label>
-                <input class="form-input" id="adminEmail" type="email" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminRole">Роль</label>
-                <select class="form-input" id="adminRole">
-                    <option value="Student">Student</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Supervisor">Supervisor</option>
-                    <option value="DepartmentStaff">DepartmentStaff</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminSpecialtyView">Специальность</label>
-                <input class="form-input" id="adminSpecialtyView" type="text" readonly />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminGroupView">Группа</label>
-                <input class="form-input" id="adminGroupView" type="text" readonly />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="adminCourseView">Курс</label>
-                <input class="form-input" id="adminCourseView" type="text" readonly />
-            </div>
-
-            <div class="form-group admin-form-full">
-                <label class="form-label" for="adminAvatarUpload">Аватар</label>
-                <input class="form-input" id="adminAvatarUpload" type="file" accept="image/*" />
-            </div>
-        </form>
-
-        <div class="admin-avatar-preview" id="adminAvatarPreview"></div>
-
-        <div class="admin-modal-actions">
-            <button type="button" class="admin-ghost-button" id="removeAvatarButton">Удалить аватар</button>
-            <button type="button" class="admin-secondary-button" id="toggleActiveButton">Деактивировать</button>
-            <button type="button" class="admin-primary-button" id="saveAccountButton">Сохранить</button>
-        </div>
-    </div>
 </div>
 
 @section Scripts {
