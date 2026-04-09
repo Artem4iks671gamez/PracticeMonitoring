@@ -16,7 +16,7 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult Login()
     {
-        return View();
+        return View(new LoginViewModel());
     }
 
     [HttpPost]
@@ -26,21 +26,22 @@ public class AccountController : Controller
             return View(model);
 
         var result = await _authApiService.LoginAsync(model);
-        
-        if (result is null)
+
+        if (!result.Success || result.Data is null)
         {
-            ViewBag.Error = "Неверный логин или пароль";
+            ApplyApiErrorsToModelState(result.ValidationErrors);
+            ViewBag.Error = result.ErrorMessage ?? "Неверный логин или пароль.";
             return View(model);
         }
 
-        HttpContext.Session.SetString("Token", result.Token);
-        HttpContext.Session.SetString("FullName", result.FullName);
-        HttpContext.Session.SetString("Role", result.Role);
+        HttpContext.Session.SetString("Token", result.Data.Token);
+        HttpContext.Session.SetString("FullName", result.Data.FullName);
+        HttpContext.Session.SetString("Role", result.Data.Role);
 
-        if (result.Role == "Admin")
+        if (result.Data.Role == "Admin")
             return RedirectToAction("Index", "Admin");
 
-        if (result.Role == "Student")
+        if (result.Data.Role == "Student")
             return RedirectToAction("Index", "Student");
 
         return RedirectToAction("Profile");
@@ -49,7 +50,7 @@ public class AccountController : Controller
     [HttpGet]
     public IActionResult Register()
     {
-        return View();
+        return View(new RegisterViewModel());
     }
 
     [HttpPost]
@@ -60,15 +61,16 @@ public class AccountController : Controller
 
         var result = await _authApiService.RegisterAsync(model);
 
-        if (result is null)
+        if (!result.Success || result.Data is null)
         {
-            ViewBag.Error = "Ошибка регистрации";
+            ApplyApiErrorsToModelState(result.ValidationErrors);
+            ViewBag.Error = result.ErrorMessage ?? "Ошибка регистрации.";
             return View(model);
         }
 
-        HttpContext.Session.SetString("Token", result.Token);
-        HttpContext.Session.SetString("FullName", result.FullName);
-        HttpContext.Session.SetString("Role", result.Role);
+        HttpContext.Session.SetString("Token", result.Data.Token);
+        HttpContext.Session.SetString("FullName", result.Data.FullName);
+        HttpContext.Session.SetString("Role", result.Data.Role);
 
         return RedirectToAction("Profile");
     }
@@ -77,12 +79,10 @@ public class AccountController : Controller
     public async Task<IActionResult> Profile()
     {
         var token = HttpContext.Session.GetString("Token");
-
         if (string.IsNullOrEmpty(token))
             return RedirectToAction("Login");
 
         var user = await _authApiService.GetCurrentUserAsync(token);
-
         if (user is null)
             return RedirectToAction("Login");
 
@@ -94,5 +94,16 @@ public class AccountController : Controller
     {
         HttpContext.Session.Clear();
         return RedirectToAction("Login");
+    }
+
+    private void ApplyApiErrorsToModelState(Dictionary<string, string[]> validationErrors)
+    {
+        foreach (var pair in validationErrors)
+        {
+            foreach (var error in pair.Value)
+            {
+                ModelState.AddModelError(pair.Key, error);
+            }
+        }
     }
 }

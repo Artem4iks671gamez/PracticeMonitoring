@@ -1,5 +1,9 @@
 ﻿@model PracticeMonitoring.Web.Models.Auth.RegisterViewModel
 
+@{
+    ViewData["Title"] = "Регистрация";
+}
+
 <div class="loginwrap">
     <div class="loginblock registerblock">
         <h1 class="login-title">Регистрация</h1>
@@ -10,7 +14,9 @@
             <div class="validation-error">@ViewBag.Error</div>
         }
 
-        <form asp-action="Register" method="post" class="auth-form">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <form asp-action="Register" method="post" class="auth-form" id="registerForm" novalidate>
             <div class="form-group">
                 <label asp-for="Surname" class="form-label">Фамилия</label>
                 <input asp-for="Surname" class="form-input" placeholder="Введите фамилию" />
@@ -31,7 +37,7 @@
 
             <div class="form-group">
                 <label asp-for="Email" class="form-label">Email</label>
-                <input asp-for="Email" type="email" class="form-input" placeholder="Введите email" />
+                <input asp-for="Email" type="email" class="form-input" placeholder="Введите email" autocomplete="username" />
                 <span asp-validation-for="Email" class="field-validation-error"></span>
             </div>
 
@@ -39,14 +45,15 @@
                 <label class="form-label" for="specialtySelect">Специальность</label>
 
                 <select id="specialtySelect" name="SpecialtyId" class="native-select-hidden">
-                    <option value="">-- выберите специальность --</option> 
+                    <option value="">-- выберите специальность --</option>
                 </select>
 
                 <div class="custom-select" data-target="specialtySelect">
                     <button type="button" class="custom-select-trigger">-- выберите специальность --</button>
                     <div class="custom-select-menu"></div>
-                    <span asp-validation-for="SpecialtyId" class="field-validation-error"></span>
                 </div>
+
+                <span class="field-validation-error" id="specialtyError"></span>
             </div>
 
             <div class="form-group">
@@ -58,9 +65,10 @@
 
                 <div class="custom-select" data-target="groupSelect">
                     <button type="button" class="custom-select-trigger">-- выберите группу --</button>
-                    <span asp-validation-for="GroupId" class="field-validation-error"></span>
                     <div class="custom-select-menu"></div>
                 </div>
+
+                <span class="field-validation-error" id="groupError"></span>
             </div>
 
             <div class="form-group">
@@ -70,7 +78,7 @@
 
             <div class="form-group">
                 <label asp-for="Password" class="form-label">Пароль</label>
-                <input asp-for="Password" type="password" class="form-input" placeholder="Введите пароль" />
+                <input asp-for="Password" type="password" class="form-input" placeholder="Введите пароль" autocomplete="new-password" />
                 <span asp-validation-for="Password" class="field-validation-error"></span>
             </div>
 

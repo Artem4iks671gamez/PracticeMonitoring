@@ -1,5 +1,9 @@
 ﻿@model PracticeMonitoring.Web.Models.Auth.LoginViewModel
 
+@{
+    ViewData["Title"] = "Вход";
+}
+
 <div class="loginwrap">
     <div class="loginblock">
         <h1 class="login-title">Вход</h1>
@@ -10,16 +14,18 @@
             <div class="validation-error">@ViewBag.Error</div>
         }
 
-        <form asp-action="Login" method="post" class="auth-form">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <form asp-action="Login" method="post" class="auth-form" novalidate>
             <div class="form-group">
                 <label asp-for="Email" class="form-label">Email</label>
-                <input asp-for="Email" class="form-input" placeholder="Введите email" />
+                <input asp-for="Email" type="email" class="form-input" placeholder="Введите email" autocomplete="username" />
                 <span asp-validation-for="Email" class="field-validation-error"></span>
             </div>
 
             <div class="form-group">
                 <label asp-for="Password" class="form-label">Пароль</label>
-                <input asp-for="Password" type="password" class="form-input" placeholder="Введите пароль" />
+                <input asp-for="Password" type="password" class="form-input" placeholder="Введите пароль" autocomplete="current-password" />
                 <span asp-validation-for="Password" class="field-validation-error"></span>
             </div>
 
