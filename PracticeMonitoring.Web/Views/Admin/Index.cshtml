@@ -25,34 +25,38 @@
 
     <section class="admin-workspace">
         <aside class="admin-sidebar-card">
-            <div class="admin-sidebar-title">Навигация</div>
+            <div class="admin-sidebar-block">
+                <div class="admin-sidebar-title">Навигация</div>
 
-            <div class="admin-sidebar-nav">
-                <button type="button" class="admin-nav-button active" data-panel="accounts-panel">
-                    Аккаунты
-                </button>
+                <div class="admin-sidebar-nav">
+                    <button type="button" class="admin-nav-button active" data-panel="accounts-panel">
+                        Аккаунты
+                    </button>
 
-                <button type="button" class="admin-nav-button" data-panel="logs-panel">
-                    Журнал
-                </button>
+                    <button type="button" class="admin-nav-button" data-panel="logs-panel">
+                        Журнал
+                    </button>
+                </div>
             </div>
 
             <div class="admin-sidebar-divider"></div>
 
-            <div class="admin-sidebar-title">Действия</div>
+            <div class="admin-sidebar-block">
+                <div class="admin-sidebar-title">Быстрые действия</div>
 
-            <div class="admin-sidebar-actions">
-                <button type="button" class="admin-primary-button admin-action-button" data-create-role="Admin">
-                    Создать администратора
-                </button>
+                <div class="admin-sidebar-actions">
+                    <button type="button" class="admin-primary-button admin-action-button" data-create-role="Admin">
+                        Создать администратора
+                    </button>
 
-                <button type="button" class="admin-primary-button admin-action-button" data-create-role="Supervisor">
-                    Создать руководителя практики
-                </button>
+                    <button type="button" class="admin-primary-button admin-action-button" data-create-role="Supervisor">
+                        Создать руководителя практики
+                    </button>
 
-                <button type="button" class="admin-primary-button admin-action-button" data-create-role="DepartmentStaff">
-                    Создать работника отдела
-                </button>
+                    <button type="button" class="admin-primary-button admin-action-button" data-create-role="DepartmentStaff">
+                        Создать работника отдела
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -61,48 +65,85 @@
                 <div class="admin-panel-header">
                     <div>
                         <h2>Аккаунты пользователей</h2>
-                        <p>Поиск, фильтрация, сортировка и быстрый просмотр профилей.</p>
+                        <p>Компактный список с фильтрацией, поиском и сортировкой.</p>
                     </div>
                 </div>
 
-                <div class="accounts-toolbar-grid">
-                    <div class="accounts-search-wrap">
-                        <input type="text"
-                               id="accountsSearchInput"
-                               class="form-input accounts-search-input"
-                               placeholder="Поиск по ФИО, email, роли, группе, специальности..." />
+                <div class="accounts-toolbar">
+                    <div class="accounts-toolbar-row">
+                        <div class="accounts-search-wrap">
+                            <input type="text"
+                                   id="accountsSearchInput"
+                                   class="form-input accounts-search-input"
+                                   placeholder="Поиск по ФИО, email, группе или специальности..." />
+                        </div>
+
+                        <div class="accounts-sort-wrap">
+                            <select id="sortSelect" class="native-select-hidden">
+                                <option value="name-asc">ФИО А-Я</option>
+                                <option value="name-desc">ФИО Я-А</option>
+                                <option value="role-asc">Роль А-Я</option>
+                                <option value="status-desc">Активные выше</option>
+                            </select>
+
+                            <div class="custom-select custom-sort-select" data-target="sortSelect">
+                                <button type="button" class="custom-select-trigger">ФИО А-Я</button>
+                                <div class="custom-select-menu"></div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="accounts-filter-wrap">
-                        <select id="roleFilterSelect" class="form-input accounts-filter-select">
-                            <option value="all">Все роли</option>
-                            <option value="Admin">Администратор</option>
-                            <option value="Student">Студент</option>
-                            <option value="Supervisor">Руководитель практики</option>
-                            <option value="DepartmentStaff">Работник отдела</option>
-                        </select>
-                    </div>
+                    <div class="accounts-filters-panel">
+                        <div class="filter-section">
+                            <div class="filter-section-title">Роли</div>
+                            <div class="role-filter-list" id="roleFilterGroup">
+                                <label class="role-check">
+                                    <input type="checkbox" data-role-filter="Admin" checked />
+                                    <span class="role-check-indicator"></span>
+                                    <span class="role-check-text">Администратор</span>
+                                </label>
 
-                    <div class="accounts-filter-wrap">
-                        <select id="statusFilterSelect" class="form-input accounts-filter-select">
-                            <option value="all">Любой статус</option>
-                            <option value="active">Только активные</option>
-                            <option value="inactive">Только неактивные</option>
-                        </select>
-                    </div>
+                                <label class="role-check">
+                                    <input type="checkbox" data-role-filter="Student" checked />
+                                    <span class="role-check-indicator"></span>
+                                    <span class="role-check-text">Студент</span>
+                                </label>
 
-                    <div class="accounts-filter-wrap">
-                        <select id="sortSelect" class="form-input accounts-filter-select">
-                            <option value="name-asc">Сортировка: ФИО А-Я</option>
-                            <option value="name-desc">Сортировка: ФИО Я-А</option>
-                            <option value="role-asc">Сортировка: роль А-Я</option>
-                            <option value="status-desc">Сортировка: активные выше</option>
-                        </select>
+                                <label class="role-check">
+                                    <input type="checkbox" data-role-filter="Supervisor" checked />
+                                    <span class="role-check-indicator"></span>
+                                    <span class="role-check-text">Руководитель практики</span>
+                                </label>
+
+                                <label class="role-check">
+                                    <input type="checkbox" data-role-filter="DepartmentStaff" checked />
+                                    <span class="role-check-indicator"></span>
+                                    <span class="role-check-text">Работник отдела</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="filter-section">
+                            <div class="filter-section-title">Статус</div>
+                            <div class="status-toggle-group" id="statusFilterGroup">
+                                <label class="switch-filter">
+                                    <input type="checkbox" data-status-filter="active" checked />
+                                    <span class="switch-slider"></span>
+                                    <span class="switch-label">Активные</span>
+                                </label>
+
+                                <label class="switch-filter">
+                                    <input type="checkbox" data-status-filter="inactive" checked />
+                                    <span class="switch-slider"></span>
+                                    <span class="switch-label">Неактивные</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="accounts-summary-bar">
-                    <span id="accountsCountLabel">Всего аккаунтов: @Model.Users.Count</span>
+                    <span id="accountsCountLabel">Показано аккаунтов: @Model.Users.Count</span>
                 </div>
 
                 <div class="accounts-scroll-list" id="accountsList">
@@ -131,50 +172,51 @@
                                  data-specialty-id="@user.SpecialtyId"
                                  data-specialty-code="@user.SpecialtyCode"
                                  data-specialty-name="@user.SpecialtyName">
-                            <div class="account-card-top">
-                                <div class="account-card-avatar">
-                                    @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
-                                    {
-                                        <img src="@user.AvatarUrl" alt="Аватар пользователя" />
-                                    }
-                                    else
-                                    {
-                                        <span>@avatarInitials</span>
-                                    }
-                                </div>
-
-                                <div class="account-card-headline">
-                                    <div class="account-card-title-row">
-                                        <h3 class="account-card-name">@user.FullName</h3>
-                                        <span class="account-role-chip">@user.Role</span>
-                                    </div>
-
-                                    <div class="account-card-email">@user.Email</div>
-                                </div>
-
-                                <div class="account-card-status-area">
-                                    <span class="account-status @(user.IsActive ? "account-status-active" : "account-status-inactive")">
-                                        @(user.IsActive ? "Активен" : "Неактивен")
-                                    </span>
-                                </div>
+                            <div class="account-card-avatar">
+                                @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                                {
+                                    <img src="@user.AvatarUrl" alt="Аватар пользователя" />
+                                }
+                                else
+                                {
+                                    <span>@avatarInitials</span>
+                                }
                             </div>
 
-                            <div class="account-card-divider"></div>
+                            <div class="account-card-main">
+                                <div class="account-card-topline">
+                                    <div class="account-card-name-block">
+                                        <h3 class="account-card-name">@user.FullName</h3>
+                                        <div class="account-card-email">@user.Email</div>
+                                    </div>
 
-                            <div class="account-card-details">
-                                <div class="account-detail-pill">
-                                    <span class="account-detail-label">Специальность</span>
-                                    <span class="account-detail-value">@specialtyText</span>
+                                    <div class="account-card-badges">
+                                        <span class="account-role-chip">@user.Role</span>
+                                        <span class="account-status @(user.IsActive ? "account-status-active" : "account-status-inactive")">
+                                            @(user.IsActive ? "Активен" : "Неактивен")
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div class="account-detail-pill">
-                                    <span class="account-detail-label">Группа</span>
-                                    <span class="account-detail-value">@(user.GroupName ?? "—")</span>
-                                </div>
+                                <div class="account-card-meta-row">
+                                    <div class="account-inline-info">
+                                        <span class="account-inline-label">Специальность:</span>
+                                        <span class="account-inline-value">@specialtyText</span>
+                                    </div>
 
-                                <div class="account-detail-pill">
-                                    <span class="account-detail-label">Курс</span>
-                                    <span class="account-detail-value">@(user.Course?.ToString() ?? "—")</span>
+                                    <div class="account-inline-separator"></div>
+
+                                    <div class="account-inline-info">
+                                        <span class="account-inline-label">Группа:</span>
+                                        <span class="account-inline-value">@(user.GroupName ?? "—")</span>
+                                    </div>
+
+                                    <div class="account-inline-separator"></div>
+
+                                    <div class="account-inline-info">
+                                        <span class="account-inline-label">Курс:</span>
+                                        <span class="account-inline-value">@(user.Course?.ToString() ?? "—")</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -192,7 +234,7 @@
                 <div class="admin-panel-header">
                     <div>
                         <h2>Журнал системы</h2>
-                        <p>Выберите тип событий для просмотра.</p>
+                        <p>Выберите нужный тип логов.</p>
                     </div>
                 </div>
 
