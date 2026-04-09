@@ -1,8 +1,94 @@
-﻿<h2>Страница администратора</h2>
+﻿@model PracticeMonitoring.Web.Models.Admin.AdminLogsPageViewModel
 
-<p><strong>ФИО:</strong> @ViewBag.FullName</p>
-<p><strong>Роль:</strong> @ViewBag.Role</p>
+@{
+    ViewData["Title"] = "Админ-панель";
+}
 
-<form asp-controller="Account" asp-action="Logout" method="post">
-    <button type="submit">Выйти</button>
-</form>
+<div class="admin-shell">
+    <section class="admin-header-card">
+        <div>
+            <div class="admin-badge">Панель администратора</div>
+            <h1 class="admin-title">Журнал системы</h1>
+            <p class="admin-subtitle">Администратор: @Model.AdminFullName</p>
+        </div>
+
+        <form asp-controller="Account" asp-action="Logout" method="post">
+            <button type="submit" class="admin-danger-button">Выйти</button>
+        </form>
+    </section>
+
+    <section class="admin-tabs-card">
+        <div class="admin-tabs">
+            <button type="button" class="admin-tab-button active" data-tab="registered-users-tab">
+                Зарегистрированные пользователи
+            </button>
+            <button type="button" class="admin-tab-button" data-tab="admin-actions-tab">
+                Изменения администраторами
+            </button>
+            <button type="button" class="admin-tab-button" data-tab="user-profile-changes-tab">
+                Изменения данных пользователями
+            </button>
+        </div>
+
+        <div class="admin-console-wrapper">
+            <div class="admin-console active" id="registered-users-tab">
+                @if (Model.RegisteredUsersLogs.Count == 0)
+                {
+                    <div class="admin-console-empty">Пока нет записей.</div>
+                }
+                else
+                {
+                    @foreach (var log in Model.RegisteredUsersLogs)
+                    {
+                        <div class="admin-console-line">
+                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                            <span class="admin-console-text">@log.Description</span>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="admin-console" id="admin-actions-tab">
+                @if (Model.AdminActionsLogs.Count == 0)
+                {
+                    <div class="admin-console-empty">Пока нет записей.</div>
+                }
+                else
+                {
+                    @foreach (var log in Model.AdminActionsLogs)
+                    {
+                        <div class="admin-console-line">
+                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                            <span class="admin-console-text">
+                                <strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="admin-console" id="user-profile-changes-tab">
+                @if (Model.UserProfileChangesLogs.Count == 0)
+                {
+                    <div class="admin-console-empty">Пока нет записей.</div>
+                }
+                else
+                {
+                    @foreach (var log in Model.UserProfileChangesLogs)
+                    {
+                        <div class="admin-console-line">
+                            <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                            <span class="admin-console-text">
+                                <strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin.js"></script>
+}

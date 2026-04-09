@@ -16,15 +16,18 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _context;
     private readonly PasswordService _passwordService;
     private readonly JwtService _jwtService;
+    private readonly AuditLogService _auditLogService;
 
     public AuthController(
         AppDbContext context,
         PasswordService passwordService,
-        JwtService jwtService)
+        JwtService jwtService,
+        AuditLogService auditLogService)
     {
         _context = context;
         _passwordService = passwordService;
         _jwtService = jwtService;
+        _auditLogService = auditLogService;
     }
 
     [HttpPost("register")]
@@ -71,6 +74,8 @@ public class AuthController : ControllerBase
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogRegisteredUserAsync(user);
 
         var token = _jwtService.GenerateToken(user);
 

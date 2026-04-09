@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Specialty> Specialties => Set<Specialty>();
     public DbSet<Group> Groups => Set<Group>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,6 +81,22 @@ public class AppDbContext : DbContext
                 .WithMany(x => x.Users)
                 .HasForeignKey(x => x.GroupId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Category).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Action).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Description).IsRequired().HasMaxLength(1000);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.ActorFullName).HasMaxLength(200);
+            entity.Property(x => x.TargetUserFullName).HasMaxLength(200);
+
+            entity.HasIndex(x => x.Category);
+            entity.HasIndex(x => x.CreatedAtUtc);
         });
     }
 }

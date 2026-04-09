@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PracticeMonitoring.Api.Data;
 using PracticeMonitoring.Api.Dtos;
+using PracticeMonitoring.Api.Services;
 
 namespace PracticeMonitoring.Api.Controllers;
 
@@ -13,10 +14,12 @@ namespace PracticeMonitoring.Api.Controllers;
 public class ProfileController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly AuditLogService _auditLogService;
 
-    public ProfileController(AppDbContext context)
+    public ProfileController(AppDbContext context, AuditLogService auditLogService)
     {
         _context = context;
+        _auditLogService = auditLogService;
     }
 
     [HttpPut("me")]
@@ -40,9 +43,24 @@ public class ProfileController : ControllerBase
         if (emailInUse)
             return BadRequest(new { message = "Этот email уже используется другим пользователем." });
 
+        var changedFields = new List<string>();
+
+        if (user.Surname != request.Surname.Trim())
+            changedFields.Add("Фамилия");
+
+        if (user.FirstName != request.FirstName.Trim())
+            changedFields.Add("Имя");
+
+        var newPatronymic = string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim();
+        if (user.Patronymic != newPatronymic)
+            changedFields.Add("Отчество");
+
+        if (user.Email != normalizedEmail)
+            changedFields.Add("Email");
+
         user.Surname = request.Surname.Trim();
         user.FirstName = request.FirstName.Trim();
-        user.Patronymic = string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim();
+        user.Patronymic = newPatronymic;
         user.Email = normalizedEmail;
         user.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
         user.Theme = request.Theme.Trim().ToLower();
@@ -51,6 +69,16 @@ public class ProfileController : ControllerBase
             : $"{user.Surname} {user.FirstName} {user.Patronymic}";
 
         await _context.SaveChangesAsync();
+
+        if (changedFields.Count > 0)
+        {
+            await _auditLogService.LogUserProfileChangeAsync(
+                actorUserId: user.Id,
+                actorFullName: user.FullName,
+                targetUserId: user.Id,
+                targetUserFullName: user.FullName,
+                changedFields: changedFields);
+        }
 
         return Ok(new CurrentUserResponse
         {
