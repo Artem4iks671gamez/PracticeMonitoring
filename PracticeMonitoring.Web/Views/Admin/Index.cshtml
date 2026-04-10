@@ -169,6 +169,14 @@
                         ? "Специальность не указана"
                         : $"{user.SpecialtyCode} {user.SpecialtyName}".Trim();
 
+                        var roleDescription = user.Role switch
+                        {
+                            "Supervisor" => "Руководитель практики от техникума",
+                            "DepartmentStaff" => "Работник отдела производственного обучения",
+                            "Admin" => "Администратор системы",
+                            _ => string.Empty
+                        };
+
                         <article class="account-card"
                                  data-user-id="@user.Id"
                                  data-full-name="@user.FullName"
@@ -209,24 +217,34 @@
                                 </div>
 
                                 <div class="account-card-meta-row">
-                                    <div class="account-inline-info">
-                                        <span class="account-inline-label">Специальность:</span>
-                                        <span class="account-inline-value">@specialtyText</span>
-                                    </div>
+                                    @if (user.Role == "Student")
+                                    {
+                                        <div class="account-inline-info">
+                                            <span class="account-inline-label">Специальность:</span>
+                                            <span class="account-inline-value">@specialtyText</span>
+                                        </div>
 
-                                    <div class="account-inline-separator"></div>
+                                        <div class="account-inline-separator"></div>
 
-                                    <div class="account-inline-info">
-                                        <span class="account-inline-label">Группа:</span>
-                                        <span class="account-inline-value">@(user.GroupName ?? "—")</span>
-                                    </div>
+                                        <div class="account-inline-info">
+                                            <span class="account-inline-label">Группа:</span>
+                                            <span class="account-inline-value">@(user.GroupName ?? "—")</span>
+                                        </div>
 
-                                    <div class="account-inline-separator"></div>
+                                        <div class="account-inline-separator"></div>
 
-                                    <div class="account-inline-info">
-                                        <span class="account-inline-label">Курс:</span>
-                                        <span class="account-inline-value">@(user.Course?.ToString() ?? "—")</span>
-                                    </div>
+                                        <div class="account-inline-info">
+                                            <span class="account-inline-label">Курс:</span>
+                                            <span class="account-inline-value">@(user.Course?.ToString() ?? "—")</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="account-inline-info">
+                                            <span class="account-inline-label">Статус:</span>
+                                            <span class="account-inline-value">@roleDescription</span>
+                                        </div>
+                                    }
                                 </div>
                             </div>
 
