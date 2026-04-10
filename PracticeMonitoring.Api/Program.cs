@@ -17,6 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<DatabaseBackupService>();
 
 builder.Services.AddCors(options =>
 {

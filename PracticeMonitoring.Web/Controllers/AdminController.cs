@@ -115,4 +115,75 @@ public class AdminController : Controller
 
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadLogs(string category)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction("Login", "Account");
+
+        var file = await _adminApiService.DownloadLogsAsync(token, category);
+        if (file is null)
+        {
+            TempData["AdminError"] = "Не удалось выгрузить лог.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BackupDatabase()
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction("Login", "Account");
+
+        var file = await _adminApiService.BackupDatabaseAsync(token);
+        if (file is null)
+        {
+            TempData["AdminError"] = "Не удалось создать резервную копию базы данных.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreDatabase(IFormFile backupFile)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction("Login", "Account");
+
+        if (backupFile is null || backupFile.Length == 0)
+        {
+            TempData["AdminError"] = "Выберите файл резервной копии.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await _adminApiService.RestoreDatabaseAsync(token, backupFile);
+
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] =
+            result.Success
+                ? "База данных успешно восстановлена."
+                : (result.ErrorMessage ?? "Не удалось восстановить базу данных.");
+
+        return RedirectToAction(nameof(Index));
+    }
 }

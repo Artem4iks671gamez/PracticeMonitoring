@@ -68,6 +68,35 @@
                     </button>
                 </div>
             </div>
+
+            <div class="admin-sidebar-divider"></div>
+
+            <div class="admin-sidebar-block">
+                <div class="admin-sidebar-title">Резервная копия базы</div>
+
+                <div class="admin-sidebar-actions">
+                    <form asp-controller="Admin" asp-action="BackupDatabase" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="admin-primary-button admin-full-button">
+                            Сохранить копию БД
+                        </button>
+                    </form>
+
+                    <form asp-controller="Admin" asp-action="RestoreDatabase" method="post" enctype="multipart/form-data" onsubmit="return confirm('Вы уверены? Текущие данные базы могут быть перезаписаны.');">
+                        @Html.AntiForgeryToken()
+
+                        <div class="file-upload-control file-upload-control-column" style="margin-bottom: 13px">
+                            <input type="file" id="restoreBackupFile" name="backupFile" accept=".dump" class="file-upload-input" />
+                            <label for="restoreBackupFile" class="file-upload-button">Выбрать backup-файл</label>
+                            <span class="file-upload-name" id="restoreBackupFileName">Файл не выбран</span>
+                        </div>
+
+                        <button type="submit" class="admin-danger-button admin-full-button">
+                            Загрузить БД
+                        </button>
+                    </form>
+                </div>
+            </div>
         </aside>
 
         <section class="admin-main-card">
@@ -280,54 +309,78 @@
 
                 <div class="admin-console-wrapper">
                     <div class="admin-console active" id="registered-users-tab">
-                        @if (Model.RegisteredUsersLogs.Count == 0)
-                        {
-                            <div class="admin-console-empty">Пока нет записей.</div>
-                        }
-                        else
-                        {
-                            @foreach (var log in Model.RegisteredUsersLogs)
+                        <div class="admin-console-body">
+                            @if (Model.RegisteredUsersLogs.Count == 0)
                             {
-                                <div class="admin-console-line">
-                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                                    <span class="admin-console-text">@log.Description</span>
-                                </div>
+                                <div class="admin-console-empty">Пока нет записей.</div>
                             }
-                        }
+                            else
+                            {
+                                @foreach (var log in Model.RegisteredUsersLogs)
+                                {
+                                    <div class="admin-console-line">
+                                        <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                        <span class="admin-console-text">@log.Description</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="admin-console-footer">
+                            <a asp-controller="Admin" asp-action="DownloadLogs" asp-route-category="registered-users" class="admin-console-download-button">
+                                Выгрузить .txt
+                            </a>
+                        </div>
                     </div>
 
                     <div class="admin-console" id="admin-actions-tab">
-                        @if (Model.AdminActionsLogs.Count == 0)
-                        {
-                            <div class="admin-console-empty">Пока нет записей.</div>
-                        }
-                        else
-                        {
-                            @foreach (var log in Model.AdminActionsLogs)
+                        <div class="admin-console-body">
+                            @if (Model.AdminActionsLogs.Count == 0)
                             {
-                                <div class="admin-console-line">
-                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                                    <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description</span>
-                                </div>
+                                <div class="admin-console-empty">Пока нет записей.</div>
                             }
-                        }
+                            else
+                            {
+                                @foreach (var log in Model.AdminActionsLogs)
+                                {
+                                    <div class="admin-console-line">
+                                        <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                        <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Администратор")</strong>: @log.Description</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="admin-console-footer">
+                            <a asp-controller="Admin" asp-action="DownloadLogs" asp-route-category="admin-actions" class="admin-console-download-button">
+                                Выгрузить .txt
+                            </a>
+                        </div>
                     </div>
 
                     <div class="admin-console" id="user-profile-changes-tab">
-                        @if (Model.UserProfileChangesLogs.Count == 0)
-                        {
-                            <div class="admin-console-empty">Пока нет записей.</div>
-                        }
-                        else
-                        {
-                            @foreach (var log in Model.UserProfileChangesLogs)
+                        <div class="admin-console-body">
+                            @if (Model.UserProfileChangesLogs.Count == 0)
                             {
-                                <div class="admin-console-line">
-                                    <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
-                                    <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description</span>
-                                </div>
+                                <div class="admin-console-empty">Пока нет записей.</div>
                             }
-                        }
+                            else
+                            {
+                                @foreach (var log in Model.UserProfileChangesLogs)
+                                {
+                                    <div class="admin-console-line">
+                                        <span class="admin-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                        <span class="admin-console-text"><strong>@(log.ActorFullName ?? "Пользователь")</strong>: @log.Description</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="admin-console-footer">
+                            <a asp-controller="Admin" asp-action="DownloadLogs" asp-route-category="user-profile-changes" class="admin-console-download-button">
+                                Выгрузить .txt
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

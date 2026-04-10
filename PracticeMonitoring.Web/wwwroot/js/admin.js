@@ -537,4 +537,14 @@
     initCustomSelect('modalGroupSelect');
 
     applyAccountsFilters();
+
+});
+const restoreBackupFile = document.getElementById('restoreBackupFile');
+const restoreBackupFileName = document.getElementById('restoreBackupFileName');
+
+restoreBackupFile?.addEventListener('change', function () {
+    const file = restoreBackupFile.files && restoreBackupFile.files[0];
+    if (restoreBackupFileName) {
+        restoreBackupFileName.textContent = file ? file.name : 'Файл не выбран';
+    }
 });

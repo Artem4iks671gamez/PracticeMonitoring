@@ -61,6 +61,82 @@ public class AdminApiService
         return await SendUserRequestAsync(HttpMethod.Post, "api/admin/users/create-department-staff", token, requestModel);
     }
 
+    public async Task<AdminFileResult?> DownloadLogsAsync(string token, string category)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/admin/maintenance/logs/export/{category}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsByteArrayAsync();
+        var fileName = ExtractFileName(response.Content.Headers.ContentDisposition?.FileNameStar)
+                       ?? ExtractFileName(response.Content.Headers.ContentDisposition?.FileName)
+                       ?? "logs.txt";
+
+        return new AdminFileResult
+        {
+            Content = content,
+            ContentType = response.Content.Headers.ContentType?.ToString() ?? "text/plain; charset=utf-8",
+            FileName = fileName
+        };
+    }
+
+    public async Task<AdminFileResult?> BackupDatabaseAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/admin/maintenance/database/backup");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsByteArrayAsync();
+        var fileName = ExtractFileName(response.Content.Headers.ContentDisposition?.FileNameStar)
+                       ?? ExtractFileName(response.Content.Headers.ContentDisposition?.FileName)
+                       ?? "backup.dump";
+
+        return new AdminFileResult
+        {
+            Content = content,
+            ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream",
+            FileName = fileName
+        };
+    }
+
+    public async Task<AdminApiResult<object>> RestoreDatabaseAsync(string token, IFormFile backupFile)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/admin/maintenance/database/restore");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var formData = new MultipartFormDataContent();
+        await using var stream = backupFile.OpenReadStream();
+        using var streamContent = new StreamContent(stream);
+        formData.Add(streamContent, "backupFile", backupFile.FileName);
+
+        request.Content = formData;
+
+        var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
+
+        if (response.IsSuccessStatusCode)
+        {
+            return new AdminApiResult<object>
+            {
+                Success = true,
+                StatusCode = (int)response.StatusCode
+            };
+        }
+
+        return new AdminApiResult<object>
+        {
+            Success = false,
+            StatusCode = (int)response.StatusCode,
+            ErrorMessage = ExtractError(json) ?? "Не удалось восстановить базу данных."
+        };
+    }
+
     private async Task<AdminApiResult<AdminUserItemViewModel>> SendUserRequestAsync(HttpMethod method, string url, string token, object requestModel)
     {
         using var request = new HttpRequestMessage(method, url);
@@ -121,5 +197,13 @@ public class AdminApiService
         }
 
         return null;
+    }
+
+    private string? ExtractFileName(string? rawFileName)
+    {
+        if (string.IsNullOrWhiteSpace(rawFileName))
+            return null;
+
+        return rawFileName.Trim('"');
     }
 }
