@@ -1,4 +1,4 @@
-﻿@model PracticeMonitoring.Web.Models.Admin.AdminLogsPageViewModel
+﻿@model PracticeMonitoring.Web.Models.Admin.AdminUsersPageViewModel
 
 @{
     ViewData["Title"] = "Админ-панель";
@@ -22,6 +22,16 @@
             </form>
         </div>
     </section>
+
+    @if (TempData["AdminSuccess"] is string successMessage)
+    {
+        <div class="student-alert student-alert-success">@successMessage</div>
+    }
+
+    @if (TempData["AdminError"] is string errorMessage)
+    {
+        <div class="student-alert student-alert-error">@errorMessage</div>
+    }
 
     <section class="admin-workspace">
         <aside class="admin-sidebar-card">
@@ -305,6 +315,137 @@
             </div>
         </section>
     </section>
+</div>
+
+<div class="admin-modal-backdrop" id="userModalBackdrop">
+    <div class="admin-modal">
+        <div class="admin-modal-header">
+            <div>
+                <h2 id="userModalTitle">Редактирование пользователя</h2>
+                <p id="userModalSubtitle">Изменение данных пользователя</p>
+            </div>
+            <button type="button" class="admin-modal-close" id="closeUserModalButton">×</button>
+        </div>
+
+        <form asp-controller="Admin" asp-action="SaveUser" method="post" enctype="multipart/form-data" id="adminUserForm" class="admin-user-form">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="Id" id="modalUserId" />
+            <input type="hidden" name="IsCreateMode" id="modalIsCreateMode" value="false" />
+            <input type="hidden" name="CurrentAvatarUrl" id="modalCurrentAvatarUrl" />
+            <input type="hidden" name="RemoveAvatar" id="modalRemoveAvatar" value="false" />
+            <input type="hidden" name="IsActive" id="modalIsActive" value="true" />
+
+            <div class="admin-form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="modalSurname">Фамилия</label>
+                    <input class="form-input" type="text" id="modalSurname" name="Surname" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="modalFirstName">Имя</label>
+                    <input class="form-input" type="text" id="modalFirstName" name="FirstName" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="modalPatronymic">Отчество</label>
+                    <input class="form-input" type="text" id="modalPatronymic" name="Patronymic" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="modalEmail">Email</label>
+                    <input class="form-input" type="email" id="modalEmail" name="Email" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="modalRoleSelect">Роль</label>
+
+                    <select id="modalRoleSelect" name="Role" class="native-select-hidden">
+                        <option value="Student">Student</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Supervisor">Supervisor</option>
+                        <option value="DepartmentStaff">DepartmentStaff</option>
+                    </select>
+
+                    <div class="custom-select" data-target="modalRoleSelect">
+                        <button type="button" class="custom-select-trigger">Student</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="modalPasswordGroup">
+                    <label class="form-label" for="modalPassword">Пароль</label>
+                    <input class="form-input" type="password" id="modalPassword" name="Password" />
+                </div>
+
+                <div class="form-group" id="modalSpecialtyGroup">
+                    <label class="form-label" for="modalSpecialtySelect">Специальность</label>
+
+                    <select id="modalSpecialtySelect" class="native-select-hidden">
+                        <option value="">-- выберите специальность --</option>
+                    </select>
+
+                    <div class="custom-select" data-target="modalSpecialtySelect">
+                        <button type="button" class="custom-select-trigger">-- выберите специальность --</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="modalGroupWrapper">
+                    <label class="form-label" for="modalGroupSelect">Группа</label>
+
+                    <select id="modalGroupSelect" name="GroupId" class="native-select-hidden">
+                        <option value="">-- выберите группу --</option>
+                    </select>
+
+                    <div class="custom-select" data-target="modalGroupSelect">
+                        <button type="button" class="custom-select-trigger">-- выберите группу --</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="modalCourseGroup">
+                    <label class="form-label" for="modalCourseDisplay">Курс</label>
+                    <input class="form-input" type="text" id="modalCourseDisplay" readonly />
+                </div>
+
+                <div class="form-group admin-form-full">
+                    <label class="form-label" for="modalAvatarFile">Аватар</label>
+
+                    <div class="file-upload-control">
+                        <input type="file" id="modalAvatarFile" name="AvatarFile" accept="image/*" class="file-upload-input" />
+                        <label for="modalAvatarFile" class="file-upload-button">Выбрать файл</label>
+                        <span class="file-upload-name" id="modalAvatarFileName">Файл не выбран</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-user-preview-row">
+                <div class="admin-user-avatar-preview" id="modalAvatarPreview">AA</div>
+
+                <div class="admin-user-preview-actions">
+                    <label class="switch-filter">
+                        <input type="checkbox" id="modalActiveSwitch" checked />
+                        <span class="switch-slider"></span>
+                        <span class="switch-label">Аккаунт активен</span>
+                    </label>
+
+                    <button type="button" class="admin-ghost-button" id="removeAvatarButton">
+                        Удалить аватар
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-modal-actions">
+                <button type="button" class="admin-ghost-button" id="cancelUserModalButton">
+                    Отмена
+                </button>
+                <button type="submit" class="admin-primary-button">
+                    Сохранить
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 @section Scripts {

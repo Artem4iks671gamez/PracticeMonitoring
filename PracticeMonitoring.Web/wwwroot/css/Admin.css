@@ -7,7 +7,8 @@
 
 .admin-hero-card,
 .admin-sidebar-card,
-.admin-main-card {
+.admin-main-card,
+.admin-modal {
     background: var(--card-bg);
     border-radius: 24px;
     border: 1px solid rgba(78, 95, 198, 0.10);
@@ -576,7 +577,6 @@
     color: #e5e7eb;
 }
 
-/* custom select */
 .native-select-hidden {
     position: absolute;
     opacity: 0;
@@ -679,6 +679,158 @@
         font-weight: 600;
     }
 
+.admin-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1500;
+}
+
+    .admin-modal-backdrop.open {
+        display: flex;
+    }
+
+.admin-modal {
+    width: 100%;
+    max-width: 920px;
+    padding: 26px;
+}
+
+.admin-modal-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+    .admin-modal-header h2 {
+        font-size: 28px;
+        color: var(--text-color);
+        margin-bottom: 6px;
+    }
+
+    .admin-modal-header p {
+        color: var(--muted-text);
+    }
+
+.admin-modal-close {
+    border: none;
+    background: var(--input-bg);
+    color: var(--text-color);
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.admin-user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+}
+
+.admin-form-full {
+    grid-column: 1 / -1;
+}
+
+.file-upload-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 8px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    flex-wrap: wrap;
+}
+
+.file-upload-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+.file-upload-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--main-color), var(--main-color-dark));
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.file-upload-name {
+    color: var(--muted-text);
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.admin-user-preview-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--input-bg);
+    border: 1px solid rgba(78, 95, 198, 0.08);
+}
+
+.admin-user-avatar-preview {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--main-color), var(--main-color-dark));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18px;
+}
+
+    .admin-user-avatar-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+.admin-user-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.admin-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 @media (max-width: 1250px) {
     .admin-workspace {
         grid-template-columns: 1fr;
@@ -706,6 +858,10 @@
     .account-card-actions {
         grid-column: 1 / -1;
         justify-content: flex-start;
+    }
+
+    .admin-form-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -739,5 +895,19 @@
 
     .admin-console-date {
         flex: none;
+    }
+
+    .admin-user-preview-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-modal {
+        padding: 20px;
+    }
+
+    .file-upload-control {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

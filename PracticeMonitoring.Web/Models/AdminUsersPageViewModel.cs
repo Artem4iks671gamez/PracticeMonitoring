@@ -1,4 +1,6 @@
-﻿namespace PracticeMonitoring.Web.Models.Admin;
+﻿using System.Collections.Generic;
+
+namespace PracticeMonitoring.Web.Models.Admin;
 
 public class AdminUsersPageViewModel
 {

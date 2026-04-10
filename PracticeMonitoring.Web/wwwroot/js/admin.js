@@ -82,7 +82,7 @@
         }
     }
 
-    function initCustomSelect(selectId) {
+    function initCustomSelect(selectId, onChange) {
         const nativeSelect = document.getElementById(selectId);
         const custom = document.querySelector(`.custom-select[data-target="${selectId}"]`);
 
@@ -101,6 +101,7 @@
 
         nativeSelect.addEventListener('change', () => {
             buildCustomSelect(selectId);
+            if (onChange) onChange(nativeSelect.value);
             applyAccountsFilters();
         });
 
@@ -237,4 +238,303 @@
         document.documentElement.setAttribute('data-theme', nextTheme);
         localStorage.setItem(storageKey, nextTheme);
     });
-});Ц
+
+    const userModalBackdrop = document.getElementById('userModalBackdrop');
+    const closeUserModalButton = document.getElementById('closeUserModalButton');
+    const cancelUserModalButton = document.getElementById('cancelUserModalButton');
+
+    const userModalTitle = document.getElementById('userModalTitle');
+    const userModalSubtitle = document.getElementById('userModalSubtitle');
+
+    const modalUserId = document.getElementById('modalUserId');
+    const modalIsCreateMode = document.getElementById('modalIsCreateMode');
+    const modalCurrentAvatarUrl = document.getElementById('modalCurrentAvatarUrl');
+    const modalRemoveAvatar = document.getElementById('modalRemoveAvatar');
+    const modalIsActive = document.getElementById('modalIsActive');
+
+    const modalSurname = document.getElementById('modalSurname');
+    const modalFirstName = document.getElementById('modalFirstName');
+    const modalPatronymic = document.getElementById('modalPatronymic');
+    const modalEmail = document.getElementById('modalEmail');
+    const modalRoleSelect = document.getElementById('modalRoleSelect');
+    const modalPassword = document.getElementById('modalPassword');
+    const modalPasswordGroup = document.getElementById('modalPasswordGroup');
+
+    const modalSpecialtySelect = document.getElementById('modalSpecialtySelect');
+    const modalGroupSelect = document.getElementById('modalGroupSelect');
+    const modalCourseDisplay = document.getElementById('modalCourseDisplay');
+
+    const modalSpecialtyGroup = document.getElementById('modalSpecialtyGroup');
+    const modalGroupWrapper = document.getElementById('modalGroupWrapper');
+    const modalCourseGroup = document.getElementById('modalCourseGroup');
+
+    const modalAvatarFile = document.getElementById('modalAvatarFile');
+    const modalAvatarFileName = document.getElementById('modalAvatarFileName');
+    const modalAvatarPreview = document.getElementById('modalAvatarPreview');
+    const removeAvatarButton = document.getElementById('removeAvatarButton');
+    const modalActiveSwitch = document.getElementById('modalActiveSwitch');
+
+    let currentEditUser = null;
+
+    function openUserModal() {
+        userModalBackdrop?.classList.add('open');
+    }
+
+    function closeUserModal() {
+        userModalBackdrop?.classList.remove('open');
+    }
+
+    closeUserModalButton?.addEventListener('click', closeUserModal);
+    cancelUserModalButton?.addEventListener('click', closeUserModal);
+
+    userModalBackdrop?.addEventListener('click', function (e) {
+        if (e.target === userModalBackdrop) {
+            closeUserModal();
+        }
+    });
+
+    function getInitials(fullName) {
+        return (fullName || 'AA')
+            .split(' ')
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(x => x[0])
+            .join('')
+            .toUpperCase();
+    }
+
+    function setAvatarPreview(url, fullName) {
+        if (!modalAvatarPreview) return;
+
+        if (url) {
+            modalAvatarPreview.innerHTML = `<img src="${url}" alt="avatar">`;
+        } else {
+            modalAvatarPreview.textContent = getInitials(fullName);
+        }
+    }
+
+    function setSelectedFileName(file) {
+        if (!modalAvatarFileName) return;
+        modalAvatarFileName.textContent = file ? file.name : 'Файл не выбран';
+    }
+
+    function parseFullName(fullName) {
+        const parts = (fullName || '').trim().split(/\s+/);
+        return {
+            surname: parts[0] || '',
+            firstName: parts[1] || '',
+            patronymic: parts.slice(2).join(' ')
+        };
+    }
+
+    async function loadSpecialties(selectedSpecialtyId, selectedGroupId) {
+        try {
+            const response = await fetch(`${window.apiBaseUrl.replace(/\/$/, '')}/api/Helping/specialties`);
+            if (!response.ok) return;
+
+            const list = await response.json();
+            modalSpecialtySelect.innerHTML = '<option value="">-- выберите специальность --</option>';
+
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `${item.code} — ${item.name}`;
+                if (selectedSpecialtyId && Number(selectedSpecialtyId) === item.id) {
+                    opt.selected = true;
+                }
+                modalSpecialtySelect.appendChild(opt);
+            });
+
+            buildCustomSelect('modalSpecialtySelect');
+
+            if (selectedSpecialtyId) {
+                await loadGroups(selectedSpecialtyId, selectedGroupId);
+            } else {
+                modalGroupSelect.innerHTML = '<option value="">-- выберите группу --</option>';
+                buildCustomSelect('modalGroupSelect');
+                modalCourseDisplay.value = '';
+            }
+        } catch {
+        }
+    }
+
+    async function loadGroups(specialtyId, selectedGroupId) {
+        if (!specialtyId) {
+            modalGroupSelect.innerHTML = '<option value="">-- выберите группу --</option>';
+            buildCustomSelect('modalGroupSelect');
+            modalCourseDisplay.value = '';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${window.apiBaseUrl.replace(/\/$/, '')}/api/Helping/groups?specialtyId=${encodeURIComponent(specialtyId)}`);
+            if (!response.ok) return;
+
+            const list = await response.json();
+            modalGroupSelect.innerHTML = '<option value="">-- выберите группу --</option>';
+
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `${item.name} (курс ${item.course})`;
+                opt.dataset.course = item.course;
+
+                if (selectedGroupId && Number(selectedGroupId) === item.id) {
+                    opt.selected = true;
+                    modalCourseDisplay.value = item.course;
+                }
+
+                modalGroupSelect.appendChild(opt);
+            });
+
+            buildCustomSelect('modalGroupSelect');
+        } catch {
+        }
+    }
+
+    function syncRoleVisibility() {
+        const role = modalRoleSelect.value;
+        const isStudent = role === 'Student';
+
+        modalSpecialtyGroup.style.display = isStudent ? '' : 'none';
+        modalGroupWrapper.style.display = isStudent ? '' : 'none';
+        modalCourseGroup.style.display = isStudent ? '' : 'none';
+    }
+
+    modalRoleSelect?.addEventListener('change', syncRoleVisibility);
+
+    modalSpecialtySelect?.addEventListener('change', async function () {
+        await loadGroups(modalSpecialtySelect.value, null);
+    });
+
+    modalGroupSelect?.addEventListener('change', function () {
+        const selected = modalGroupSelect.options[modalGroupSelect.selectedIndex];
+        modalCourseDisplay.value = selected?.dataset.course || '';
+    });
+
+    modalAvatarFile?.addEventListener('change', function () {
+        const file = modalAvatarFile.files && modalAvatarFile.files[0];
+        setSelectedFileName(file || null);
+
+        if (!file) return;
+
+        modalRemoveAvatar.value = 'false';
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            if (modalAvatarPreview) {
+                modalAvatarPreview.innerHTML = `<img src="${e.target.result}" alt="avatar">`;
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    removeAvatarButton?.addEventListener('click', function () {
+        modalRemoveAvatar.value = 'true';
+        modalCurrentAvatarUrl.value = '';
+        modalAvatarFile.value = '';
+        setSelectedFileName(null);
+        setAvatarPreview('', `${modalSurname.value} ${modalFirstName.value}`);
+    });
+
+    modalActiveSwitch?.addEventListener('change', function () {
+        modalIsActive.value = modalActiveSwitch.checked ? 'true' : 'false';
+    });
+
+    document.querySelectorAll('.edit-account-button').forEach(button => {
+        button.addEventListener('click', async function () {
+            const card = button.closest('.account-card');
+            if (!card) return;
+
+            currentEditUser = card;
+
+            const full = parseFullName(card.dataset.fullName || '');
+
+            userModalTitle.textContent = 'Редактирование пользователя';
+            userModalSubtitle.textContent = 'Изменение данных выбранного аккаунта';
+
+            modalUserId.value = card.dataset.userId || '';
+            modalIsCreateMode.value = 'false';
+
+            modalSurname.value = full.surname;
+            modalFirstName.value = full.firstName;
+            modalPatronymic.value = full.patronymic;
+            modalEmail.value = card.dataset.email || '';
+            modalRoleSelect.value = card.dataset.role || 'Student';
+            modalPassword.value = '';
+            modalPasswordGroup.style.display = 'none';
+
+            modalCurrentAvatarUrl.value = card.dataset.avatarUrl || '';
+            modalRemoveAvatar.value = 'false';
+            modalAvatarFile.value = '';
+            setSelectedFileName(null);
+
+            modalActiveSwitch.checked = (card.dataset.active || 'false') === 'true';
+            modalIsActive.value = modalActiveSwitch.checked ? 'true' : 'false';
+
+            setAvatarPreview(card.dataset.avatarUrl || '', card.dataset.fullName || '');
+
+            buildCustomSelect('modalRoleSelect');
+            syncRoleVisibility();
+
+            await loadSpecialties(card.dataset.specialtyId || '', card.dataset.groupId || '');
+
+            openUserModal();
+        });
+    });
+
+    document.querySelectorAll('.admin-action-button').forEach(button => {
+        button.addEventListener('click', async function () {
+            const role = button.dataset.createRole || 'Admin';
+
+            currentEditUser = null;
+
+            userModalTitle.textContent = 'Создание пользователя';
+            userModalSubtitle.textContent = 'Создание нового аккаунта через админку';
+
+            modalUserId.value = '';
+            modalIsCreateMode.value = 'true';
+
+            modalSurname.value = '';
+            modalFirstName.value = '';
+            modalPatronymic.value = '';
+            modalEmail.value = '';
+            modalRoleSelect.value = role;
+            modalPassword.value = '';
+            modalPasswordGroup.style.display = '';
+
+            modalCurrentAvatarUrl.value = '';
+            modalRemoveAvatar.value = 'false';
+            modalAvatarFile.value = '';
+            setSelectedFileName(null);
+
+            modalActiveSwitch.checked = true;
+            modalIsActive.value = 'true';
+
+            setAvatarPreview('', 'НП');
+
+            buildCustomSelect('modalRoleSelect');
+            syncRoleVisibility();
+
+            modalSpecialtySelect.innerHTML = '<option value="">-- выберите специальность --</option>';
+            modalGroupSelect.innerHTML = '<option value="">-- выберите группу --</option>';
+            modalCourseDisplay.value = '';
+
+            buildCustomSelect('modalSpecialtySelect');
+            buildCustomSelect('modalGroupSelect');
+
+            if (role === 'Student') {
+                await loadSpecialties('', '');
+            }
+
+            openUserModal();
+        });
+    });
+
+    initCustomSelect('sortSelect');
+    initCustomSelect('modalRoleSelect', syncRoleVisibility);
+    initCustomSelect('modalSpecialtySelect');
+    initCustomSelect('modalGroupSelect');
+
+    applyAccountsFilters();
+});
