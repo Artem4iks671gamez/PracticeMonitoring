@@ -47,13 +47,7 @@ public class AccountController : Controller
         HttpContext.Session.SetString("FullName", result.Data.FullName);
         HttpContext.Session.SetString("Role", result.Data.Role);
 
-        if (result.Data.Role == "Admin")
-            return RedirectToAction("Index", "Admin");
-
-        if (result.Data.Role == "Student")
-            return RedirectToAction("Index", "Student");
-
-        return RedirectToAction("Profile");
+        return RedirectByRole(result.Data.Role);
     }
 
     [HttpGet]
@@ -89,13 +83,7 @@ public class AccountController : Controller
         HttpContext.Session.SetString("FullName", result.Data.FullName);
         HttpContext.Session.SetString("Role", result.Data.Role);
 
-        if (result.Data.Role == "Admin")
-            return RedirectToAction("Index", "Admin");
-
-        if (result.Data.Role == "Student")
-            return RedirectToAction("Index", "Student");
-
-        return RedirectToAction("Profile");
+        return RedirectByRole(result.Data.Role);
     }
 
     [HttpGet]
@@ -120,6 +108,18 @@ public class AccountController : Controller
     {
         HttpContext.Session.Clear();
         return RedirectToAction("Login");
+    }
+
+    private IActionResult RedirectByRole(string role)
+    {
+        return role switch
+        {
+            "Admin" => RedirectToAction("Index", "Admin"),
+            "Student" => RedirectToAction("Index", "Student"),
+            "DepartmentStaff" => RedirectToAction("Index", "DepartmentStaff"),
+            "Supervisor" => RedirectToAction("Index", "Supervisor"),
+            _ => RedirectToAction("Profile")
+        };
     }
 
     private void ApplyApiErrorsToModelState(Dictionary<string, string[]> validationErrors)

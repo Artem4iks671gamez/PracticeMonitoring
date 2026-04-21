@@ -1,0 +1,367 @@
+﻿@model PracticeMonitoring.Web.Models.DepartmentStaff.DepartmentStaffPageViewModel
+
+@{
+    ViewData["Title"] = "Работник отдела";
+}
+
+<div class="department-shell">
+    <section class="department-hero-card">
+        <div>
+            <div class="department-badge">Работник отдела по производственному обучению</div>
+            <h1 class="department-title">Производственные практики</h1>
+            <p class="department-subtitle">@Model.FullName</p>
+        </div>
+
+        <div class="department-hero-actions">
+            <button type="button" class="department-primary-button" id="openCreatePracticeButton">
+                Создать производственную практику
+            </button>
+
+            <form asp-controller="Account" asp-action="Logout" method="post">
+                <button type="submit" class="department-secondary-button">
+                    Выйти
+                </button>
+            </form>
+        </div>
+    </section>
+
+    @if (TempData["DepartmentStaffSuccess"] is string successMessage)
+    {
+        <div class="student-alert student-alert-success">@successMessage</div>
+    }
+
+    @if (TempData["DepartmentStaffError"] is string errorMessage)
+    {
+        <div class="student-alert student-alert-error">@errorMessage</div>
+    }
+
+    <section class="department-main-card">
+        <div class="department-panel-header">
+            <div>
+                <h2>Список практик</h2>
+                <p>Поиск, сортировка и фильтрация по ключевым свойствам.</p>
+            </div>
+        </div>
+
+        <div class="department-toolbar">
+            <div class="department-toolbar-row">
+                <div class="department-search-wrap">
+                    <input type="text"
+                           id="practiceSearchInput"
+                           class="form-input department-search-input"
+                           placeholder="Поиск по индексу ПП, названию, ПМ или специальности..." />
+                </div>
+
+                <div class="department-filter-wrap">
+                    <select id="practiceSortSelect" class="native-select-hidden">
+                        <option value="date-asc">Сначала ранние сроки</option>
+                        <option value="date-desc">Сначала поздние сроки</option>
+                        <option value="index-asc">Индекс ПП А-Я</option>
+                        <option value="hours-desc">Больше часов выше</option>
+                    </select>
+
+                    <div class="custom-select" data-target="practiceSortSelect">
+                        <button type="button" class="custom-select-trigger">Сначала ранние сроки</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="department-toolbar-row department-toolbar-row-secondary">
+                <div class="department-filter-wrap">
+                    <select id="specialtyFilterSelect" class="native-select-hidden">
+                        <option value="">Все специальности</option>
+                    </select>
+
+                    <div class="custom-select" data-target="specialtyFilterSelect">
+                        <button type="button" class="custom-select-trigger">Все специальности</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+
+                <div class="department-date-range">
+                    <input type="date" id="dateFromFilter" class="form-input" />
+                    <input type="date" id="dateToFilter" class="form-input" />
+                </div>
+            </div>
+        </div>
+
+        <div class="department-summary-bar">
+            <span id="practicesCountLabel">Показано практик: @Model.Practices.Count</span>
+        </div>
+
+        <div class="department-practices-list" id="practicesList">
+            @foreach (var practice in Model.Practices)
+            {
+                <article class="practice-card"
+                         data-id="@practice.Id"
+                         data-practice-index="@practice.PracticeIndex"
+                         data-name="@practice.Name"
+                         data-specialty-id="@practice.SpecialtyId"
+                         data-specialty-code="@practice.SpecialtyCode"
+                         data-specialty-name="@practice.SpecialtyName"
+                         data-hours="@practice.Hours"
+                         data-start-date="@practice.StartDate.ToString("yyyy-MM-dd")"
+                         data-end-date="@practice.EndDate.ToString("yyyy-MM-dd")"
+                         data-students-count="@practice.AssignedStudentsCount">
+                    <div class="practice-card-main">
+                        <div class="practice-card-top">
+                            <div class="practice-card-title-block">
+                                <div class="practice-index-chip">@practice.PracticeIndex</div>
+                                <h3 class="practice-card-name">@practice.Name</h3>
+                            </div>
+
+                            <div class="practice-card-side">
+                                <span class="practice-side-meta">@practice.Hours ч.</span>
+                                <span class="practice-side-meta">@practice.StartDate.ToString("dd.MM.yyyy") - @practice.EndDate.ToString("dd.MM.yyyy")</span>
+                            </div>
+                        </div>
+
+                        <div class="practice-card-meta-row">
+                            <div class="practice-meta-item">
+                                <span class="practice-meta-label">Специальность</span>
+                                <span class="practice-meta-value">@practice.SpecialtyCode @practice.SpecialtyName</span>
+                            </div>
+
+                            <div class="practice-meta-separator"></div>
+
+                            <div class="practice-meta-item">
+                                <span class="practice-meta-label">Назначено студентов</span>
+                                <span class="practice-meta-value">@practice.AssignedStudentsCount</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="practice-card-actions">
+                        <button type="button" class="department-secondary-button practice-details-button">
+                            Сведения
+                        </button>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+</div>
+
+<div class="department-modal-backdrop" id="practiceEditModalBackdrop">
+    <div class="department-modal department-modal-large">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="practiceEditModalTitle">Создание производственной практики</h2>
+                <p id="practiceEditModalSubtitle">Заполните основную информацию, компетенции и назначения.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closePracticeEditModalButton">×</button>
+        </div>
+
+        <form asp-controller="DepartmentStaff" asp-action="SavePractice" method="post" id="practiceForm" class="department-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="practiceId" name="Id" />
+
+            <div class="department-form-section">
+                <div class="department-form-section-title">Основная информация</div>
+
+                <div class="department-form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="practiceIndex">Индекс ПП</label>
+                        <input class="form-input" type="text" id="practiceIndex" name="PracticeIndex" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="practiceName">Название ПП</label>
+                        <input class="form-input" type="text" id="practiceName" name="Name" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="practiceSpecialtySelect">Специальность</label>
+                        <select id="practiceSpecialtySelect" name="SpecialtyId" class="native-select-hidden">
+                            <option value="">-- выберите специальность --</option>
+                        </select>
+
+                        <div class="custom-select" data-target="practiceSpecialtySelect">
+                            <button type="button" class="custom-select-trigger">-- выберите специальность --</button>
+                            <div class="custom-select-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="practiceHours">Количество часов</label>
+                        <input class="form-input" type="number" id="practiceHours" name="Hours" min="1" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="professionalModuleCode">Код профессионального модуля</label>
+                        <input class="form-input" type="text" id="professionalModuleCode" name="ProfessionalModuleCode" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="professionalModuleName">Название профессионального модуля</label>
+                        <input class="form-input" type="text" id="professionalModuleName" name="ProfessionalModuleName" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="practiceStartDate">Дата начала</label>
+                        <input class="form-input" type="date" id="practiceStartDate" name="StartDate" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="practiceEndDate">Дата окончания</label>
+                        <input class="form-input" type="date" id="practiceEndDate" name="EndDate" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="department-form-section">
+                <div class="department-form-section-header">
+                    <div class="department-form-section-title">Профессиональные компетенции и виды работ</div>
+                    <button type="button" class="department-ghost-button" id="addCompetencyButton">
+                        Добавить компетенцию
+                    </button>
+                </div>
+
+                <div id="competenciesContainer" class="department-repeaters-container"></div>
+            </div>
+
+            <div class="department-form-section">
+                <div class="department-form-section-header">
+                    <div class="department-form-section-title">Назначения студентов и руководителей</div>
+                    <button type="button" class="department-ghost-button" id="addAssignmentButton">
+                        Назначить студента
+                    </button>
+                </div>
+
+                <div id="assignmentsContainer" class="department-repeaters-container"></div>
+            </div>
+
+            <div class="department-modal-actions">
+                <button type="button" class="department-ghost-button" id="cancelPracticeEditModalButton">
+                    Отмена
+                </button>
+                <button type="submit" class="department-primary-button">
+                    Сохранить практику
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="department-modal-backdrop" id="practiceDetailsModalBackdrop">
+    <div class="department-modal department-modal-large">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="practiceDetailsTitle">Сведения о производственной практике</h2>
+                <p id="practiceDetailsSubtitle">Полная информация по практике, назначениям и компетенциям.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closePracticeDetailsModalButton">×</button>
+        </div>
+
+        <div class="department-details-layout">
+            <div class="department-details-section">
+                <div class="department-details-title">Основная информация</div>
+                <div id="practiceDetailsInfo" class="department-details-grid"></div>
+            </div>
+
+            <div class="department-details-section">
+                <div class="department-details-title">Назначенные студенты</div>
+                <div id="practiceDetailsAssignments" class="department-details-list"></div>
+            </div>
+
+            <div class="department-details-section">
+                <div class="department-details-title">Профессиональные компетенции и виды работ</div>
+                <div id="practiceDetailsCompetencies" class="department-details-list"></div>
+            </div>
+        </div>
+
+        <div class="department-modal-actions">
+            <form asp-controller="DepartmentStaff" asp-action="DeletePractice" method="post" id="deletePracticeForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="deletePracticeId" name="id" />
+                <button type="submit" class="department-danger-button">
+                    Удалить
+                </button>
+            </form>
+
+            <button type="button" class="department-secondary-button" id="editPracticeFromDetailsButton">
+                Редактировать
+            </button>
+
+            <button type="button" class="department-primary-button" id="generateAttestationSheetButton">
+                Сформировать аттестационный лист
+            </button>
+        </div>
+    </div>
+</div>
+
+<template id="competencyItemTemplate">
+    <div class="department-repeater-item competency-item">
+        <div class="department-repeater-grid">
+            <div class="form-group">
+                <label class="form-label">Код компетенции</label>
+                <input class="form-input competency-code-input" type="text" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Количество часов</label>
+                <input class="form-input competency-hours-input" type="number" min="1" />
+            </div>
+
+            <div class="form-group department-form-full">
+                <label class="form-label">Описание компетенции</label>
+                <textarea class="form-input department-textarea competency-description-input"></textarea>
+            </div>
+
+            <div class="form-group department-form-full">
+                <label class="form-label">Виды работ</label>
+                <textarea class="form-input department-textarea competency-worktypes-input"></textarea>
+            </div>
+        </div>
+
+        <div class="department-repeater-actions">
+            <button type="button" class="department-danger-button remove-competency-button">
+                Удалить компетенцию
+            </button>
+        </div>
+    </div>
+</template>
+
+<template id="assignmentItemTemplate">
+    <div class="department-repeater-item assignment-item">
+        <div class="department-repeater-grid">
+            <div class="form-group">
+                <label class="form-label">Студент</label>
+                <select class="assignment-student-select native-select-hidden">
+                    <option value="">-- выберите студента --</option>
+                </select>
+
+                <div class="custom-select assignment-student-custom-select">
+                    <button type="button" class="custom-select-trigger">-- выберите студента --</button>
+                    <div class="custom-select-menu"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Руководитель практики от техникума</label>
+                <select class="assignment-supervisor-select native-select-hidden">
+                    <option value="">-- выберите руководителя --</option>
+                </select>
+
+                <div class="custom-select assignment-supervisor-custom-select">
+                    <button type="button" class="custom-select-trigger">-- выберите руководителя --</button>
+                    <div class="custom-select-menu"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="department-repeater-actions">
+            <button type="button" class="department-danger-button remove-assignment-button">
+                Удалить назначение
+            </button>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    <script>
+        window.departmentStaffInitialPractices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Practices));
+    </script>
+    <script src="~/js/departmentStaff.js"></script>
+}

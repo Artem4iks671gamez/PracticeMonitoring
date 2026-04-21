@@ -15,6 +15,10 @@ public class AppDbContext : DbContext
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    public DbSet<ProductionPractice> ProductionPractices => Set<ProductionPractice>();
+    public DbSet<ProductionPracticeCompetency> ProductionPracticeCompetencies => Set<ProductionPracticeCompetency>();
+    public DbSet<ProductionPracticeStudentAssignment> ProductionPracticeStudentAssignments => Set<ProductionPracticeStudentAssignment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -97,6 +101,62 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(x => x.Category);
             entity.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        modelBuilder.Entity<ProductionPractice>(entity =>
+        {
+            entity.ToTable("production_practices");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.PracticeIndex).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(300);
+            entity.Property(x => x.ProfessionalModuleCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.ProfessionalModuleName).IsRequired().HasMaxLength(300);
+            entity.Property(x => x.Hours).IsRequired();
+            entity.Property(x => x.StartDate).IsRequired();
+            entity.Property(x => x.EndDate).IsRequired();
+
+            entity.HasOne(x => x.Specialty)
+                .WithMany()
+                .HasForeignKey(x => x.SpecialtyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductionPracticeCompetency>(entity =>
+        {
+            entity.ToTable("production_practice_competencies");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.CompetencyCode).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.CompetencyDescription).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.WorkTypes).IsRequired().HasMaxLength(2000);
+            entity.Property(x => x.Hours).IsRequired();
+
+            entity.HasOne(x => x.ProductionPractice)
+                .WithMany(x => x.Competencies)
+                .HasForeignKey(x => x.ProductionPracticeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductionPracticeStudentAssignment>(entity =>
+        {
+            entity.ToTable("production_practice_student_assignments");
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.ProductionPractice)
+                .WithMany(x => x.StudentAssignments)
+                .HasForeignKey(x => x.ProductionPracticeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Student)
+                .WithMany()
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Supervisor)
+                .WithMany()
+                .HasForeignKey(x => x.SupervisorId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
