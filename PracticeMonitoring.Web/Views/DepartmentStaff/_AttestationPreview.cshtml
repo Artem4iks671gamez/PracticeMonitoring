@@ -1,0 +1,49 @@
+@model PracticeMonitoring.Web.Models.DepartmentStaff.DepartmentStaffPracticeDetailsViewModel
+
+<div class="attestation-preview">
+    <h2>Аттестационный лист — предпросмотр</h2>
+
+    <div class="attestation-header">
+        <div><strong>Индекс ПП:</strong> <span class="required-field">*@Model.PracticeIndex*</span></div>
+        <div><strong>Название:</strong> <span class="required-field">*@Model.Name*</span></div>
+    </div>
+
+    <div class="attestation-row">
+        <div><strong>Специальность:</strong> <span class="required-field">*@Model.SpecialtyCode @Model.SpecialtyName*</span></div>
+        <div><strong>ПМ:</strong> <span class="required-field">*@Model.ProfessionalModuleCode* — *@Model.ProfessionalModuleName*</span></div>
+    </div>
+
+    <div class="attestation-row">
+        <div><strong>Период:</strong> <span class="required-field">*@Model.StartDate.ToString("dd.MM.yyyy")* — *@Model.EndDate.ToString("dd.MM.yyyy")*</span></div>
+        <div><strong>Часы:</strong> <span class="required-field">*@Model.Hours*</span></div>
+    </div>
+
+    <h3>Компетенции</h3>
+    <ol>
+        @foreach (var c in Model.Competencies)
+        {
+            <li>
+                <div><strong class="required-field">*</strong> <strong>@c.CompetencyCode</strong> — @c.CompetencyDescription (@c.Hours ч.)</div>
+                <div class="small">Виды работ: @c.WorkTypes</div>
+            </li>
+        }
+    </ol>
+
+    <h3>Назначенные студенты</h3>
+    <ol>
+        @foreach (var a in Model.StudentAssignments)
+        {
+            <li>
+                <div><strong>@a.StudentFullName</strong> — руководитель: @(@a.SupervisorFullName ?? "не назначен")</div>
+            </li>
+        }
+    </ol>
+
+    <style>
+        .attestation-preview { padding: 18px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color: #0f172a; }
+        .attestation-preview h2 { margin-top: 0; }
+        .attestation-row { display:flex; gap: 18px; margin: 8px 0; flex-wrap:wrap; }
+        .required-field { color: #b42318; font-weight:700; }
+        .small { color: #475569; font-size: 13px; }
+    </style>
+</div>
