@@ -7,10 +7,14 @@ namespace PracticeMonitoring.Web.Controllers;
 public class DepartmentStaffController : Controller
 {
     private readonly DepartmentStaffApiService _departmentStaffApiService;
+    private readonly AttestationSheetService _attestationSheetService;
 
-    public DepartmentStaffController(DepartmentStaffApiService departmentStaffApiService)
+    public DepartmentStaffController(
+        DepartmentStaffApiService departmentStaffApiService,
+        AttestationSheetService attestationSheetService)
     {
         _departmentStaffApiService = departmentStaffApiService;
+        _attestationSheetService = attestationSheetService;
     }
 
     [HttpGet]
@@ -145,6 +149,46 @@ public class DepartmentStaffController : Controller
         }
 
         return Ok(new { message = "Практика удалена." });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PreviewAttestation(int id)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        var practice = await _departmentStaffApiService.GetPracticeByIdAsync(token, id);
+        if (practice is null)
+            return NotFound();
+
+        var html = _attestationSheetService.BuildPreviewHtml(practice);
+
+        return Json(new
+        {
+            html,
+            fileName = _attestationSheetService.BuildFileName(practice)
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadAttestation(int id)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        var practice = await _departmentStaffApiService.GetPracticeByIdAsync(token, id);
+        if (practice is null)
+            return NotFound();
+
+        var bytes = _attestationSheetService.BuildDocx(practice);
+        var fileName = _attestationSheetService.BuildFileName(practice);
+
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            fileName);
     }
 
     private static string NormalizeModelStateKey(string key)

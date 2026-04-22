@@ -356,6 +356,30 @@
     </div>
 </div>
 
+<div class="department-modal-backdrop" id="attestationPreviewModalBackdrop">
+    <div class="department-modal department-modal-extra-large">
+        <div class="department-modal-header">
+            <div>
+                <h2>Предпросмотр аттестационного листа</h2>
+                <p id="attestationPreviewFileName">Аттестационный лист</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closeAttestationPreviewModalButton">×</button>
+        </div>
+
+        <div class="attestation-preview-container" id="attestationPreviewContainer"></div>
+
+        <div class="department-modal-actions">
+            <button type="button" class="department-ghost-button" id="cancelAttestationPreviewButton">
+                Отменить
+            </button>
+
+            <button type="button" class="department-primary-button" id="downloadAttestationButton">
+                Сохранить как...
+            </button>
+        </div>
+    </div>
+</div>
+
 <template id="competencyItemTemplate">
     <div class="department-repeater-item competency-item">
         <div class="department-repeater-grid">

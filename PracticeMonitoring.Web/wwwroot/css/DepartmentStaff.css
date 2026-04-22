@@ -469,6 +469,10 @@
     max-width: 1080px;
 }
 
+.department-modal-extra-large {
+    max-width: 1180px;
+}
+
 .department-modal-header {
     display: flex;
     justify-content: space-between;
@@ -684,6 +688,143 @@
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
+/* Preview */
+.attestation-preview-container {
+    overflow: auto;
+    padding-right: 8px;
+}
+
+.attestation-preview-sheet {
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 36px 42px;
+    background: #ffffff;
+    color: #111827;
+    border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+    font-family: "Times New Roman", serif;
+    line-height: 1.45;
+}
+
+.attestation-preview-header {
+    text-align: center;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.attestation-preview-title {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.attestation-preview-subtitle {
+    text-align: center;
+    font-size: 14px;
+    margin-top: 6px;
+    margin-bottom: 20px;
+}
+
+.attestation-preview-line {
+    margin-top: 14px;
+    font-size: 18px;
+}
+
+.attestation-preview-line-caption {
+    font-size: 12px;
+    color: #4b5563;
+    margin-top: 2px;
+}
+
+.attestation-preview-paragraph {
+    margin-top: 18px;
+    text-align: justify;
+    font-size: 16px;
+}
+
+.attestation-preview-section-title {
+    margin-top: 22px;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.attestation-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 15px;
+}
+
+    .attestation-preview-table th,
+    .attestation-preview-table td {
+        border: 1px solid #111827;
+        padding: 10px 12px;
+        vertical-align: top;
+    }
+
+    .attestation-preview-table th {
+        text-align: center;
+        font-weight: 700;
+    }
+
+.attestation-preview-pc {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.attestation-preview-worktypes {
+    white-space: pre-line;
+}
+
+.attestation-preview-hours {
+    width: 160px;
+    text-align: center;
+    vertical-align: middle !important;
+    font-weight: 600;
+}
+
+.attestation-preview-quality {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 15px;
+}
+
+.attestation-preview-signatures {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+}
+
+.attestation-preview-sign-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 15px;
+}
+
+.attestation-preview-sign-title {
+    font-weight: 700;
+}
+
+.attestation-preview-sign-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.attestation-preview-date {
+    margin-top: 4px;
+}
+
 @media (max-width: 1250px) {
     .department-workspace {
         grid-template-columns: 1fr;
@@ -709,6 +850,10 @@
 
     .practice-card-actions {
         justify-content: flex-start;
+    }
+
+    .attestation-preview-sign-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -737,5 +882,9 @@
 
     .department-modal {
         padding: 20px;
+    }
+
+    .attestation-preview-sheet {
+        padding: 22px;
     }
 }

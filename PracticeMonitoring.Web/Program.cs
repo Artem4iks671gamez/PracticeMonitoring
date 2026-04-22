@@ -30,6 +30,8 @@ builder.Services.AddHttpClient<DepartmentStaffApiService>(client =>
     client.BaseAddress = new Uri(apiBaseUrl);
 });
 
+builder.Services.AddScoped<AttestationSheetService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

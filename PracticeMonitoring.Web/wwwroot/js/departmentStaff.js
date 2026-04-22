@@ -14,11 +14,18 @@
 
     const editModalBackdrop = document.getElementById('practiceEditModalBackdrop');
     const detailsModalBackdrop = document.getElementById('practiceDetailsModalBackdrop');
+    const attestationPreviewModalBackdrop = document.getElementById('attestationPreviewModalBackdrop');
 
     const openCreatePracticeButton = document.getElementById('openCreatePracticeButton');
     const closePracticeEditModalButton = document.getElementById('closePracticeEditModalButton');
     const cancelPracticeEditModalButton = document.getElementById('cancelPracticeEditModalButton');
     const closePracticeDetailsModalButton = document.getElementById('closePracticeDetailsModalButton');
+
+    const closeAttestationPreviewModalButton = document.getElementById('closeAttestationPreviewModalButton');
+    const cancelAttestationPreviewButton = document.getElementById('cancelAttestationPreviewButton');
+    const downloadAttestationButton = document.getElementById('downloadAttestationButton');
+    const attestationPreviewContainer = document.getElementById('attestationPreviewContainer');
+    const attestationPreviewFileName = document.getElementById('attestationPreviewFileName');
 
     const practiceEditModalTitle = document.getElementById('practiceEditModalTitle');
     const practiceEditModalSubtitle = document.getElementById('practiceEditModalSubtitle');
@@ -51,11 +58,11 @@
     const generateAttestationSheetButton = document.getElementById('generateAttestationSheetButton');
     const deletePracticeButton = document.getElementById('deletePracticeButton');
 
-    let practices = Array.isArray(initialPractices) ? initialPractices : [];
     let specialties = [];
     let students = [];
     let supervisors = [];
     let currentDetails = null;
+    let currentAttestationPracticeId = null;
 
     function escapeHtml(value) {
         const div = document.createElement('div');
@@ -65,12 +72,8 @@
 
     function formatDate(value) {
         if (!value) return '—';
-
         const date = new Date(value);
-        if (Number.isNaN(date.getTime())) {
-            return value;
-        }
-
+        if (Number.isNaN(date.getTime())) return value;
         return date.toLocaleDateString('ru-RU');
     }
 
@@ -418,6 +421,8 @@
     closePracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
     cancelPracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
     closePracticeDetailsModalButton?.addEventListener('click', () => closeModal(detailsModalBackdrop));
+    closeAttestationPreviewModalButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
+    cancelAttestationPreviewButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
 
     editModalBackdrop?.addEventListener('click', function (e) {
         if (e.target === editModalBackdrop) closeModal(editModalBackdrop);
@@ -425,6 +430,10 @@
 
     detailsModalBackdrop?.addEventListener('click', function (e) {
         if (e.target === detailsModalBackdrop) closeModal(detailsModalBackdrop);
+    });
+
+    attestationPreviewModalBackdrop?.addEventListener('click', function (e) {
+        if (e.target === attestationPreviewModalBackdrop) closeModal(attestationPreviewModalBackdrop);
     });
 
     async function fetchJson(url, options = {}) {
@@ -715,8 +724,21 @@
         openModal(editModalBackdrop);
     });
 
-    generateAttestationSheetButton?.addEventListener('click', () => {
-        alert('Следующий этап — формирование аттестационного листа с предпросмотром и сохранением.');
+    generateAttestationSheetButton?.addEventListener('click', async () => {
+        if (!currentDetails) return;
+
+        const result = await fetchJson(`/DepartmentStaff/PreviewAttestation?id=${currentDetails.id}`);
+        currentAttestationPracticeId = currentDetails.id;
+
+        attestationPreviewContainer.innerHTML = result.html || '';
+        attestationPreviewFileName.textContent = result.fileName || 'Аттестационный лист';
+
+        openModal(attestationPreviewModalBackdrop);
+    });
+
+    downloadAttestationButton?.addEventListener('click', () => {
+        if (!currentAttestationPracticeId) return;
+        window.location.href = `/DepartmentStaff/DownloadAttestation?id=${currentAttestationPracticeId}`;
     });
 
     deletePracticeButton?.addEventListener('click', async () => {
@@ -738,7 +760,6 @@
                 card.remove();
             }
 
-            practices = practices.filter(x => Number(x.id) !== Number(currentDetails.id));
             applyPracticeFilters();
         } catch (error) {
             alert(error.message || 'Не удалось удалить практику.');
