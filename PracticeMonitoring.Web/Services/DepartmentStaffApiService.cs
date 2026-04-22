@@ -1,8 +1,8 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using PracticeMonitoring.Web.Models.Admin;
 using PracticeMonitoring.Web.Models.DepartmentStaff;
+using PracticeMonitoring.Web.Models;
 
 namespace PracticeMonitoring.Web.Services;
 
@@ -29,10 +29,11 @@ public class DepartmentStaffApiService
             return new List<DepartmentStaffPracticeListItemViewModel>();
 
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<List<DepartmentStaffPracticeListItemViewModel>>(json, _jsonOptions) ?? new();
+        return JsonSerializer.Deserialize<List<DepartmentStaffPracticeListItemViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffPracticeListItemViewModel>();
     }
 
-    public async Task<DepartmentStaffPracticeDetailsViewModel?> GetPracticeAsync(string token, int id)
+    public async Task<DepartmentStaffPracticeDetailsViewModel?> GetPracticeByIdAsync(string token, int id)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/practices/{id}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -45,22 +46,86 @@ public class DepartmentStaffApiService
         return JsonSerializer.Deserialize<DepartmentStaffPracticeDetailsViewModel>(json, _jsonOptions);
     }
 
-    public async Task<AdminApiResult<DepartmentStaffPracticeDetailsViewModel>> CreatePracticeAsync(
-        string token,
-        DepartmentStaffPracticeUpsertViewModel model)
+    public async Task<List<DepartmentStaffSelectOptionViewModel>> GetSpecialtiesAsync(string token)
     {
-        return await SendPracticeRequestAsync(HttpMethod.Post, "api/department-staff/practices", token, model);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/department-staff/practices/metadata/specialties");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<DepartmentStaffSelectOptionViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<DepartmentStaffSelectOptionViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffSelectOptionViewModel>();
     }
 
-    public async Task<AdminApiResult<DepartmentStaffPracticeDetailsViewModel>> UpdatePracticeAsync(
-        string token,
-        int id,
-        DepartmentStaffPracticeUpsertViewModel model)
+    public async Task<List<DepartmentStaffStudentOptionViewModel>> GetStudentsAsync(string token, int specialtyId)
     {
-        return await SendPracticeRequestAsync(HttpMethod.Put, $"api/department-staff/practices/{id}", token, model);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/practices/metadata/students?specialtyId={specialtyId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<DepartmentStaffStudentOptionViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<DepartmentStaffStudentOptionViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffStudentOptionViewModel>();
     }
 
-    public async Task<AdminApiResult<object>> DeletePracticeAsync(string token, int id)
+    public async Task<List<DepartmentStaffSupervisorOptionViewModel>> GetSupervisorsAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/department-staff/practices/metadata/supervisors");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<DepartmentStaffSupervisorOptionViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<DepartmentStaffSupervisorOptionViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffSupervisorOptionViewModel>();
+    }
+
+    public async Task<DepartmentStaffApiResult<object>> SavePracticeAsync(string token, DepartmentStaffPracticeUpsertViewModel model)
+    {
+        if (model == null)
+            return new DepartmentStaffApiResult<object>
+            {
+                Success = false,
+                ErrorMessage = "Model is null or invalid."
+            };
+
+        var isEdit = model.Id.HasValue && model.Id.Value > 0;
+        var method = isEdit ? HttpMethod.Put : HttpMethod.Post;
+        var url = isEdit
+            ? $"api/department-staff/practices/{model.Id!.Value}"
+            : "api/department-staff/practices";
+
+        using var request = new HttpRequestMessage(method, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(model),
+            Encoding.UTF8,
+            "application/json");
+
+        var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
+
+        if (response.IsSuccessStatusCode)
+        {
+            return new DepartmentStaffApiResult<object>
+            {
+                Success = true,
+                StatusCode = (int)response.StatusCode
+            };
+        }
+
+        return ParseErrorResult(json, (int)response.StatusCode, "Не удалось сохранить производственную практику.");
+    }
+
+    public async Task<DepartmentStaffApiResult<object>> DeletePracticeAsync(string token, int id)
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/department-staff/practices/{id}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -70,95 +135,55 @@ public class DepartmentStaffApiService
 
         if (response.IsSuccessStatusCode)
         {
-            return new AdminApiResult<object>
+            return new DepartmentStaffApiResult<object>
             {
                 Success = true,
                 StatusCode = (int)response.StatusCode
             };
         }
 
-        return new AdminApiResult<object>
-        {
-            Success = false,
-            StatusCode = (int)response.StatusCode,
-            ErrorMessage = ExtractError(json) ?? "Не удалось удалить производственную практику."
-        };
+        return ParseErrorResult(json, (int)response.StatusCode, "Не удалось удалить производственную практику.");
     }
 
-    private async Task<AdminApiResult<DepartmentStaffPracticeDetailsViewModel>> SendPracticeRequestAsync(
-        HttpMethod method,
-        string url,
-        string token,
-        DepartmentStaffPracticeUpsertViewModel model)
+    private DepartmentStaffApiResult<object> ParseErrorResult(string json, int statusCode, string fallbackMessage)
     {
-        using var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var payload = new
-        {
-            PracticeIndex = model.PracticeIndex,
-            Name = model.Name,
-            SpecialtyId = model.SpecialtyId,
-            ProfessionalModuleCode = model.ProfessionalModuleCode,
-            ProfessionalModuleName = model.ProfessionalModuleName,
-            Hours = model.Hours,
-            StartDate = model.StartDate,
-            EndDate = model.EndDate,
-            Competencies = model.Competencies.Select(x => new
-            {
-                x.CompetencyCode,
-                x.CompetencyDescription,
-                x.WorkTypes,
-                x.Hours
-            }),
-            StudentAssignments = model.StudentAssignments.Select(x => new
-            {
-                x.StudentId,
-                x.SupervisorId
-            })
-        };
-
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(payload),
-            Encoding.UTF8,
-            "application/json");
-
-        var response = await _httpClient.SendAsync(request);
-        var json = await response.Content.ReadAsStringAsync();
-
-        if (response.IsSuccessStatusCode)
-        {
-            return new AdminApiResult<DepartmentStaffPracticeDetailsViewModel>
-            {
-                Success = true,
-                StatusCode = (int)response.StatusCode,
-                Data = JsonSerializer.Deserialize<DepartmentStaffPracticeDetailsViewModel>(json, _jsonOptions)
-            };
-        }
-
-        return new AdminApiResult<DepartmentStaffPracticeDetailsViewModel>
+        var result = new DepartmentStaffApiResult<object>
         {
             Success = false,
-            StatusCode = (int)response.StatusCode,
-            ErrorMessage = ExtractError(json) ?? "Не удалось сохранить производственную практику."
+            StatusCode = statusCode,
+            ErrorMessage = fallbackMessage
         };
-    }
 
-    private string? ExtractError(string json)
-    {
         if (string.IsNullOrWhiteSpace(json))
-            return null;
+            return result;
 
         try
         {
             using var doc = JsonDocument.Parse(json);
+
             if (doc.RootElement.TryGetProperty("message", out var messageElement))
-                return messageElement.GetString();
+                result.ErrorMessage = messageElement.GetString() ?? fallbackMessage;
+
+            if (doc.RootElement.TryGetProperty("errors", out var errorsElement) &&
+                errorsElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in errorsElement.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        result.ValidationErrors[property.Name] = property.Value
+                            .EnumerateArray()
+                            .Select(x => x.GetString() ?? string.Empty)
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .ToArray();
+                    }
+                }
+            }
         }
         catch
         {
         }
 
-        return null;
+        return result;
     }
 }

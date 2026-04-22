@@ -1,4 +1,5 @@
-﻿document.addEventListener('DOMContentLoaded', function () {
+﻿/* Обновлённый весь файл: добавлена клиентская валидация и небольшие улучшения UX */
+document.addEventListener('DOMContentLoaded', function () {
     const initialPractices = window.departmentStaffInitialPractices || [];
 
     const practiceSearchInput = document.getElementById('practiceSearchInput');
@@ -19,7 +20,9 @@
 
     const practiceEditModalTitle = document.getElementById('practiceEditModalTitle');
     const practiceEditModalSubtitle = document.getElementById('practiceEditModalSubtitle');
+    const practiceGlobalError = document.getElementById('practiceGlobalError');
 
+    const practiceForm = document.getElementById('practiceForm');
     const practiceIdInput = document.getElementById('practiceId');
     const practiceIndexInput = document.getElementById('practiceIndex');
     const practiceNameInput = document.getElementById('practiceName');
@@ -43,14 +46,151 @@
     const practiceDetailsInfo = document.getElementById('practiceDetailsInfo');
     const practiceDetailsAssignments = document.getElementById('practiceDetailsAssignments');
     const practiceDetailsCompetencies = document.getElementById('practiceDetailsCompetencies');
-    const deletePracticeId = document.getElementById('deletePracticeId');
     const editPracticeFromDetailsButton = document.getElementById('editPracticeFromDetailsButton');
     const generateAttestationSheetButton = document.getElementById('generateAttestationSheetButton');
+    const deletePracticeButton = document.getElementById('deletePracticeButton');
 
+    let practices = Array.isArray(initialPractices) ? initialPractices : [];
     let specialties = [];
     let students = [];
     let supervisors = [];
     let currentDetails = null;
+
+    function clearFieldErrors() {
+        document.querySelectorAll('.field-error').forEach(x => {
+            x.textContent = '';
+        });
+
+        document.querySelectorAll('.input-error').forEach(x => {
+            x.classList.remove('input-error');
+        });
+
+        if (practiceGlobalError) {
+            practiceGlobalError.textContent = '';
+            practiceGlobalError.classList.remove('show');
+        }
+    }
+
+    function showGlobalError(message) {
+        if (!practiceGlobalError) return;
+        practiceGlobalError.textContent = message || 'Исправьте ошибки формы.';
+        practiceGlobalError.classList.add('show');
+    }
+
+    function setSimpleFieldError(fieldName, message) {
+        const errorBlock = document.querySelector(`[data-error-for="${fieldName}"]`);
+        if (errorBlock) {
+            errorBlock.textContent = message;
+        }
+
+        const inputMap = {
+            PracticeIndex: practiceIndexInput,
+            Name: practiceNameInput,
+            SpecialtyId: practiceSpecialtySelect,
+            Hours: practiceHoursInput,
+            ProfessionalModuleCode: professionalModuleCodeInput,
+            ProfessionalModuleName: professionalModuleNameInput,
+            StartDate: practiceStartDateInput,
+            EndDate: practiceEndDateInput
+        };
+
+        const input = inputMap[fieldName];
+        if (!input) return;
+
+        input.classList.add('input-error');
+
+        if (input.tagName.toLowerCase() === 'select') {
+            const customTrigger = document.querySelector(`.custom-select[data-target="${input.id}"] .custom-select-trigger`);
+            customTrigger?.classList.add('input-error');
+        }
+    }
+
+    function applyValidationErrors(errors, globalMessage) {
+        clearFieldErrors();
+
+        if (globalMessage) {
+            showGlobalError(globalMessage);
+        }
+
+        Object.entries(errors || {}).forEach(([key, messages]) => {
+            if (!messages || !messages.length) return;
+
+            if (key.startsWith('Competencies[')) {
+                const match = key.match(/^Competencies\[(\d+)\]\.(.+)$/);
+                if (!match) return;
+
+                const index = Number(match[1]);
+                const field = match[2];
+                const card = competenciesContainer.querySelectorAll('.competency-item')[index];
+                if (!card) return;
+
+                const inputMap = {
+                    CompetencyCode: '.competency-code-input',
+                    CompetencyDescription: '.competency-description-input',
+                    WorkTypes: '.competency-worktypes-input',
+                    Hours: '.competency-hours-input'
+                };
+
+                const errorMap = {
+                    CompetencyCode: '.competency-code-error',
+                    CompetencyDescription: '.competency-description-error',
+                    WorkTypes: '.competency-worktypes-error',
+                    Hours: '.competency-hours-error'
+                };
+
+                const input = card.querySelector(inputMap[field]);
+                const errorBlock = card.querySelector(errorMap[field]);
+
+                if (input) input.classList.add('input-error');
+                if (errorBlock) errorBlock.textContent = messages[0];
+                return;
+            }
+
+            if (key.startsWith('StudentAssignments[')) {
+                const match = key.match(/^StudentAssignments\[(\d+)\]\.(.+)$/);
+                if (!match) return;
+
+                const index = Number(match[1]);
+                const field = match[2];
+                const card = assignmentsContainer.querySelectorAll('.assignment-item')[index];
+                if (!card) return;
+
+                const inputMap = {
+                    StudentId: '.assignment-student-select',
+                    SupervisorId: '.assignment-supervisor-select'
+                };
+
+                const errorMap = {
+                    StudentId: '.assignment-student-error',
+                    SupervisorId: '.assignment-supervisor-error'
+                };
+
+                const input = card.querySelector(inputMap[field]);
+                const errorBlock = card.querySelector(errorMap[field]);
+
+                if (input) {
+                    input.classList.add('input-error');
+
+                    if (input.tagName.toLowerCase() === 'select') {
+                        const customTrigger = card.querySelector(`.custom-select[data-target="${input.id}"] .custom-select-trigger`);
+                        customTrigger?.classList.add('input-error');
+                    }
+                }
+
+                if (errorBlock) errorBlock.textContent = messages[0];
+                return;
+            }
+
+            setSimpleFieldError(key, messages[0]);
+        });
+
+        // фокус на первую ошибку
+        const firstErrorInput = document.querySelector('.input-error');
+        if (firstErrorInput) {
+            firstErrorInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstErrorInput.focus?.();
+        }
+    }
 
     function buildCustomSelect(selectId, onChange) {
         const nativeSelect = document.getElementById(selectId);
@@ -258,15 +398,30 @@
         if (e.target === detailsModalBackdrop) closeModal(detailsModalBackdrop);
     });
 
-    async function fetchJson(url) {
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        return await response.json();
+    async function fetchJson(url, options = {}) {
+        const response = await fetch(url, {
+            headers: options.body ? { 'Content-Type': 'application/json' } : {},
+            ...options
+        });
+
+        if (response.status === 204) return null;
+
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+
+        if (!response.ok) {
+            const error = new Error((data && data.message) || 'Произошла ошибка.');
+            error.validationErrors = data && data.errors ? data.errors : {};
+            throw error;
+        }
+
+        return data;
     }
 
     async function loadSpecialties() {
-        const data = await fetchJson(`${window.apiBaseUrl.replace(/\/$/, '')}/api/Helping/specialties`);
-        specialties = Array.isArray(data) ? data : [];
+        const data = await fetchJson('/DepartmentStaff/GetFormData');
+        specialties = data && data.specialties ? data.specialties : [];
+        supervisors = data && data.supervisors ? data.supervisors : [];
 
         specialtyFilterSelect.innerHTML = '<option value="">Все специальности</option>';
         practiceSpecialtySelect.innerHTML = '<option value="">-- выберите специальность --</option>';
@@ -274,12 +429,12 @@
         specialties.forEach(item => {
             const filterOption = document.createElement('option');
             filterOption.value = item.id;
-            filterOption.textContent = `${item.code} — ${item.name}`;
+            filterOption.textContent = item.label;
             specialtyFilterSelect.appendChild(filterOption);
 
             const formOption = document.createElement('option');
             formOption.value = item.id;
-            formOption.textContent = `${item.code} — ${item.name}`;
+            formOption.textContent = item.label;
             practiceSpecialtySelect.appendChild(formOption);
         });
 
@@ -287,12 +442,12 @@
         practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    async function loadStudentsAndSupervisors() {
-        const studentsData = await fetchJson(`${window.apiBaseUrl.replace(/\/$/, '')}/api/admin/users`);
-        const allUsers = Array.isArray(studentsData) ? studentsData : [];
-
-        students = allUsers.filter(x => x.role === 'Student');
-        supervisors = allUsers.filter(x => x.role === 'Supervisor');
+    async function loadStudentsForSpecialty(specialtyId) {
+        if (!specialtyId) return [];
+        const data = await fetchJson(`/DepartmentStaff/GetFormData?specialtyId=${specialtyId}`);
+        students = data && data.students ? data.students : [];
+        supervisors = data && data.supervisors ? data.supervisors : supervisors;
+        return students;
     }
 
     function createCompetencyItem(value = {}) {
@@ -306,6 +461,7 @@
 
         element.querySelector('.remove-competency-button').addEventListener('click', () => {
             element.remove();
+            clearFieldErrors();
             reindexPracticeForm();
         });
 
@@ -313,7 +469,7 @@
         reindexPracticeForm();
     }
 
-    function createAssignmentItem(value = {}) {
+    function createAssignmentItem(studentsSource, value = {}) {
         const fragment = assignmentTemplate.content.cloneNode(true);
         const element = fragment.querySelector('.assignment-item');
 
@@ -325,27 +481,29 @@
         studentSelect.innerHTML = '<option value="">-- выберите студента --</option>';
         supervisorSelect.innerHTML = '<option value="">-- выберите руководителя --</option>';
 
-        const selectedSpecialtyId = practiceSpecialtySelect.value;
+        studentsSource.forEach(student => {
+            const option = document.createElement('option');
+            option.value = student.id;
+            option.textContent = student.groupName
+                ? `${student.fullName} (${student.groupName})`
+                : student.fullName;
 
-        students
-            .filter(x => !selectedSpecialtyId || String(x.specialtyId || '') === String(selectedSpecialtyId))
-            .forEach(student => {
-                const option = document.createElement('option');
-                option.value = student.id;
-                option.textContent = student.fullName;
-                if (Number(value.studentId || 0) === Number(student.id)) {
-                    option.selected = true;
-                }
-                studentSelect.appendChild(option);
-            });
+            if (Number(value.studentId || 0) === Number(student.id)) {
+                option.selected = true;
+            }
+
+            studentSelect.appendChild(option);
+        });
 
         supervisors.forEach(supervisor => {
             const option = document.createElement('option');
             option.value = supervisor.id;
             option.textContent = supervisor.fullName;
+
             if (Number(value.supervisorId || 0) === Number(supervisor.id)) {
                 option.selected = true;
             }
+
             supervisorSelect.appendChild(option);
         });
 
@@ -354,6 +512,7 @@
 
         element.querySelector('.remove-assignment-button').addEventListener('click', () => {
             element.remove();
+            clearFieldErrors();
             reindexPracticeForm();
         });
 
@@ -364,16 +523,12 @@
     function reindexPracticeForm() {
         const competencyItems = Array.from(competenciesContainer.querySelectorAll('.competency-item'));
         competencyItems.forEach((item, index) => {
-            item.querySelector('.competency-code-input').name = `Competencies[${index}].CompetencyCode`;
-            item.querySelector('.competency-description-input').name = `Competencies[${index}].CompetencyDescription`;
-            item.querySelector('.competency-worktypes-input').name = `Competencies[${index}].WorkTypes`;
-            item.querySelector('.competency-hours-input').name = `Competencies[${index}].Hours`;
+            item.dataset.index = String(index);
         });
 
         const assignmentItems = Array.from(assignmentsContainer.querySelectorAll('.assignment-item'));
         assignmentItems.forEach((item, index) => {
-            item.querySelector('.assignment-student-select').name = `StudentAssignments[${index}].StudentId`;
-            item.querySelector('.assignment-supervisor-select').name = `StudentAssignments[${index}].SupervisorId`;
+            item.dataset.index = String(index);
         });
     }
 
@@ -389,25 +544,50 @@
         practiceEndDateInput.value = '';
         competenciesContainer.innerHTML = '';
         assignmentsContainer.innerHTML = '';
+        clearFieldErrors();
         practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    function refillAssignmentsForSpecialty() {
+    async function refillAssignmentsForSpecialty() {
+        clearFieldErrors();
+
+        const selectedSpecialtyId = practiceSpecialtySelect.value;
+        if (!selectedSpecialtyId) {
+            assignmentsContainer.innerHTML = '';
+            return;
+        }
+
         const existingValues = Array.from(assignmentsContainer.querySelectorAll('.assignment-item')).map(item => ({
             studentId: item.querySelector('.assignment-student-select').value,
             supervisorId: item.querySelector('.assignment-supervisor-select').value
         }));
 
+        const studentsForSpecialty = await loadStudentsForSpecialty(selectedSpecialtyId);
+
         assignmentsContainer.innerHTML = '';
-        existingValues.forEach(item => createAssignmentItem(item));
+        existingValues.forEach(item => createAssignmentItem(studentsForSpecialty, item));
     }
 
     practiceSpecialtySelect?.addEventListener('change', refillAssignmentsForSpecialty);
 
-    addCompetencyButton?.addEventListener('click', () => createCompetencyItem());
-    addAssignmentButton?.addEventListener('click', () => createAssignmentItem());
+    addCompetencyButton?.addEventListener('click', () => {
+        createCompetencyItem();
+    });
 
-    openCreatePracticeButton?.addEventListener('click', () => {
+    addAssignmentButton?.addEventListener('click', async () => {
+        clearFieldErrors();
+
+        const specialtyId = Number(practiceSpecialtySelect.value);
+        if (!specialtyId) {
+            applyValidationErrors({ SpecialtyId: ['Сначала выберите специальность.'] }, 'Сначала выберите специальность.');
+            return;
+        }
+
+        const studentsForSpecialty = await loadStudentsForSpecialty(specialtyId);
+        createAssignmentItem(studentsForSpecialty);
+    });
+
+    openCreatePracticeButton?.addEventListener('click', async () => {
         resetPracticeForm();
         practiceEditModalTitle.textContent = 'Создание производственной практики';
         practiceEditModalSubtitle.textContent = 'Заполните основную информацию, компетенции и назначения.';
@@ -416,7 +596,7 @@
     });
 
     async function openDetails(practiceId) {
-        const details = await fetchJson(`${window.apiBaseUrl.replace(/\/$/, '')}/api/department-staff/practices/${practiceId}`);
+        const details = await fetchJson(`/DepartmentStaff/GetPracticeDetails?id=${practiceId}`);
         if (!details) return;
 
         currentDetails = details;
@@ -427,7 +607,7 @@
         practiceDetailsInfo.innerHTML = `
             <div class="department-details-item">
                 <span class="department-details-label">Индекс ПП</span>
-                <span class="department-details-value">${details.practiceIndex}</span>
+                <span class="department-details-value">${escapeHtml(details.practiceIndex)}</span>
             </div>
             <div class="department-details-item">
                 <span class="department-details-label">Количество часов</span>
@@ -435,11 +615,11 @@
             </div>
             <div class="department-details-item">
                 <span class="department-details-label">Код ПМ</span>
-                <span class="department-details-value">${details.professionalModuleCode}</span>
+                <span class="department-details-value">${escapeHtml(details.professionalModuleCode)}</span>
             </div>
             <div class="department-details-item">
                 <span class="department-details-label">Название ПМ</span>
-                <span class="department-details-value">${details.professionalModuleName}</span>
+                <span class="department-details-value">${escapeHtml(details.professionalModuleName)}</span>
             </div>
             <div class="department-details-item">
                 <span class="department-details-label">Дата начала</span>
@@ -472,11 +652,10 @@
             `).join('')
             : '<div class="department-details-card"><div class="department-details-card-text">Компетенции пока не добавлены.</div></div>';
 
-        deletePracticeId.value = details.id;
         openModal(detailsModalBackdrop);
     }
 
-    function fillEditFormFromDetails(details) {
+    async function fillEditFormFromDetails(details) {
         resetPracticeForm();
 
         practiceIdInput.value = details.id;
@@ -492,16 +671,18 @@
         practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
 
         (details.competencies || []).forEach(item => createCompetencyItem(item));
-        (details.studentAssignments || []).forEach(item => createAssignmentItem(item));
+
+        const studentsForSpecialty = await loadStudentsForSpecialty(details.specialtyId);
+        (details.studentAssignments || []).forEach(item => createAssignmentItem(studentsForSpecialty, item));
 
         practiceEditModalTitle.textContent = 'Редактирование производственной практики';
         practiceEditModalSubtitle.textContent = 'Измените данные практики, компетенции и назначения.';
     }
 
-    editPracticeFromDetailsButton?.addEventListener('click', () => {
+    editPracticeFromDetailsButton?.addEventListener('click', async () => {
         if (!currentDetails) return;
         closeModal(detailsModalBackdrop);
-        fillEditFormFromDetails(currentDetails);
+        await fillEditFormFromDetails(currentDetails);
         openModal(editModalBackdrop);
     });
 
@@ -509,24 +690,153 @@
         alert('Следующим шагом сюда подключим формирование аттестационного листа по шаблону.');
     });
 
-    document.getElementById('deletePracticeForm')?.addEventListener('submit', function (e) {
-        if (!confirm('Вы уверены, что хотите удалить производственную практику?')) {
-            e.preventDefault();
+    deletePracticeButton?.addEventListener('click', async () => {
+        if (!currentDetails) return;
+
+        const confirmed = confirm('Вы уверены, что хотите удалить производственную практику?');
+        if (!confirmed) return;
+
+        try {
+            await fetchJson('/DepartmentStaff/DeletePractice', {
+                method: 'POST',
+                body: JSON.stringify(currentDetails.id)
+            });
+
+            closeModal(detailsModalBackdrop);
+
+            const card = practicesList.querySelector(`.practice-card[data-id="${currentDetails.id}"]`);
+            if (card) {
+                card.remove();
+            }
+
+            practices = practices.filter(x => Number(x.id) !== Number(currentDetails.id));
+            applyPracticeFilters();
+        } catch (error) {
+            alert(error.message || 'Не удалось удалить практику.');
         }
     });
 
-    function formatDate(dateText) {
-        if (!dateText) return '—';
-        const date = new Date(dateText);
-        if (Number.isNaN(date.getTime())) return dateText;
-        return date.toLocaleDateString('ru-RU');
+    function buildPayload() {
+        return {
+            id: practiceIdInput.value ? Number(practiceIdInput.value) : null,
+            practiceIndex: practiceIndexInput.value.trim(),
+            name: practiceNameInput.value.trim(),
+            specialtyId: Number(practiceSpecialtySelect.value),
+            professionalModuleCode: professionalModuleCodeInput.value.trim(),
+            professionalModuleName: professionalModuleNameInput.value.trim(),
+            hours: Number(practiceHoursInput.value),
+            startDate: practiceStartDateInput.value,
+            endDate: practiceEndDateInput.value,
+            competencies: Array.from(competenciesContainer.querySelectorAll('.competency-item')).map(item => ({
+                competencyCode: item.querySelector('.competency-code-input').value.trim(),
+                competencyDescription: item.querySelector('.competency-description-input').value.trim(),
+                workTypes: item.querySelector('.competency-worktypes-input').value.trim(),
+                hours: Number(item.querySelector('.competency-hours-input').value)
+            })),
+            studentAssignments: Array.from(assignmentsContainer.querySelectorAll('.assignment-item')).map(item => {
+                const studentValue = item.querySelector('.assignment-student-select').value;
+                const supervisorValue = item.querySelector('.assignment-supervisor-select').value;
+
+                return {
+                    studentId: studentValue ? Number(studentValue) : 0,
+                    supervisorId: supervisorValue ? Number(supervisorValue) : null
+                };
+            })
+        };
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text || '';
-        return div.innerHTML;
+    function validatePayload(payload) {
+        const errors = {};
+        let global = null;
+
+        // helpers
+        const add = (key, msg) => {
+            if (!errors[key]) errors[key] = [];
+            errors[key].push(msg);
+        };
+
+        const isIndexValid = (v) => /^\d+(\.\d+)*$/.test(v);
+        const isCodeValid = (v) => /^\d+(\.\d+)*$/.test(v); // код: цифры и точки
+
+        // Основные поля
+        if (!payload.practiceIndex) add('PracticeIndex', 'Индекс ПП обязателен.');
+        else if (!isIndexValid(payload.practiceIndex)) add('PracticeIndex', 'Индекс должен содержать только цифры и точки, напр. 12.3.');
+
+        if (!payload.name) add('Name', 'Название практики обязательно.');
+        else if (payload.name.length < 3) add('Name', 'Название слишком короткое.');
+
+        if (!payload.specialtyId || payload.specialtyId <= 0) add('SpecialtyId', 'Выберите специальность.');
+
+        if (!payload.hours || !Number.isFinite(payload.hours) || payload.hours < 1) add('Hours', 'Количество часов должно быть положительным числом.');
+
+        if (!payload.professionalModuleCode) add('ProfessionalModuleCode', 'Код ПМ обязателен.');
+        else if (!isCodeValid(payload.professionalModuleCode)) add('ProfessionalModuleCode', 'Код ПМ должен содержать только цифры и точки.');
+
+        if (!payload.professionalModuleName) add('ProfessionalModuleName', 'Название ПМ обязательно.');
+
+        if (!payload.startDate) add('StartDate', 'Укажите дату начала.');
+        if (!payload.endDate) add('EndDate', 'Укажите дату окончания.');
+
+        if (payload.startDate && payload.endDate) {
+            const s = new Date(payload.startDate);
+            const e = new Date(payload.endDate);
+            if (isNaN(s) || isNaN(e)) add('StartDate', 'Неверный формат даты.');
+            else if (e < s) add('EndDate', 'Дата окончания не может быть раньше даты начала.');
+        }
+
+        // Компетенции
+        if (!Array.isArray(payload.competencies) || payload.competencies.length === 0) {
+            add('Competencies', 'Добавьте хотя бы одну компетенцию.');
+        } else {
+            payload.competencies.forEach((c, i) => {
+                const base = `Competencies[${i}]`;
+                if (!c.competencyCode) add(`${base}.CompetencyCode`, 'Код компетенции обязателен.');
+                else if (!/^[\w\-\d\.]+$/.test(c.competencyCode)) add(`${base}.CompetencyCode`, 'Код содержит недопустимые символы.');
+
+                if (!c.competencyDescription) add(`${base}.CompetencyDescription`, 'Описание компетенции обязательно.');
+                if (!c.workTypes) add(`${base}.WorkTypes`, 'Укажите виды работ.');
+                if (!c.hours || !Number.isFinite(c.hours) || c.hours < 1) add(`${base}.Hours`, 'Часы должны быть положительным числом.');
+            });
+        }
+
+        // Назначения
+        if (Array.isArray(payload.studentAssignments)) {
+            payload.studentAssignments.forEach((a, i) => {
+                const base = `StudentAssignments[${i}]`;
+                if (!a.studentId || a.studentId <= 0) add(`${base}.StudentId`, 'Выберите студента.');
+                // supervisorId может быть null на этапе создания — не делаем обязательным
+            });
+        }
+
+        if (Object.keys(errors).length) global = 'Есть ошибки в форме. Исправьте их и попробуйте снова.';
+        return { valid: Object.keys(errors).length === 0, errors, global };
     }
+
+    practiceForm?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        clearFieldErrors();
+
+        try {
+            const payload = buildPayload();
+
+            // локальная валидация перед отправкой
+            const { valid, errors, global } = validatePayload(payload);
+            if (!valid) {
+                applyValidationErrors(errors, global);
+                return;
+            }
+
+            await fetchJson('/DepartmentStaff/SavePractice', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            closeModal(editModalBackdrop);
+            window.location.reload();
+        } catch (error) {
+            applyValidationErrors(error.validationErrors || {}, error.message || 'Не удалось сохранить производственную практику.');
+        }
+    });
 
     document.querySelectorAll('.practice-details-button').forEach(button => {
         button.addEventListener('click', function () {
@@ -544,8 +854,20 @@
     buildCustomSelect('specialtyFilterSelect', applyPracticeFilters);
     buildCustomSelect('practiceSpecialtySelect');
 
-    Promise.all([loadSpecialties(), loadStudentsAndSupervisors()])
-        .then(() => {
-            applyPracticeFilters();
-        });
-});
+    Promise.resolve(loadSpecialties()).then(() => {
+        applyPracticeFilters();
+    });
+
+    // вспомогательные функции, используемые выше
+    function escapeHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; });
+    }
+
+    function formatDate(v) {
+        if (!v) return '';
+        try {
+            return new Date(v).toLocaleDateString('ru-RU');
+        } catch { return v; }
+    }
+});         

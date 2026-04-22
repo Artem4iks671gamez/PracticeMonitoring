@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PracticeMonitoring.Web.Models.Admin;
 using PracticeMonitoring.Web.Models.DepartmentStaff;
 using PracticeMonitoring.Web.Services;
+using PracticeMonitoring.Web.Models;
 
 namespace PracticeMonitoring.Web.Controllers;
 
@@ -34,56 +34,81 @@ public class DepartmentStaffController : Controller
         return View(model);
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SavePractice(DepartmentStaffPracticeUpsertViewModel model)
+    [HttpGet]
+    public async Task<IActionResult> GetPracticeDetails(int id)
     {
-        var role = HttpContext.Session.GetString("Role");
-        if (role != "DepartmentStaff" && role != "Admin")
-            return RedirectToAction("Login", "Account");
-
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrWhiteSpace(token))
-            return RedirectToAction("Login", "Account");
+            return Unauthorized();
 
-        AdminApiResult<DepartmentStaffPracticeDetailsViewModel> result;
+        var item = await _departmentStaffApiService.GetPracticeByIdAsync(token, id);
+        if (item is null)
+            return NotFound();
 
-        if (model.Id.HasValue && model.Id.Value > 0)
+        return Json(item);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetFormData(int specialtyId = 0)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        var model = new DepartmentStaffFormDataViewModel
         {
-            result = await _departmentStaffApiService.UpdatePracticeAsync(token, model.Id.Value, model);
-        }
-        else
-        {
-            result = await _departmentStaffApiService.CreatePracticeAsync(token, model);
-        }
+            Specialties = await _departmentStaffApiService.GetSpecialtiesAsync(token),
+            Supervisors = await _departmentStaffApiService.GetSupervisorsAsync(token),
+            Students = specialtyId > 0
+                ? await _departmentStaffApiService.GetStudentsAsync(token, specialtyId)
+                : new List<DepartmentStaffStudentOptionViewModel>()
+        };
 
-        TempData[result.Success ? "DepartmentStaffSuccess" : "DepartmentStaffError"] =
-            result.Success
-                ? "Производственная практика успешно сохранена."
-                : (result.ErrorMessage ?? "Не удалось сохранить производственную практику.");
-
-        return RedirectToAction(nameof(Index));
+        return Json(model);
     }
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeletePractice(int id)
+    public async Task<IActionResult> SavePractice([FromBody] DepartmentStaffPracticeUpsertViewModel model)
     {
-        var role = HttpContext.Session.GetString("Role");
-        if (role != "DepartmentStaff" && role != "Admin")
-            return RedirectToAction("Login", "Account");
-
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrWhiteSpace(token))
-            return RedirectToAction("Login", "Account");
+            return Unauthorized();
+
+        if (model == null)
+            return BadRequest(new { message = "Тело запроса пустое или JSON некорректен." });
+
+        var result = await _departmentStaffApiService.SavePracticeAsync(token, model);
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = result.ErrorMessage ?? "Не удалось сохранить практику.",
+                errors = result.ValidationErrors
+            });
+        }
+
+        return Ok(new { message = "Практика успешно сохранена." });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeletePractice([FromBody] int id)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
 
         var result = await _departmentStaffApiService.DeletePracticeAsync(token, id);
 
-        TempData[result.Success ? "DepartmentStaffSuccess" : "DepartmentStaffError"] =
-            result.Success
-                ? "Производственная практика удалена."
-                : (result.ErrorMessage ?? "Не удалось удалить производственную практику.");
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = result.ErrorMessage ?? "Не удалось удалить практику.",
+                errors = result.ValidationErrors
+            });
+        }
 
-        return RedirectToAction(nameof(Index));
+        return Ok(new { message = "Практика удалена." });
     }
 }
