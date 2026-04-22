@@ -10,139 +10,194 @@
     <section class="department-hero-card">
         <div>
             <div class="department-badge">Работник отдела по производственному обучению</div>
-            <h1 class="department-title">Производственные практики</h1>
+            <h1 class="department-title">Модуль производственной практики</h1>
             <p class="department-subtitle">@Model.FullName</p>
         </div>
-
-        <div class="department-hero-actions">
-            <button type="button" class="department-primary-button" id="openCreatePracticeButton">
-                Создать производственную практику
-            </button>
-
-            <form asp-controller="Account" asp-action="Logout" method="post">
-                <button type="submit" class="department-secondary-button">
-                    Выйти
-                </button>
-            </form>
-        </div>
     </section>
 
-    @if (TempData["DepartmentStaffSuccess"] is string successMessage)
-    {
-        <div class="student-alert student-alert-success">@successMessage</div>
-    }
+    <div class="department-workspace">
+        <aside class="department-sidebar-card">
+            <div class="department-sidebar-block">
+                <div class="department-sidebar-title">Навигация</div>
 
-    @if (TempData["DepartmentStaffError"] is string errorMessage)
-    {
-        <div class="student-alert student-alert-error">@errorMessage</div>
-    }
+                <div class="department-sidebar-nav">
+                    <button type="button" class="department-nav-button active" data-panel-target="practicesPanel">
+                        Производственные практики
+                    </button>
 
-    <section class="department-main-card">
-        <div class="department-panel-header">
-            <div>
-                <h2>Список практик</h2>
-                <p>Поиск, сортировка и фильтрация по ключевым свойствам.</p>
-            </div>
-        </div>
+                    <button type="button" class="department-nav-button" data-panel-target="logsPanel">
+                        Журнал изменений
+                    </button>
 
-        <div class="department-toolbar">
-            <div class="department-toolbar-row">
-                <div class="department-search-wrap">
-                    <input type="text"
-                           id="practiceSearchInput"
-                           class="form-input department-search-input"
-                           placeholder="Поиск по индексу ПП, названию, ПМ или специальности..." />
-                </div>
-
-                <div class="department-filter-wrap">
-                    <select id="practiceSortSelect" class="native-select-hidden">
-                        <option value="date-asc">Сначала ранние сроки</option>
-                        <option value="date-desc">Сначала поздние сроки</option>
-                        <option value="index-asc">Индекс ПП А-Я</option>
-                        <option value="hours-desc">Больше часов выше</option>
-                    </select>
-
-                    <div class="custom-select" data-target="practiceSortSelect">
-                        <button type="button" class="custom-select-trigger">Сначала ранние сроки</button>
-                        <div class="custom-select-menu"></div>
-                    </div>
+                    <button type="button" class="department-nav-button" data-panel-target="chatsPanel">
+                        Чаты
+                    </button>
                 </div>
             </div>
 
-            <div class="department-toolbar-row department-toolbar-row-secondary">
-                <div class="department-filter-wrap">
-                    <select id="specialtyFilterSelect" class="native-select-hidden">
-                        <option value="">Все специальности</option>
-                    </select>
+            <div class="department-sidebar-divider"></div>
 
-                    <div class="custom-select" data-target="specialtyFilterSelect">
-                        <button type="button" class="custom-select-trigger">Все специальности</button>
-                        <div class="custom-select-menu"></div>
-                    </div>
-                </div>
+            <div class="department-sidebar-block">
+                <div class="department-sidebar-title">Действия</div>
 
-                <div class="department-date-range">
-                    <input type="date" id="dateFromFilter" class="form-input" />
-                    <input type="date" id="dateToFilter" class="form-input" />
-                </div>
-            </div>
-        </div>
+                <div class="department-sidebar-actions">
+                    <button type="button" class="department-primary-button department-full-button" id="openCreatePracticeButton">
+                        Создать практику
+                    </button>
 
-        <div class="department-summary-bar">
-            <span id="practicesCountLabel">Показано практик: @Model.Practices.Count</span>
-        </div>
-
-        <div class="department-practices-list" id="practicesList">
-            @foreach (var practice in Model.Practices)
-            {
-                <article class="practice-card"
-                         data-id="@practice.Id"
-                         data-practice-index="@practice.PracticeIndex"
-                         data-name="@practice.Name"
-                         data-specialty-id="@practice.SpecialtyId"
-                         data-specialty-code="@practice.SpecialtyCode"
-                         data-specialty-name="@practice.SpecialtyName"
-                         data-hours="@practice.Hours"
-                         data-start-date="@practice.StartDate.ToString("yyyy-MM-dd")"
-                         data-end-date="@practice.EndDate.ToString("yyyy-MM-dd")"
-                         data-students-count="@practice.AssignedStudentsCount">
-                    <div class="practice-card-main">
-                        <div class="practice-card-top">
-                            <div class="practice-card-title-block">
-                                <div class="practice-index-chip">@practice.PracticeIndex</div>
-                                <h3 class="practice-card-name">@practice.Name</h3>
-                            </div>
-
-                            <div class="practice-card-side">
-                                <span class="practice-side-meta">@practice.Hours ч.</span>
-                                <span class="practice-side-meta">@practice.StartDate.ToString("dd.MM.yyyy") - @practice.EndDate.ToString("dd.MM.yyyy")</span>
-                            </div>
-                        </div>
-
-                        <div class="practice-card-meta-row">
-                            <div class="practice-meta-item">
-                                <span class="practice-meta-label">Специальность</span>
-                                <span class="practice-meta-value">@practice.SpecialtyCode @practice.SpecialtyName</span>
-                            </div>
-
-                            <div class="practice-meta-separator"></div>
-
-                            <div class="practice-meta-item">
-                                <span class="practice-meta-label">Назначено студентов</span>
-                                <span class="practice-meta-value">@practice.AssignedStudentsCount</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="practice-card-actions">
-                        <button type="button" class="department-secondary-button practice-details-button">
-                            Сведения
+                    <form asp-controller="Account" asp-action="Logout" method="post">
+                        <button type="submit" class="department-secondary-button department-full-button">
+                            Выйти
                         </button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+
+        <section class="department-main-card">
+            <div class="department-panel active" id="practicesPanel">
+                <div class="department-panel-header">
+                    <div>
+                        <h2>Производственные практики</h2>
+                        <p>Создание, поиск, сортировка и редактирование практик.</p>
                     </div>
-                </article>
-            }
-        </div>
-    </section>
+                </div>
+
+                <div class="department-toolbar">
+                    <div class="department-toolbar-row">
+                        <div class="department-search-wrap">
+                            <input type="text"
+                                   id="practiceSearchInput"
+                                   class="form-input department-search-input"
+                                   placeholder="Поиск по индексу ПП, названию, ПМ или специальности..." />
+                        </div>
+
+                        <div class="department-filter-wrap">
+                            <select id="practiceSortSelect" class="native-select-hidden">
+                                <option value="date-asc">Сначала ранние сроки</option>
+                                <option value="date-desc">Сначала поздние сроки</option>
+                                <option value="index-asc">Индекс ПП А-Я</option>
+                                <option value="hours-desc">Больше часов выше</option>
+                            </select>
+
+                            <div class="custom-select" data-target="practiceSortSelect">
+                                <button type="button" class="custom-select-trigger">Сначала ранние сроки</button>
+                                <div class="custom-select-menu"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="department-toolbar-row department-toolbar-row-secondary">
+                        <div class="department-filter-wrap">
+                            <select id="specialtyFilterSelect" class="native-select-hidden">
+                                <option value="">Все специальности</option>
+                            </select>
+
+                            <div class="custom-select" data-target="specialtyFilterSelect">
+                                <button type="button" class="custom-select-trigger">Все специальности</button>
+                                <div class="custom-select-menu"></div>
+                            </div>
+                        </div>
+
+                        <div class="department-date-range">
+                            <input type="date" id="dateFromFilter" class="form-input" />
+                            <input type="date" id="dateToFilter" class="form-input" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="department-summary-bar">
+                    <span id="practicesCountLabel">Показано практик: @Model.Practices.Count</span>
+                </div>
+
+                <div class="department-practices-list" id="practicesList">
+                    @foreach (var practice in Model.Practices)
+                    {
+                        <article class="practice-card"
+                                 data-id="@practice.Id"
+                                 data-practice-index="@practice.PracticeIndex"
+                                 data-name="@practice.Name"
+                                 data-specialty-id="@practice.SpecialtyId"
+                                 data-specialty-code="@practice.SpecialtyCode"
+                                 data-specialty-name="@practice.SpecialtyName"
+                                 data-professional-module-code="@practice.ProfessionalModuleCode"
+                                 data-professional-module-name="@practice.ProfessionalModuleName"
+                                 data-hours="@practice.Hours"
+                                 data-start-date="@practice.StartDate.ToString("yyyy-MM-dd")"
+                                 data-end-date="@practice.EndDate.ToString("yyyy-MM-dd")"
+                                 data-students-count="@practice.AssignedStudentsCount">
+                            <div class="practice-card-main">
+                                <div class="practice-card-top">
+                                    <div class="practice-card-title-block">
+                                        <div class="practice-index-chip">@practice.PracticeIndex</div>
+                                        <h3 class="practice-card-name">@practice.Name</h3>
+                                    </div>
+
+                                    <div class="practice-card-side">
+                                        <span class="practice-side-meta">@practice.Hours ч.</span>
+                                        <span class="practice-side-meta">@practice.StartDate.ToString("dd.MM.yyyy") - @practice.EndDate.ToString("dd.MM.yyyy")</span>
+                                    </div>
+                                </div>
+
+                                <div class="practice-card-meta-row">
+                                    <div class="practice-meta-item">
+                                        <span class="practice-meta-label">Специальность</span>
+                                        <span class="practice-meta-value">@practice.SpecialtyCode @practice.SpecialtyName</span>
+                                    </div>
+
+                                    <div class="practice-meta-separator"></div>
+
+                                    <div class="practice-meta-item">
+                                        <span class="practice-meta-label">ПМ</span>
+                                        <span class="practice-meta-value">@practice.ProfessionalModuleCode @practice.ProfessionalModuleName</span>
+                                    </div>
+
+                                    <div class="practice-meta-separator"></div>
+
+                                    <div class="practice-meta-item">
+                                        <span class="practice-meta-label">Назначено студентов</span>
+                                        <span class="practice-meta-value">@practice.AssignedStudentsCount</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="practice-card-actions">
+                                <button type="button" class="department-secondary-button practice-details-button">
+                                    Сведения
+                                </button>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </div>
+
+            <div class="department-panel" id="logsPanel">
+                <div class="department-panel-header">
+                    <div>
+                        <h2>Журнал изменений</h2>
+                        <p>Здесь позже будет журнал действий по производственным практикам.</p>
+                    </div>
+                </div>
+
+                <div class="department-placeholder-card">
+                    Раздел журнала подготовлен как отдельная вкладка и будет подключён следующим этапом.
+                </div>
+            </div>
+
+            <div class="department-panel" id="chatsPanel">
+                <div class="department-panel-header">
+                    <div>
+                        <h2>Чаты</h2>
+                        <p>Будущий раздел для общения по практикам.</p>
+                    </div>
+                </div>
+
+                <div class="department-placeholder-card">
+                    Раздел чатов подготовлен как отдельная вкладка и будет реализован позже.
+                </div>
+            </div>
+        </section>
+    </div>
 </div>
 
 <div class="department-modal-backdrop" id="practiceEditModalBackdrop">

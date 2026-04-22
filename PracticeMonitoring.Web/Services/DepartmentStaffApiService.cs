@@ -2,7 +2,6 @@
 using System.Text;
 using System.Text.Json;
 using PracticeMonitoring.Web.Models.DepartmentStaff;
-using PracticeMonitoring.Web.Models;
 
 namespace PracticeMonitoring.Web.Services;
 
@@ -90,13 +89,6 @@ public class DepartmentStaffApiService
 
     public async Task<DepartmentStaffApiResult<object>> SavePracticeAsync(string token, DepartmentStaffPracticeUpsertViewModel model)
     {
-        if (model == null)
-            return new DepartmentStaffApiResult<object>
-            {
-                Success = false,
-                ErrorMessage = "Model is null or invalid."
-            };
-
         var isEdit = model.Id.HasValue && model.Id.Value > 0;
         var method = isEdit ? HttpMethod.Put : HttpMethod.Post;
         var url = isEdit

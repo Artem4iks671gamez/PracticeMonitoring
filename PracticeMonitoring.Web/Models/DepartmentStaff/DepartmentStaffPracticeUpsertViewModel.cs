@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Text.RegularExpressions;
 
 namespace PracticeMonitoring.Web.Models.DepartmentStaff;
 
@@ -28,11 +27,9 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
     [Range(1, int.MaxValue, ErrorMessage = "Количество часов должно быть больше нуля.")]
     public int Hours { get; set; }
 
-    [DataType(DataType.Date, ErrorMessage = "Неверная дата начала.")]
-    public DateTime StartDate { get; set; }
+    public DateTime? StartDate { get; set; }
 
-    [DataType(DataType.Date, ErrorMessage = "Неверная дата окончания.")]
-    public DateTime EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
 
     public List<DepartmentStaffPracticeCompetencyEditViewModel> Competencies { get; set; } = new();
 
@@ -40,17 +37,15 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        // Dates
-        if (StartDate == default)
+        if (!StartDate.HasValue)
             yield return new ValidationResult("Укажите дату начала.", new[] { nameof(StartDate) });
 
-        if (EndDate == default)
+        if (!EndDate.HasValue)
             yield return new ValidationResult("Укажите дату окончания.", new[] { nameof(EndDate) });
 
-        if (StartDate != default && EndDate != default && EndDate < StartDate)
+        if (StartDate.HasValue && EndDate.HasValue && EndDate.Value < StartDate.Value)
             yield return new ValidationResult("Дата окончания не может быть раньше даты начала.", new[] { nameof(EndDate) });
 
-        // Competencies
         if (Competencies == null || Competencies.Count == 0)
         {
             yield return new ValidationResult("Добавьте хотя бы одну профессиональную компетенцию.", new[] { nameof(Competencies) });
@@ -58,6 +53,7 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
         else
         {
             var sum = 0;
+
             for (var i = 0; i < Competencies.Count; i++)
             {
                 var c = Competencies[i];
@@ -79,10 +75,11 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
             }
 
             if (Hours > 0 && sum != Hours)
-                yield return new ValidationResult($"Сумма часов по компетенциям ({sum}) должна быть равна общему количеству часов ({Hours}).", new[] { nameof(Competencies) });
+                yield return new ValidationResult(
+                    $"Сумма часов по компетенциям ({sum}) должна быть равна общему количеству часов ({Hours}).",
+                    new[] { nameof(Competencies) });
         }
 
-        // Student assignments
         if (StudentAssignments == null || StudentAssignments.Count == 0)
         {
             yield return new ValidationResult("Назначьте хотя бы одного студента.", new[] { nameof(StudentAssignments) });

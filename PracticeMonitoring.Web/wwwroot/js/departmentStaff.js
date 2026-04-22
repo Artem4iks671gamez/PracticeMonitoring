@@ -1,6 +1,8 @@
-﻿/* Обновлённый весь файл: добавлена клиентская валидация и небольшие улучшения UX */
-document.addEventListener('DOMContentLoaded', function () {
+﻿document.addEventListener('DOMContentLoaded', function () {
     const initialPractices = window.departmentStaffInitialPractices || [];
+
+    const panelButtons = Array.from(document.querySelectorAll('.department-nav-button'));
+    const panels = Array.from(document.querySelectorAll('.department-panel'));
 
     const practiceSearchInput = document.getElementById('practiceSearchInput');
     const practicesList = document.getElementById('practicesList');
@@ -22,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const practiceEditModalSubtitle = document.getElementById('practiceEditModalSubtitle');
     const practiceGlobalError = document.getElementById('practiceGlobalError');
 
-    const practiceForm = document.getElementById('practiceForm');
     const practiceIdInput = document.getElementById('practiceId');
     const practiceIndexInput = document.getElementById('practiceIndex');
     const practiceNameInput = document.getElementById('practiceName');
@@ -55,6 +56,39 @@ document.addEventListener('DOMContentLoaded', function () {
     let students = [];
     let supervisors = [];
     let currentDetails = null;
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value ?? '';
+        return div.innerHTML;
+    }
+
+    function formatDate(value) {
+        if (!value) return '—';
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+
+        return date.toLocaleDateString('ru-RU');
+    }
+
+    function switchPanel(targetId) {
+        panelButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.panelTarget === targetId);
+        });
+
+        panels.forEach(panel => {
+            panel.classList.toggle('active', panel.id === targetId);
+        });
+    }
+
+    panelButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            switchPanel(button.dataset.panelTarget);
+        });
+    });
 
     function clearFieldErrors() {
         document.querySelectorAll('.field-error').forEach(x => {
@@ -172,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     input.classList.add('input-error');
 
                     if (input.tagName.toLowerCase() === 'select') {
-                        const customTrigger = card.querySelector(`.custom-select[data-target="${input.id}"] .custom-select-trigger`);
+                        const customTrigger = card.querySelector('.custom-select .custom-select-trigger');
                         customTrigger?.classList.add('input-error');
                     }
                 }
@@ -183,13 +217,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             setSimpleFieldError(key, messages[0]);
         });
-
-        // фокус на первую ошибку
-        const firstErrorInput = document.querySelector('.input-error');
-        if (firstErrorInput) {
-            firstErrorInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            firstErrorInput.focus?.();
-        }
     }
 
     function buildCustomSelect(selectId, onChange) {
@@ -317,7 +344,9 @@ document.addEventListener('DOMContentLoaded', function () {
             card.dataset.practiceIndex,
             card.dataset.name,
             card.dataset.specialtyCode,
-            card.dataset.specialtyName
+            card.dataset.specialtyName,
+            card.dataset.professionalModuleCode,
+            card.dataset.professionalModuleName
         ]
             .filter(Boolean)
             .join(' ')
@@ -687,7 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     generateAttestationSheetButton?.addEventListener('click', () => {
-        alert('Следующим шагом сюда подключим формирование аттестационного листа по шаблону.');
+        alert('Следующий этап — формирование аттестационного листа с предпросмотром и сохранением.');
     });
 
     deletePracticeButton?.addEventListener('click', async () => {
@@ -721,17 +750,17 @@ document.addEventListener('DOMContentLoaded', function () {
             id: practiceIdInput.value ? Number(practiceIdInput.value) : null,
             practiceIndex: practiceIndexInput.value.trim(),
             name: practiceNameInput.value.trim(),
-            specialtyId: Number(practiceSpecialtySelect.value),
+            specialtyId: Number(practiceSpecialtySelect.value || 0),
             professionalModuleCode: professionalModuleCodeInput.value.trim(),
             professionalModuleName: professionalModuleNameInput.value.trim(),
-            hours: Number(practiceHoursInput.value),
-            startDate: practiceStartDateInput.value,
-            endDate: practiceEndDateInput.value,
+            hours: Number(practiceHoursInput.value || 0),
+            startDate: practiceStartDateInput.value ? practiceStartDateInput.value : null,
+            endDate: practiceEndDateInput.value ? practiceEndDateInput.value : null,
             competencies: Array.from(competenciesContainer.querySelectorAll('.competency-item')).map(item => ({
                 competencyCode: item.querySelector('.competency-code-input').value.trim(),
                 competencyDescription: item.querySelector('.competency-description-input').value.trim(),
                 workTypes: item.querySelector('.competency-worktypes-input').value.trim(),
-                hours: Number(item.querySelector('.competency-hours-input').value)
+                hours: Number(item.querySelector('.competency-hours-input').value || 0)
             })),
             studentAssignments: Array.from(assignmentsContainer.querySelectorAll('.assignment-item')).map(item => {
                 const studentValue = item.querySelector('.assignment-student-select').value;
@@ -745,86 +774,12 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    function validatePayload(payload) {
-        const errors = {};
-        let global = null;
-
-        // helpers
-        const add = (key, msg) => {
-            if (!errors[key]) errors[key] = [];
-            errors[key].push(msg);
-        };
-
-        const isIndexValid = (v) => /^\d+(\.\d+)*$/.test(v);
-        const isCodeValid = (v) => /^\d+(\.\d+)*$/.test(v); // код: цифры и точки
-
-        // Основные поля
-        if (!payload.practiceIndex) add('PracticeIndex', 'Индекс ПП обязателен.');
-        else if (!isIndexValid(payload.practiceIndex)) add('PracticeIndex', 'Индекс должен содержать только цифры и точки, напр. 12.3.');
-
-        if (!payload.name) add('Name', 'Название практики обязательно.');
-        else if (payload.name.length < 3) add('Name', 'Название слишком короткое.');
-
-        if (!payload.specialtyId || payload.specialtyId <= 0) add('SpecialtyId', 'Выберите специальность.');
-
-        if (!payload.hours || !Number.isFinite(payload.hours) || payload.hours < 1) add('Hours', 'Количество часов должно быть положительным числом.');
-
-        if (!payload.professionalModuleCode) add('ProfessionalModuleCode', 'Код ПМ обязателен.');
-        else if (!isCodeValid(payload.professionalModuleCode)) add('ProfessionalModuleCode', 'Код ПМ должен содержать только цифры и точки.');
-
-        if (!payload.professionalModuleName) add('ProfessionalModuleName', 'Название ПМ обязательно.');
-
-        if (!payload.startDate) add('StartDate', 'Укажите дату начала.');
-        if (!payload.endDate) add('EndDate', 'Укажите дату окончания.');
-
-        if (payload.startDate && payload.endDate) {
-            const s = new Date(payload.startDate);
-            const e = new Date(payload.endDate);
-            if (isNaN(s) || isNaN(e)) add('StartDate', 'Неверный формат даты.');
-            else if (e < s) add('EndDate', 'Дата окончания не может быть раньше даты начала.');
-        }
-
-        // Компетенции
-        if (!Array.isArray(payload.competencies) || payload.competencies.length === 0) {
-            add('Competencies', 'Добавьте хотя бы одну компетенцию.');
-        } else {
-            payload.competencies.forEach((c, i) => {
-                const base = `Competencies[${i}]`;
-                if (!c.competencyCode) add(`${base}.CompetencyCode`, 'Код компетенции обязателен.');
-                else if (!/^[\w\-\d\.]+$/.test(c.competencyCode)) add(`${base}.CompetencyCode`, 'Код содержит недопустимые символы.');
-
-                if (!c.competencyDescription) add(`${base}.CompetencyDescription`, 'Описание компетенции обязательно.');
-                if (!c.workTypes) add(`${base}.WorkTypes`, 'Укажите виды работ.');
-                if (!c.hours || !Number.isFinite(c.hours) || c.hours < 1) add(`${base}.Hours`, 'Часы должны быть положительным числом.');
-            });
-        }
-
-        // Назначения
-        if (Array.isArray(payload.studentAssignments)) {
-            payload.studentAssignments.forEach((a, i) => {
-                const base = `StudentAssignments[${i}]`;
-                if (!a.studentId || a.studentId <= 0) add(`${base}.StudentId`, 'Выберите студента.');
-                // supervisorId может быть null на этапе создания — не делаем обязательным
-            });
-        }
-
-        if (Object.keys(errors).length) global = 'Есть ошибки в форме. Исправьте их и попробуйте снова.';
-        return { valid: Object.keys(errors).length === 0, errors, global };
-    }
-
     practiceForm?.addEventListener('submit', async function (e) {
         e.preventDefault();
         clearFieldErrors();
 
         try {
             const payload = buildPayload();
-
-            // локальная валидация перед отправкой
-            const { valid, errors, global } = validatePayload(payload);
-            if (!valid) {
-                applyValidationErrors(errors, global);
-                return;
-            }
 
             await fetchJson('/DepartmentStaff/SavePractice', {
                 method: 'POST',
@@ -858,16 +813,5 @@ document.addEventListener('DOMContentLoaded', function () {
         applyPracticeFilters();
     });
 
-    // вспомогательные функции, используемые выше
-    function escapeHtml(s) {
-        if (!s) return '';
-        return String(s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; });
-    }
-
-    function formatDate(v) {
-        if (!v) return '';
-        try {
-            return new Date(v).toLocaleDateString('ru-RU');
-        } catch { return v; }
-    }
-});         
+    switchPanel('practicesPanel');
+});

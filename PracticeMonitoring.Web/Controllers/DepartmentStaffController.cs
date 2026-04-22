@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Models.DepartmentStaff;
 using PracticeMonitoring.Web.Services;
-using PracticeMonitoring.Web.Models;
 
 namespace PracticeMonitoring.Web.Controllers;
 
@@ -28,7 +27,8 @@ public class DepartmentStaffController : Controller
         var model = new DepartmentStaffPageViewModel
         {
             FullName = HttpContext.Session.GetString("FullName") ?? "Работник отдела",
-            Practices = await _departmentStaffApiService.GetPracticesAsync(token)
+            Practices = await _departmentStaffApiService.GetPracticesAsync(token),
+            Logs = new List<PracticeLogViewModel>()
         };
 
         return View(model);
@@ -68,14 +68,49 @@ public class DepartmentStaffController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> SavePractice([FromBody] DepartmentStaffPracticeUpsertViewModel model)
+    public async Task<IActionResult> SavePractice([FromBody] DepartmentStaffPracticeUpsertViewModel? model)
     {
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrWhiteSpace(token))
             return Unauthorized();
 
-        if (model == null)
-            return BadRequest(new { message = "Тело запроса пустое или JSON некорректен." });
+        if (model is null)
+        {
+            return BadRequest(new
+            {
+                message = "Исправьте ошибки формы.",
+                errors = new Dictionary<string, string[]>
+                {
+                    ["PracticeIndex"] = new[] { "Введите индекс ПП." },
+                    ["Name"] = new[] { "Введите название практики." },
+                    ["SpecialtyId"] = new[] { "Выберите специальность." },
+                    ["ProfessionalModuleCode"] = new[] { "Введите код профессионального модуля." },
+                    ["ProfessionalModuleName"] = new[] { "Введите название профессионального модуля." },
+                    ["Hours"] = new[] { "Укажите количество часов." },
+                    ["StartDate"] = new[] { "Укажите дату начала." },
+                    ["EndDate"] = new[] { "Укажите дату окончания." },
+                    ["Competencies"] = new[] { "Добавьте хотя бы одну профессиональную компетенцию." },
+                    ["StudentAssignments"] = new[] { "Назначьте хотя бы одного студента." }
+                }
+            });
+        }
+
+        if (!TryValidateModel(model))
+        {
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => NormalizeModelStateKey(x.Key),
+                    x => x.Value!.Errors
+                        .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Некорректное значение." : e.ErrorMessage)
+                        .ToArray());
+
+            return BadRequest(new
+            {
+                message = "Исправьте ошибки формы.",
+                errors
+            });
+        }
 
         var result = await _departmentStaffApiService.SavePracticeAsync(token, model);
 
@@ -110,5 +145,16 @@ public class DepartmentStaffController : Controller
         }
 
         return Ok(new { message = "Практика удалена." });
+    }
+
+    private static string NormalizeModelStateKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return key;
+
+        const string modelPrefix = "model.";
+        return key.StartsWith(modelPrefix, StringComparison.OrdinalIgnoreCase)
+            ? key[modelPrefix.Length..]
+            : key;
     }
 }

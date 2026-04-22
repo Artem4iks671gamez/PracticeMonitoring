@@ -1,4 +1,4 @@
-﻿namespace PracticeMonitoring.Web.Models;
+﻿namespace PracticeMonitoring.Web.Models.DepartmentStaff;
 
 public class DepartmentStaffFormDataViewModel
 {

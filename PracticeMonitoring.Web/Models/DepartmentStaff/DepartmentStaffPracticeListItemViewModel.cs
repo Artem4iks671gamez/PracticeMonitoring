@@ -14,6 +14,10 @@ public class DepartmentStaffPracticeListItemViewModel
 
     public string SpecialtyName { get; set; } = string.Empty;
 
+    public string ProfessionalModuleCode { get; set; } = string.Empty;
+
+    public string ProfessionalModuleName { get; set; } = string.Empty;
+
     public int Hours { get; set; }
 
     public DateTime StartDate { get; set; }
