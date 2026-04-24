@@ -208,6 +208,24 @@ public class DepartmentStaffController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> DownloadLogs(string category)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "DepartmentStaff" && role != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return RedirectToAction("Login", "Account");
+
+        var file = await _departmentStaffApiService.DownloadLogsAsync(token, category);
+        if (file is null)
+            return RedirectToAction(nameof(Index));
+
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> PreviewAttestation(int id)
     {
         var token = HttpContext.Session.GetString("Token");

@@ -233,7 +233,9 @@
                         </div>
 
                         <div class="department-console-footer">
-                            <span class="department-console-footnote">Консоль изменений карточек производственных практик.</span>
+                            <a asp-controller="DepartmentStaff" asp-action="DownloadLogs" asp-route-category="practice-changes" class="department-console-download-button">
+                                Сохранить .txt
+                            </a>
                         </div>
                     </div>
 
@@ -256,7 +258,9 @@
                         </div>
 
                         <div class="department-console-footer">
-                            <span class="department-console-footnote">Консоль назначений, снятия и переназначения студентов.</span>
+                            <a asp-controller="DepartmentStaff" asp-action="DownloadLogs" asp-route-category="assignment-changes" class="department-console-download-button">
+                                Сохранить .txt
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -602,6 +606,57 @@
 
             <button type="button" class="department-primary-button" id="downloadAttestationButton">
                 Сохранить как...
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="department-modal-backdrop" id="warningModalBackdrop">
+    <div class="department-modal department-modal-warning">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="warningModalTitle">Подтверждение действия</h2>
+                <p id="warningModalSubtitle">Проверьте последствия перед продолжением.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closeWarningModalButton">×</button>
+        </div>
+
+        <div class="department-warning-body">
+            <div class="department-warning-badge">Внимание</div>
+            <div class="department-warning-message" id="warningModalMessage"></div>
+            <div class="department-warning-list" id="warningModalConsequences"></div>
+        </div>
+
+        <div class="department-modal-actions">
+            <button type="button" class="department-secondary-button" id="cancelWarningModalButton">
+                Отмена
+            </button>
+            <button type="button" class="department-primary-button" id="confirmWarningModalButton">
+                Продолжить
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="department-modal-backdrop" id="errorModalBackdrop">
+    <div class="department-modal department-modal-error">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="errorModalTitle">Не удалось выполнить действие</h2>
+                <p id="errorModalSubtitle">Система остановила операцию из-за ошибки.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closeErrorModalButton">×</button>
+        </div>
+
+        <div class="department-warning-body">
+            <div class="department-warning-badge department-warning-badge-error">Ошибка</div>
+            <div class="department-warning-message" id="errorModalMessage"></div>
+            <div class="department-warning-list" id="errorModalDetails"></div>
+        </div>
+
+        <div class="department-modal-actions">
+            <button type="button" class="department-primary-button" id="confirmErrorModalButton">
+                Понятно
             </button>
         </div>
     </div>

@@ -178,6 +178,28 @@ public class DepartmentStaffApiService
         return ParseErrorResult(json, (int)response.StatusCode, "Не удалось удалить производственную практику.");
     }
 
+    public async Task<DepartmentStaffFileResult?> DownloadLogsAsync(string token, string category)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/practice-logs/export/{category}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsByteArrayAsync();
+        var fileName = ExtractFileName(response.Content.Headers.ContentDisposition?.FileNameStar)
+                       ?? ExtractFileName(response.Content.Headers.ContentDisposition?.FileName)
+                       ?? "logs.txt";
+
+        return new DepartmentStaffFileResult
+        {
+            Content = content,
+            ContentType = response.Content.Headers.ContentType?.ToString() ?? "text/plain; charset=utf-8",
+            FileName = fileName
+        };
+    }
+
     private async Task<List<DepartmentStaffAuditLogItemViewModel>> GetLogsAsync(string token, string url)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -232,5 +254,13 @@ public class DepartmentStaffApiService
         }
 
         return result;
+    }
+
+    private static string? ExtractFileName(string? rawFileName)
+    {
+        if (string.IsNullOrWhiteSpace(rawFileName))
+            return null;
+
+        return rawFileName.Trim('"');
     }
 }

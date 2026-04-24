@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 using PracticeMonitoring.Api.Data;
 using PracticeMonitoring.Api.Dtos;
 
@@ -28,6 +29,43 @@ public class DepartmentStaffPracticeLogsController : ControllerBase
     public Task<ActionResult<List<AuditLogItemResponse>>> GetAssignmentChangesLogs()
     {
         return GetLogsByCategoryAsync("ProductionPracticeAssignmentChange");
+    }
+
+    [HttpGet("export/{category}")]
+    public async Task<IActionResult> ExportLogs(string category)
+    {
+        var normalizedCategory = category switch
+        {
+            "practice-changes" => "ProductionPracticeChange",
+            "assignment-changes" => "ProductionPracticeAssignmentChange",
+            _ => null
+        };
+
+        if (normalizedCategory is null)
+            return BadRequest(new { message = "Неизвестная категория логов." });
+
+        var logs = await _context.AuditLogs
+            .Where(x => x.Category == normalizedCategory)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+
+        foreach (var log in logs)
+        {
+            var actor = string.IsNullOrWhiteSpace(log.ActorFullName) ? "Работник отдела" : log.ActorFullName;
+            sb.AppendLine($"{log.CreatedAtUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss} | {actor} | {log.Action} | {log.Description}");
+        }
+
+        var fileName = category switch
+        {
+            "practice-changes" => "production-practice-changes-log.txt",
+            "assignment-changes" => "production-practice-assignments-log.txt",
+            _ => "department-staff-logs.txt"
+        };
+
+        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        return File(bytes, "text/plain; charset=utf-8", fileName);
     }
 
     private async Task<ActionResult<List<AuditLogItemResponse>>> GetLogsByCategoryAsync(string category)

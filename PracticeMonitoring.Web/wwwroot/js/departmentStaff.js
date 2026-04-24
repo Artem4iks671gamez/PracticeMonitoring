@@ -80,6 +80,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const editPracticeFromDetailsButton = document.getElementById('editPracticeFromDetailsButton');
     const generateAttestationSheetButton = document.getElementById('generateAttestationSheetButton');
     const deletePracticeButton = document.getElementById('deletePracticeButton');
+    const warningModalBackdrop = document.getElementById('warningModalBackdrop');
+    const warningModalTitle = document.getElementById('warningModalTitle');
+    const warningModalSubtitle = document.getElementById('warningModalSubtitle');
+    const warningModalMessage = document.getElementById('warningModalMessage');
+    const warningModalConsequences = document.getElementById('warningModalConsequences');
+    const closeWarningModalButton = document.getElementById('closeWarningModalButton');
+    const cancelWarningModalButton = document.getElementById('cancelWarningModalButton');
+    const confirmWarningModalButton = document.getElementById('confirmWarningModalButton');
+    const errorModalBackdrop = document.getElementById('errorModalBackdrop');
+    const errorModalTitle = document.getElementById('errorModalTitle');
+    const errorModalSubtitle = document.getElementById('errorModalSubtitle');
+    const errorModalMessage = document.getElementById('errorModalMessage');
+    const errorModalDetails = document.getElementById('errorModalDetails');
+    const closeErrorModalButton = document.getElementById('closeErrorModalButton');
+    const confirmErrorModalButton = document.getElementById('confirmErrorModalButton');
 
     let specialties = [];
     let students = [];
@@ -99,6 +114,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let originalEditSpecialtyId = null;
     let originalEditAssignedStudentsCount = 0;
     let specialtyChangeStudentResetConfirmed = false;
+    let warningModalResolver = null;
+    let errorModalResolver = null;
 
     function createDefaultAssignmentFilters() {
         return {
@@ -185,6 +202,137 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!practiceGlobalError) return;
         practiceGlobalError.textContent = message || 'Исправьте ошибки формы.';
         practiceGlobalError.classList.add('show');
+    }
+
+    function closeWarningModal(result) {
+        if (warningModalResolver) {
+            const resolver = warningModalResolver;
+            warningModalResolver = null;
+            resolver(result);
+        }
+
+        warningModalMessage && (warningModalMessage.textContent = '');
+        warningModalConsequences && (warningModalConsequences.innerHTML = '');
+        warningModalTitle && (warningModalTitle.textContent = 'Подтверждение действия');
+        warningModalSubtitle && (warningModalSubtitle.textContent = 'Проверьте последствия перед продолжением.');
+
+        closeModal(warningModalBackdrop);
+    }
+
+    function showWarningModal(options) {
+        if (warningModalResolver) {
+            closeWarningModal(false);
+        }
+
+        if (warningModalTitle) {
+            warningModalTitle.textContent = options.title || 'Подтверждение действия';
+        }
+
+        if (warningModalSubtitle) {
+            warningModalSubtitle.textContent = options.subtitle || 'Проверьте последствия перед продолжением.';
+        }
+
+        if (warningModalMessage) {
+            warningModalMessage.textContent = options.message || '';
+        }
+
+        if (warningModalConsequences) {
+            warningModalConsequences.innerHTML = (options.consequences || []).map(item => {
+                if (typeof item === 'string') {
+                    return `<div class="department-warning-item"><div class="department-warning-item-text">${escapeHtml(item)}</div></div>`;
+                }
+
+                const text = escapeHtml(item.text || '');
+                const accent = item.accent ? `<div class="department-warning-item-accent">${escapeHtml(item.accent)}</div>` : '';
+                return `
+                    <div class="department-warning-item">
+                        <div>
+                            <div class="department-warning-item-text">${text}</div>
+                            ${accent}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        if (confirmWarningModalButton) {
+            confirmWarningModalButton.textContent = options.confirmText || 'Продолжить';
+        }
+
+        openModal(warningModalBackdrop);
+
+        return new Promise(resolve => {
+            warningModalResolver = resolve;
+        });
+    }
+
+    function closeErrorModal() {
+        if (errorModalResolver) {
+            const resolver = errorModalResolver;
+            errorModalResolver = null;
+            resolver();
+        }
+
+        if (errorModalTitle) {
+            errorModalTitle.textContent = 'Не удалось выполнить действие';
+        }
+
+        if (errorModalSubtitle) {
+            errorModalSubtitle.textContent = 'Система остановила операцию из-за ошибки.';
+        }
+
+        if (errorModalMessage) {
+            errorModalMessage.textContent = '';
+        }
+
+        if (errorModalDetails) {
+            errorModalDetails.innerHTML = '';
+        }
+
+        closeModal(errorModalBackdrop);
+    }
+
+    function showErrorModal(options) {
+        if (errorModalResolver) {
+            closeErrorModal();
+        }
+
+        if (errorModalTitle) {
+            errorModalTitle.textContent = options.title || 'Не удалось выполнить действие';
+        }
+
+        if (errorModalSubtitle) {
+            errorModalSubtitle.textContent = options.subtitle || 'Система остановила операцию из-за ошибки.';
+        }
+
+        if (errorModalMessage) {
+            errorModalMessage.textContent = options.message || 'Операцию не удалось завершить.';
+        }
+
+        if (errorModalDetails) {
+            errorModalDetails.innerHTML = (options.details || []).map(item => {
+                if (typeof item === 'string') {
+                    return `<div class="department-warning-item department-warning-item-error"><div class="department-warning-item-text">${escapeHtml(item)}</div></div>`;
+                }
+
+                const text = escapeHtml(item.text || '');
+                const accent = item.accent ? `<div class="department-warning-item-accent">${escapeHtml(item.accent)}</div>` : '';
+                return `
+                    <div class="department-warning-item department-warning-item-error">
+                        <div>
+                            <div class="department-warning-item-text">${text}</div>
+                            ${accent}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        openModal(errorModalBackdrop);
+
+        return new Promise(resolve => {
+            errorModalResolver = resolve;
+        });
     }
 
     function setSimpleFieldError(fieldName, message) {
@@ -1230,6 +1378,21 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target === attestationPreviewModalBackdrop) closeModal(attestationPreviewModalBackdrop);
     });
 
+    warningModalBackdrop?.addEventListener('click', event => {
+        if (event.target === warningModalBackdrop) closeWarningModal(false);
+    });
+
+    closeWarningModalButton?.addEventListener('click', () => closeWarningModal(false));
+    cancelWarningModalButton?.addEventListener('click', () => closeWarningModal(false));
+    confirmWarningModalButton?.addEventListener('click', () => closeWarningModal(true));
+
+    errorModalBackdrop?.addEventListener('click', event => {
+        if (event.target === errorModalBackdrop) closeErrorModal();
+    });
+
+    closeErrorModalButton?.addEventListener('click', () => closeErrorModal());
+    confirmErrorModalButton?.addEventListener('click', () => closeErrorModal());
+
     panelButtons.forEach(button => {
         button.addEventListener('click', () => {
             switchPanel(button.dataset.panelTarget);
@@ -1386,7 +1549,17 @@ document.addEventListener('DOMContentLoaded', function () {
             await fillEditFormFromDetails(currentDetails);
             openModal(editModalBackdrop);
         } catch (error) {
-            alert(error.message || 'Не удалось подготовить форму редактирования.');
+            await showErrorModal({
+                title: 'Не удалось открыть режим редактирования',
+                subtitle: 'Карточка практики не была подготовлена',
+                message: error.message || 'Система не смогла загрузить данные практики для редактирования.',
+                details: [
+                    {
+                        text: 'Форма редактирования осталась закрытой, данные на странице не изменились.',
+                        accent: 'Можно повторить попытку ещё раз.'
+                    }
+                ]
+            });
         }
     });
 
@@ -1397,7 +1570,17 @@ document.addEventListener('DOMContentLoaded', function () {
             closeModal(detailsModalBackdrop);
             await openAssignmentsModal(currentDetails.id);
         } catch (error) {
-            alert(error.message || 'Не удалось открыть окно назначения студентов.');
+            await showErrorModal({
+                title: 'Не удалось открыть назначение студентов',
+                subtitle: 'Окно назначения не было загружено',
+                message: error.message || 'Система не смогла открыть рабочее окно назначения студентов для выбранной практики.',
+                details: [
+                    {
+                        text: 'Состав студентов не изменился и текущие назначения остались без правок.',
+                        accent: 'Попробуй повторить открытие окна ещё раз.'
+                    }
+                ]
+            });
         }
     });
 
@@ -1426,7 +1609,26 @@ document.addEventListener('DOMContentLoaded', function () {
     deletePracticeButton?.addEventListener('click', async () => {
         if (!currentDetails) return;
 
-        const confirmed = confirm('Вы уверены, что хотите удалить производственную практику?');
+        const confirmed = await showWarningModal({
+            title: 'Удаление производственной практики',
+            subtitle: `${currentDetails.practiceIndex} • ${currentDetails.name}`,
+            message: 'Это действие удалит карточку практики из рабочего раздела. Отменить его после сохранения не получится.',
+            confirmText: 'Удалить практику',
+            consequences: [
+                {
+                    text: 'Будут удалены основные сведения о практике, профессиональные компетенции и текущий состав назначенных студентов.',
+                    accent: 'Практика исчезнет из активного и завершённого списков.'
+                },
+                {
+                    text: 'Сформировать аттестационный лист по этой карточке после удаления уже не получится.',
+                    accent: 'Для повторной работы практику придётся создавать заново.'
+                },
+                {
+                    text: 'Записи о факте удаления сохранятся в журнале изменений.',
+                    accent: 'Аудит не удаляется вместе с карточкой.'
+                }
+            ]
+        });
         if (!confirmed) return;
 
         try {
@@ -1442,7 +1644,17 @@ document.addEventListener('DOMContentLoaded', function () {
             currentDetails = null;
             applyPracticeFilters();
         } catch (error) {
-            alert(error.message || 'Не удалось удалить практику.');
+            await showErrorModal({
+                title: 'Не удалось удалить практику',
+                subtitle: 'Карточка практики осталась в системе',
+                message: error.message || 'Система не смогла удалить производственную практику.',
+                details: [
+                    {
+                        text: 'Практика, назначения студентов и компетенции остались без изменений.',
+                        accent: 'Журнал аудита тоже не был дополнен записью об удалении.'
+                    }
+                ]
+            });
         }
     });
 
@@ -1481,7 +1693,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 currentSpecialtyId !== originalEditSpecialtyId;
 
             if (specialtyChanged && !specialtyChangeStudentResetConfirmed) {
-                const confirmed = confirm('В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Продолжить?');
+                const confirmed = await showWarningModal({
+                    title: 'Смена специальности у практики',
+                    subtitle: 'Изменение влияет на текущие назначения студентов',
+                    message: 'У этой производственной практики уже есть назначенные студенты. После смены специальности старые назначения перестанут соответствовать правилам предметной области.',
+                    confirmText: 'Изменить специальность',
+                    consequences: [
+                        {
+                            text: 'Все уже назначенные студенты и выбранные для них руководители будут автоматически удалены из состава практики.',
+                            accent: 'После сохранения придётся заново сформировать список студентов для новой специальности.'
+                        },
+                        {
+                            text: 'Основная карточка практики и перечень компетенций останутся, изменится только специальность и связанный с ней состав студентов.',
+                            accent: 'Если нужна старая группа назначений, лучше не менять специальность, а создать отдельную практику.'
+                        },
+                        {
+                            text: 'Факт автоматической очистки назначений будет зафиксирован в журнале изменений.',
+                            accent: 'Это нужно для прозрачности и последующей проверки действий.'
+                        }
+                    ]
+                });
                 if (!confirmed) return;
                 specialtyChangeStudentResetConfirmed = true;
             }
@@ -1520,7 +1751,17 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 await openAssignmentsModal(card.dataset.id);
             } catch (error) {
-                alert(error.message || 'Не удалось открыть окно назначения студентов.');
+                await showErrorModal({
+                    title: 'Не удалось открыть назначение студентов',
+                    subtitle: 'Окно назначения не было загружено',
+                    message: error.message || 'Система не смогла открыть рабочее окно назначения студентов для выбранной практики.',
+                    details: [
+                        {
+                            text: 'Текущая карточка практики осталась без изменений.',
+                            accent: 'Можно повторить попытку после обновления страницы.'
+                        }
+                    ]
+                });
             }
         });
     });
