@@ -29,6 +29,10 @@
                         Журнал изменений
                     </button>
 
+                    <button type="button" class="department-nav-button" data-panel-target="supervisorsPanel">
+                        Руководители
+                    </button>
+
                     <button type="button" class="department-nav-button" data-panel-target="chatsPanel">
                         Чаты
                     </button>
@@ -266,6 +270,85 @@
                 </div>
             </div>
 
+            <div class="department-panel" id="supervisorsPanel">
+                <div class="department-panel-header">
+                    <div>
+                        <h2>Руководители</h2>
+                        <p>Нагрузка по студентам и производственным практикам у руководителей от техникума.</p>
+                    </div>
+                </div>
+
+                <div class="department-toolbar">
+                    <div class="department-toolbar-row">
+                        <div class="department-search-wrap">
+                            <input type="text"
+                                   id="supervisorSearchInput"
+                                   class="form-input department-search-input"
+                                   placeholder="Поиск по ФИО или email руководителя..." />
+                        </div>
+
+                        <div class="department-filter-wrap">
+                            <select id="supervisorSortSelect" class="native-select-hidden">
+                                <option value="name-asc">ФИО А-Я</option>
+                                <option value="students-desc">Больше студентов</option>
+                                <option value="practices-desc">Больше практик</option>
+                            </select>
+
+                            <div class="custom-select" data-target="supervisorSortSelect">
+                                <button type="button" class="custom-select-trigger">ФИО А-Я</button>
+                                <div class="custom-select-menu"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="department-summary-bar">
+                    <span id="supervisorsCountLabel">Показано руководителей: @Model.Supervisors.Count</span>
+                </div>
+
+                <div class="department-supervisors-list" id="supervisorsList">
+                    @foreach (var supervisor in Model.Supervisors)
+                    {
+                        <article class="supervisor-card"
+                                 data-id="@supervisor.Id"
+                                 data-full-name="@supervisor.FullName"
+                                 data-email="@supervisor.Email"
+                                 data-students-count="@supervisor.AssignedStudentsCount"
+                                 data-practices-count="@supervisor.PracticesCount">
+                            <div class="supervisor-card-main">
+                                <div class="supervisor-card-header">
+                                    <div class="supervisor-card-avatar">
+                                        @(string.IsNullOrWhiteSpace(supervisor.FullName) ? "Р" : supervisor.FullName[0].ToString().ToUpper())
+                                    </div>
+                                    <div class="supervisor-card-headline">
+                                        <h3 class="supervisor-card-name">@supervisor.FullName</h3>
+                                        <div class="supervisor-card-email">@supervisor.Email</div>
+                                    </div>
+                                </div>
+
+                                <div class="supervisor-card-metrics">
+                                    <div class="supervisor-card-metric">
+                                        <span class="supervisor-card-metric-label">Назначено студентов</span>
+                                        <span class="supervisor-card-metric-value">@supervisor.AssignedStudentsCount</span>
+                                    </div>
+
+                                    <div class="supervisor-card-metric">
+                                        <span class="supervisor-card-metric-label">Практик в нагрузке</span>
+                                        <span class="supervisor-card-metric-value">@supervisor.PracticesCount</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="supervisor-card-actions">
+                                <button type="button" class="department-primary-button supervisor-details-button">
+                                    Подробнее
+                                </button>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </div>
+
             <div class="department-panel" id="chatsPanel">
                 <div class="department-panel-header">
                     <div>
@@ -279,6 +362,66 @@
                 </div>
             </div>
         </section>
+    </div>
+</div>
+
+<div class="department-modal-backdrop" id="supervisorDetailsModalBackdrop">
+    <div class="department-modal department-modal-large department-modal-supervisor">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="supervisorDetailsTitle">Сведения о руководителе</h2>
+                <p id="supervisorDetailsSubtitle">Нагрузка по студентам и производственным практикам.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closeSupervisorDetailsModalButton">×</button>
+        </div>
+
+        <div class="department-details-layout department-supervisor-layout">
+            <section class="department-details-overview">
+                <div class="department-details-overview-main">
+                    <div class="department-details-overview-label">Руководитель</div>
+                    <div class="department-details-overview-title" id="supervisorDetailsOverviewTitle">
+                        Выберите руководителя
+                    </div>
+                    <div class="department-details-overview-subtitle" id="supervisorDetailsOverviewSubtitle">
+                        Здесь будет собрана текущая нагрузка по студентам и практикам.
+                    </div>
+                </div>
+
+                <div class="department-details-overview-stats" id="supervisorDetailsOverviewStats"></div>
+            </section>
+
+            <div class="department-subtabs">
+                <button type="button" class="department-subtab-button active" data-supervisor-details-tab="students">
+                    Студенты
+                    <span class="department-subtab-counter" id="supervisorStudentsTabCounter">0</span>
+                </button>
+
+                <button type="button" class="department-subtab-button" data-supervisor-details-tab="practices">
+                    Производственные практики преподавателя
+                    <span class="department-subtab-counter" id="supervisorPracticesTabCounter">0</span>
+                </button>
+            </div>
+
+            <div class="department-supervisor-tab-content active" id="supervisorStudentsTab">
+                <div class="department-details-section">
+                    <div class="department-details-title">Студенты руководителя</div>
+                    <div id="supervisorDetailsStudents" class="department-details-list"></div>
+                </div>
+            </div>
+
+            <div class="department-supervisor-tab-content" id="supervisorPracticesTab">
+                <div class="department-details-section">
+                    <div class="department-details-title">Производственные практики преподавателя</div>
+                    <div id="supervisorDetailsPractices" class="department-details-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="department-modal-actions">
+            <button type="button" class="department-primary-button" id="closeSupervisorDetailsFooterButton">
+                Закрыть
+            </button>
+        </div>
     </div>
 </div>
 

@@ -12,11 +12,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const dateToFilter = document.getElementById('dateToFilter');
     const specialtyFilterSelect = document.getElementById('specialtyFilterSelect');
     const practiceSortSelect = document.getElementById('practiceSortSelect');
+    const supervisorSearchInput = document.getElementById('supervisorSearchInput');
+    const supervisorSortSelect = document.getElementById('supervisorSortSelect');
+    const supervisorsList = document.getElementById('supervisorsList');
+    const supervisorsCountLabel = document.getElementById('supervisorsCountLabel');
 
     const editModalBackdrop = document.getElementById('practiceEditModalBackdrop');
     const detailsModalBackdrop = document.getElementById('practiceDetailsModalBackdrop');
     const assignmentsModalBackdrop = document.getElementById('practiceAssignmentsModalBackdrop');
     const attestationPreviewModalBackdrop = document.getElementById('attestationPreviewModalBackdrop');
+    const supervisorDetailsModalBackdrop = document.getElementById('supervisorDetailsModalBackdrop');
 
     const openCreatePracticeButton = document.getElementById('openCreatePracticeButton');
     const closePracticeEditModalButton = document.getElementById('closePracticeEditModalButton');
@@ -80,6 +85,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const editPracticeFromDetailsButton = document.getElementById('editPracticeFromDetailsButton');
     const generateAttestationSheetButton = document.getElementById('generateAttestationSheetButton');
     const deletePracticeButton = document.getElementById('deletePracticeButton');
+    const closeSupervisorDetailsModalButton = document.getElementById('closeSupervisorDetailsModalButton');
+    const closeSupervisorDetailsFooterButton = document.getElementById('closeSupervisorDetailsFooterButton');
+    const supervisorDetailsTitle = document.getElementById('supervisorDetailsTitle');
+    const supervisorDetailsSubtitle = document.getElementById('supervisorDetailsSubtitle');
+    const supervisorDetailsOverviewTitle = document.getElementById('supervisorDetailsOverviewTitle');
+    const supervisorDetailsOverviewSubtitle = document.getElementById('supervisorDetailsOverviewSubtitle');
+    const supervisorDetailsOverviewStats = document.getElementById('supervisorDetailsOverviewStats');
+    const supervisorDetailsStudents = document.getElementById('supervisorDetailsStudents');
+    const supervisorDetailsPractices = document.getElementById('supervisorDetailsPractices');
+    const supervisorStudentsTabCounter = document.getElementById('supervisorStudentsTabCounter');
+    const supervisorPracticesTabCounter = document.getElementById('supervisorPracticesTabCounter');
+    const supervisorDetailsTabButtons = Array.from(document.querySelectorAll('[data-supervisor-details-tab]'));
+    const supervisorDetailsTabs = {
+        students: document.getElementById('supervisorStudentsTab'),
+        practices: document.getElementById('supervisorPracticesTab')
+    };
     const warningModalBackdrop = document.getElementById('warningModalBackdrop');
     const warningModalTitle = document.getElementById('warningModalTitle');
     const warningModalSubtitle = document.getElementById('warningModalSubtitle');
@@ -101,6 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let supervisors = [];
     let studentLookup = new Map();
     let currentDetails = null;
+    let currentSupervisorDetails = null;
     let currentAssignmentPractice = null;
     let currentAttestationPracticeId = null;
     let assignmentCatalogLoaded = false;
@@ -116,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let specialtyChangeStudentResetConfirmed = false;
     let warningModalResolver = null;
     let errorModalResolver = null;
+    let supervisorDetailsTab = 'students';
 
     function createDefaultAssignmentFilters() {
         return {
@@ -710,6 +733,62 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function getSupervisorCards() {
+        return Array.from(document.querySelectorAll('.supervisor-card'));
+    }
+
+    function applySupervisorFilters() {
+        const search = (supervisorSearchInput?.value || '').trim().toLowerCase();
+        const sort = supervisorSortSelect?.value || 'name-asc';
+
+        let cards = getSupervisorCards();
+
+        cards.forEach(card => {
+            const haystack = `${card.dataset.fullName || ''} ${card.dataset.email || ''}`.toLowerCase();
+            const matches = !search || haystack.includes(search);
+            card.style.display = matches ? '' : 'none';
+        });
+
+        cards = cards.filter(card => card.style.display !== 'none');
+
+        cards.sort((left, right) => {
+            const leftName = left.dataset.fullName || '';
+            const rightName = right.dataset.fullName || '';
+            const leftStudents = Number(left.dataset.studentsCount || 0);
+            const rightStudents = Number(right.dataset.studentsCount || 0);
+            const leftPractices = Number(left.dataset.practicesCount || 0);
+            const rightPractices = Number(right.dataset.practicesCount || 0);
+
+            switch (sort) {
+                case 'students-desc':
+                    return rightStudents - leftStudents || leftName.localeCompare(rightName, 'ru');
+                case 'practices-desc':
+                    return rightPractices - leftPractices || leftName.localeCompare(rightName, 'ru');
+                case 'name-asc':
+                default:
+                    return leftName.localeCompare(rightName, 'ru');
+            }
+        });
+
+        cards.forEach(card => supervisorsList?.appendChild(card));
+
+        if (supervisorsCountLabel) {
+            supervisorsCountLabel.textContent = `Показано руководителей: ${cards.length}`;
+        }
+    }
+
+    function setSupervisorDetailsTab(tab) {
+        supervisorDetailsTab = tab === 'practices' ? 'practices' : 'students';
+
+        supervisorDetailsTabButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.supervisorDetailsTab === supervisorDetailsTab);
+        });
+
+        Object.entries(supervisorDetailsTabs).forEach(([key, element]) => {
+            element?.classList.toggle('active', key === supervisorDetailsTab);
+        });
+    }
+
     function getPracticeSpecialtyId() {
         const value = Number(currentAssignmentPractice?.specialtyId || 0);
         return Number.isFinite(value) ? value : 0;
@@ -1244,6 +1323,84 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function renderSupervisorDetails(details) {
+        currentSupervisorDetails = details;
+
+        if (supervisorDetailsTitle) {
+            supervisorDetailsTitle.textContent = `Руководитель: ${details.fullName}`;
+        }
+
+        if (supervisorDetailsSubtitle) {
+            supervisorDetailsSubtitle.textContent = details.email || 'Руководитель от техникума';
+        }
+
+        if (supervisorDetailsOverviewTitle) {
+            supervisorDetailsOverviewTitle.textContent = details.fullName || 'Руководитель';
+        }
+
+        if (supervisorDetailsOverviewSubtitle) {
+            supervisorDetailsOverviewSubtitle.textContent = details.email || 'Нагрузка по студентам и производственным практикам';
+        }
+
+        if (supervisorDetailsOverviewStats) {
+            supervisorDetailsOverviewStats.innerHTML = `
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Студенты</span>
+                    <span class="department-details-overview-stat-value">${details.assignedStudentsCount}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Практики</span>
+                    <span class="department-details-overview-stat-value">${details.practicesCount}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Email</span>
+                    <span class="department-details-overview-stat-value">${escapeHtml(details.email || '-')}</span>
+                </div>
+            `;
+        }
+
+        if (supervisorStudentsTabCounter) {
+            supervisorStudentsTabCounter.textContent = String((details.students || []).length);
+        }
+
+        if (supervisorPracticesTabCounter) {
+            supervisorPracticesTabCounter.textContent = String((details.practices || []).length);
+        }
+
+        if (supervisorDetailsStudents) {
+            supervisorDetailsStudents.innerHTML = (details.students || []).length
+                ? details.students.map(item => `
+                    <div class="department-details-card">
+                        <div class="department-details-card-header">
+                            <div class="department-details-card-title">${escapeHtml(item.studentFullName)}</div>
+                            <div class="department-details-chip">${escapeHtml(item.course != null ? `${item.course} курс` : 'Курс не указан')}</div>
+                        </div>
+                        <div class="department-details-card-meta">
+                            <span class="department-details-inline-chip">${escapeHtml(item.groupName || 'Группа не указана')}</span>
+                            <span class="department-details-inline-chip">${escapeHtml(item.practiceIndex)} ${escapeHtml(item.practiceName)}</span>
+                        </div>
+                    </div>
+                `).join('')
+                : '<div class="department-details-card"><div class="department-details-card-text">У этого руководителя пока нет назначенных студентов.</div></div>';
+        }
+
+        if (supervisorDetailsPractices) {
+            supervisorDetailsPractices.innerHTML = (details.practices || []).length
+                ? details.practices.map(item => `
+                    <div class="department-details-card">
+                        <div class="department-details-card-header">
+                            <div class="department-details-card-title">${escapeHtml(item.practiceIndex)} - ${escapeHtml(item.practiceName)}</div>
+                            <div class="department-details-chip">${item.studentsCount} студ.</div>
+                        </div>
+                        <div class="department-details-card-meta">
+                            <span class="department-details-inline-chip">${escapeHtml(item.specialtyCode)} ${escapeHtml(item.specialtyName)}</span>
+                        </div>
+                    </div>
+                `).join('')
+                : '<div class="department-details-card"><div class="department-details-card-text">У этого руководителя пока нет производственных практик с назначенными студентами.</div></div>';
+        }
+    }
+
     async function openDetails(practiceId) {
         const details = await fetchJson(`/DepartmentStaff/GetPracticeDetails?id=${practiceId}`);
         if (!details) return;
@@ -1251,6 +1408,15 @@ document.addEventListener('DOMContentLoaded', function () {
         currentDetails = details;
         renderPracticeDetails(details);
         openModal(detailsModalBackdrop);
+    }
+
+    async function openSupervisorDetails(supervisorId) {
+        const details = await fetchJson(`/DepartmentStaff/GetSupervisorDetails?id=${supervisorId}`);
+        if (!details) return;
+
+        renderSupervisorDetails(details);
+        setSupervisorDetailsTab('students');
+        openModal(supervisorDetailsModalBackdrop);
     }
 
     async function fillEditFormFromDetails(details) {
@@ -1361,6 +1527,8 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelPracticeAssignmentsModalButton?.addEventListener('click', () => closeModal(assignmentsModalBackdrop));
     closeAttestationPreviewModalButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
     cancelAttestationPreviewButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
+    closeSupervisorDetailsModalButton?.addEventListener('click', () => closeModal(supervisorDetailsModalBackdrop));
+    closeSupervisorDetailsFooterButton?.addEventListener('click', () => closeModal(supervisorDetailsModalBackdrop));
 
     editModalBackdrop?.addEventListener('click', event => {
         if (event.target === editModalBackdrop) closeModal(editModalBackdrop);
@@ -1376,6 +1544,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     attestationPreviewModalBackdrop?.addEventListener('click', event => {
         if (event.target === attestationPreviewModalBackdrop) closeModal(attestationPreviewModalBackdrop);
+    });
+
+    supervisorDetailsModalBackdrop?.addEventListener('click', event => {
+        if (event.target === supervisorDetailsModalBackdrop) closeModal(supervisorDetailsModalBackdrop);
     });
 
     warningModalBackdrop?.addEventListener('click', event => {
@@ -1408,6 +1580,12 @@ document.addEventListener('DOMContentLoaded', function () {
     logConsoleButtons.forEach(button => {
         button.addEventListener('click', () => {
             switchLogConsole(button.dataset.logConsole || 'practiceChangesConsole');
+        });
+    });
+
+    supervisorDetailsTabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            setSupervisorDetailsTab(button.dataset.supervisorDetailsTab || 'students');
         });
     });
 
@@ -1766,9 +1944,33 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    document.querySelectorAll('.supervisor-details-button').forEach(button => {
+        button.addEventListener('click', async () => {
+            const card = button.closest('.supervisor-card');
+            if (!card) return;
+
+            try {
+                await openSupervisorDetails(card.dataset.id);
+            } catch (error) {
+                await showErrorModal({
+                    title: 'Не удалось открыть сведения о руководителе',
+                    subtitle: 'Данные по нагрузке не были загружены',
+                    message: error.message || 'Система не смогла открыть карточку руководителя.',
+                    details: [
+                        {
+                            text: 'Список руководителей остался доступен, но расширенная информация не была показана.',
+                            accent: 'Попробуй повторить открытие карточки ещё раз.'
+                        }
+                    ]
+                });
+            }
+        });
+    });
+
     practiceSearchInput?.addEventListener('input', applyPracticeFilters);
     dateFromFilter?.addEventListener('change', applyPracticeFilters);
     dateToFilter?.addEventListener('change', applyPracticeFilters);
+    supervisorSearchInput?.addEventListener('input', applySupervisorFilters);
 
     buildCustomSelect('practiceSortSelect', applyPracticeFilters);
     buildCustomSelect('specialtyFilterSelect', applyPracticeFilters);
@@ -1777,9 +1979,11 @@ document.addEventListener('DOMContentLoaded', function () {
     buildCustomSelect('studentCourseFilterSelect');
     buildCustomSelect('studentGroupFilterSelect');
     buildCustomSelect('studentSortSelect');
+    buildCustomSelect('supervisorSortSelect', applySupervisorFilters);
 
     Promise.resolve(loadFormMetadata()).then(() => {
         applyPracticeFilters();
+        applySupervisorFilters();
     });
 
     setPracticeStatusTab('active');

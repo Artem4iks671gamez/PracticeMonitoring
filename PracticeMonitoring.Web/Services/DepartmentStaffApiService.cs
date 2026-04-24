@@ -32,6 +32,20 @@ public class DepartmentStaffApiService
                ?? new List<DepartmentStaffPracticeListItemViewModel>();
     }
 
+    public async Task<List<DepartmentStaffSupervisorListItemViewModel>> GetSupervisorSummariesAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/department-staff/supervisors");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<DepartmentStaffSupervisorListItemViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<DepartmentStaffSupervisorListItemViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffSupervisorListItemViewModel>();
+    }
+
     public Task<List<DepartmentStaffAuditLogItemViewModel>> GetPracticeChangeLogsAsync(string token)
     {
         return GetLogsAsync(token, "api/department-staff/practice-logs/practice-changes");
@@ -53,6 +67,19 @@ public class DepartmentStaffApiService
 
         var json = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<DepartmentStaffPracticeDetailsViewModel>(json, _jsonOptions);
+    }
+
+    public async Task<DepartmentStaffSupervisorDetailsViewModel?> GetSupervisorByIdAsync(string token, int id)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/supervisors/{id}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<DepartmentStaffSupervisorDetailsViewModel>(json, _jsonOptions);
     }
 
     public async Task<List<DepartmentStaffSelectOptionViewModel>> GetSpecialtiesAsync(string token)

@@ -29,15 +29,17 @@ public class DepartmentStaffController : Controller
             return RedirectToAction("Login", "Account");
 
         var practicesTask = _departmentStaffApiService.GetPracticesAsync(token);
+        var supervisorsTask = _departmentStaffApiService.GetSupervisorSummariesAsync(token);
         var practiceLogsTask = _departmentStaffApiService.GetPracticeChangeLogsAsync(token);
         var assignmentLogsTask = _departmentStaffApiService.GetAssignmentChangeLogsAsync(token);
 
-        await Task.WhenAll(practicesTask, practiceLogsTask, assignmentLogsTask);
+        await Task.WhenAll(practicesTask, supervisorsTask, practiceLogsTask, assignmentLogsTask);
 
         var model = new DepartmentStaffPageViewModel
         {
             FullName = HttpContext.Session.GetString("FullName") ?? "Работник отдела",
             Practices = practicesTask.Result,
+            Supervisors = supervisorsTask.Result,
             PracticeChangeLogs = practiceLogsTask.Result,
             AssignmentChangeLogs = assignmentLogsTask.Result
         };
@@ -53,6 +55,20 @@ public class DepartmentStaffController : Controller
             return Unauthorized();
 
         var item = await _departmentStaffApiService.GetPracticeByIdAsync(token, id);
+        if (item is null)
+            return NotFound();
+
+        return Json(item);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetSupervisorDetails(int id)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        var item = await _departmentStaffApiService.GetSupervisorByIdAsync(token, id);
         if (item is null)
             return NotFound();
 

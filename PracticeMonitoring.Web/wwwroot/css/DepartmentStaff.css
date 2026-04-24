@@ -1523,7 +1523,16 @@ select.form-input {
         grid-template-columns: 1fr;
     }
 
+    .supervisor-card {
+        grid-template-columns: 1fr;
+    }
+
     .practice-card-actions {
+        justify-content: flex-start;
+    }
+
+    .supervisor-card-actions {
+        min-width: 0;
         justify-content: flex-start;
     }
 
@@ -1574,6 +1583,10 @@ select.form-input {
 
     .assignment-tab-button {
         flex: 1 1 260px;
+    }
+
+    .department-modal-supervisor .department-details-overview-stats {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1799,6 +1812,274 @@ select.form-input {
 .department-console-body::-webkit-scrollbar-thumb {
     background: rgba(96, 165, 250, 0.38);
     border-radius: 999px;
+}
+
+.department-supervisors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at top left, rgba(94, 135, 255, 0.12), transparent 24%),
+        linear-gradient(165deg, #16306c, #1a3a83 62%, #21489b);
+    border: 1px solid rgba(68, 113, 248, 0.14);
+    box-shadow: 0 16px 30px rgba(10, 23, 58, 0.10);
+}
+
+.supervisor-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 255, 0.98));
+    border: 1px solid rgba(78, 95, 198, 0.10);
+    border-radius: 22px;
+    padding: 18px 18px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 18px;
+    align-items: center;
+    box-shadow: 0 10px 20px rgba(31, 41, 55, 0.05);
+}
+
+.supervisor-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.supervisor-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.supervisor-card-avatar {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #4c7dff, #2f61eb);
+    color: #ffffff;
+    font-size: 21px;
+    font-weight: 800;
+    box-shadow: 0 10px 18px rgba(38, 87, 230, 0.14);
+}
+
+.supervisor-card-headline {
+    min-width: 0;
+}
+
+.supervisor-card-name {
+    color: var(--text-color);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.22;
+    margin-bottom: 5px;
+    letter-spacing: -0.01em;
+}
+
+.supervisor-card-email {
+    color: var(--muted-text);
+    font-size: 14px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.supervisor-card-metrics {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.supervisor-card-metric {
+    min-width: 180px;
+    padding: 13px 14px 12px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(242, 246, 255, 0.95), rgba(236, 241, 255, 0.95));
+    border: 1px solid rgba(78, 95, 198, 0.07);
+}
+
+.supervisor-card-metric-label {
+    display: block;
+    color: var(--main-color);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.supervisor-card-metric-value {
+    color: var(--text-color);
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.supervisor-card-actions {
+    min-width: 180px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+}
+
+.supervisor-card-actions .department-primary-button {
+    width: 100%;
+}
+
+.department-modal-supervisor {
+    max-width: 1100px;
+    background:
+        radial-gradient(circle at top right, rgba(78, 124, 255, 0.06), transparent 22%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(245, 248, 255, 1));
+}
+
+.department-supervisor-layout {
+    gap: 14px;
+}
+
+.department-modal-supervisor .department-details-overview {
+    padding: 20px 22px;
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at top left, rgba(84, 130, 255, 0.12), transparent 24%),
+        linear-gradient(165deg, #f4f7ff, #ebf1ff 64%, #e5ecff);
+    border: 1px solid rgba(78, 95, 198, 0.10);
+    color: var(--text-color);
+    box-shadow: none;
+}
+
+.department-modal-supervisor .department-details-overview-label {
+    color: #3556ad;
+}
+
+.department-modal-supervisor .department-details-overview-title {
+    color: #132a61;
+    font-size: 30px;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+}
+
+.department-modal-supervisor .department-details-overview-subtitle {
+    color: #526381;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.department-modal-supervisor .department-details-overview-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.department-modal-supervisor .department-details-overview-stat {
+    padding: 13px 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(78, 95, 198, 0.08);
+    backdrop-filter: none;
+}
+
+.department-modal-supervisor .department-details-overview-stat-label {
+    color: #4a64a5;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+.department-modal-supervisor .department-details-overview-stat-value {
+    color: #17326e;
+    font-size: 16px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.department-modal-supervisor .department-subtabs {
+    margin-bottom: 6px;
+}
+
+.department-modal-supervisor .department-subtab-button {
+    min-height: 42px;
+    padding: 0 15px;
+    border-color: rgba(78, 95, 198, 0.12);
+    background: linear-gradient(180deg, #f3f6ff, #e8efff);
+    color: #21408d;
+    box-shadow: none;
+}
+
+.department-modal-supervisor .department-subtab-button.active {
+    box-shadow: 0 10px 18px rgba(32, 70, 188, 0.12);
+}
+
+.department-modal-supervisor .department-subtab-counter {
+    min-width: 26px;
+    height: 22px;
+    font-size: 11px;
+}
+
+.department-modal-supervisor .department-details-section {
+    padding: 14px;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at top left, rgba(108, 149, 255, 0.10), transparent 20%),
+        linear-gradient(160deg, #18336f, #1c4389 68%, #2450a1);
+    box-shadow: 0 12px 22px rgba(11, 25, 63, 0.09);
+}
+
+.department-modal-supervisor .department-details-title {
+    margin-bottom: 12px;
+    font-size: 15px;
+    letter-spacing: 0;
+}
+
+.department-modal-supervisor .department-details-list {
+    gap: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.department-modal-supervisor .department-details-card {
+    padding: 12px 13px 11px;
+    border-radius: 16px;
+    border-color: rgba(78, 95, 198, 0.07);
+    box-shadow: 0 8px 16px rgba(15, 32, 78, 0.06);
+}
+
+.department-modal-supervisor .department-details-card-header {
+    margin-bottom: 7px;
+    gap: 10px;
+}
+
+.department-modal-supervisor .department-details-card-title {
+    font-size: 14px;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+}
+
+.department-modal-supervisor .department-details-card-meta {
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.department-modal-supervisor .department-details-chip,
+.department-modal-supervisor .department-details-inline-chip {
+    min-height: 24px;
+    padding: 0 9px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.department-modal-supervisor .department-details-card-text {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #53627e;
+}
+
+.department-supervisor-tab-content {
+    display: none;
+}
+
+.department-supervisor-tab-content.active {
+    display: block;
 }
 
 .department-modal-warning {

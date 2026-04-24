@@ -6,6 +6,8 @@ public class DepartmentStaffPageViewModel
 
     public List<DepartmentStaffPracticeListItemViewModel> Practices { get; set; } = new();
 
+    public List<DepartmentStaffSupervisorListItemViewModel> Supervisors { get; set; } = new();
+
     public List<DepartmentStaffAuditLogItemViewModel> PracticeChangeLogs { get; set; } = new();
 
     public List<DepartmentStaffAuditLogItemViewModel> AssignmentChangeLogs { get; set; } = new();
