@@ -14,6 +14,10 @@ public class ProductionPracticeListItemResponse
 
     public string SpecialtyName { get; set; } = null!;
 
+    public string ProfessionalModuleCode { get; set; } = null!;
+
+    public string ProfessionalModuleName { get; set; } = null!;
+
     public int Hours { get; set; }
 
     public DateTime StartDate { get; set; }

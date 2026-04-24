@@ -10,6 +10,8 @@ namespace PracticeMonitoring.Web.Services;
 
 public class AttestationSheetService
 {
+    private static string SignatureDateLine => $"Дата: «___» ______________ {DateTime.Now.Year} г.";
+
     public string BuildPreviewHtml(DepartmentStaffPracticeDetailsViewModel practice)
     {
         var sb = new StringBuilder();
@@ -83,7 +85,7 @@ public class AttestationSheetService
         sb.AppendLine("<div>________________</div><div>_________________</div><div>______________</div>");
         sb.AppendLine("<div class='attestation-preview-line-caption'>Должность</div><div class='attestation-preview-line-caption'>ФИО</div><div class='attestation-preview-line-caption'>Подпись</div>");
         sb.AppendLine("</div>");
-        sb.AppendLine("<div class='attestation-preview-date'>Дата: «___» ______________ 2025 г.</div>");
+        sb.AppendLine($"<div class='attestation-preview-date'>{SignatureDateLine}</div>");
         sb.AppendLine("</div>");
 
         sb.AppendLine("<div class='attestation-preview-sign-block'>");
@@ -94,7 +96,7 @@ public class AttestationSheetService
         sb.AppendLine("<div>___________</div><div>___________</div><div>______________</div>");
         sb.AppendLine("<div class='attestation-preview-line-caption'>Должность</div><div class='attestation-preview-line-caption'>ФИО</div><div class='attestation-preview-line-caption'>Подпись</div>");
         sb.AppendLine("</div>");
-        sb.AppendLine("<div class='attestation-preview-date'>Дата: «___» ______________ 2025 г.</div>");
+        sb.AppendLine($"<div class='attestation-preview-date'>{SignatureDateLine}</div>");
         sb.AppendLine("</div>");
         sb.AppendLine("</div>");
 
@@ -157,7 +159,7 @@ public class AttestationSheetService
             body.Append(CreateLeftParagraph("Руководитель практической подготовки от профильной организации", false, 24));
             body.Append(CreateLeftParagraph("________________    _________________    ______________", false, 24));
             body.Append(CreateLeftParagraph("Должность           ФИО                 Подпись", false, 20));
-            body.Append(CreateLeftParagraph("Дата: «___» ______________ 2025 г.", false, 24));
+            body.Append(CreateLeftParagraph(SignatureDateLine, false, 24));
             body.Append(CreateEmptyParagraph());
 
             body.Append(CreateLeftParagraph("Итоговая оценка по практике _________________________ (____________________)", false, 24));
@@ -167,7 +169,7 @@ public class AttestationSheetService
             body.Append(CreateLeftParagraph("Руководитель практической подготовки от Московского приборостроительного техникума", false, 24));
             body.Append(CreateLeftParagraph("___________    ___________    ______________", false, 24));
             body.Append(CreateLeftParagraph("Должность      ФИО            Подпись", false, 20));
-            body.Append(CreateLeftParagraph("Дата: «___» ______________ 2025 г.", false, 24));
+            body.Append(CreateLeftParagraph(SignatureDateLine, false, 24));
 
             mainPart.Document.Append(body);
             mainPart.Document.Save();

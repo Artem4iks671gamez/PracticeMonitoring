@@ -35,6 +35,8 @@ public class DepartmentStaffPracticesController : ControllerBase
                 SpecialtyId = x.SpecialtyId,
                 SpecialtyCode = x.Specialty.Code,
                 SpecialtyName = x.Specialty.Name,
+                ProfessionalModuleCode = x.ProfessionalModuleCode,
+                ProfessionalModuleName = x.ProfessionalModuleName,
                 Hours = x.Hours,
                 StartDate = x.StartDate,
                 EndDate = x.EndDate,
@@ -48,13 +50,7 @@ public class DepartmentStaffPracticesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductionPracticeDetailsResponse>> GetById(int id)
     {
-        var practice = await _context.ProductionPractices
-            .Include(x => x.Specialty)
-            .Include(x => x.Competencies)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Student)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Supervisor)
+        var practice = await LoadPracticeDetailsQuery()
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (practice is null)
@@ -80,22 +76,36 @@ public class DepartmentStaffPracticesController : ControllerBase
     }
 
     [HttpGet("metadata/students")]
-    public async Task<ActionResult<List<PracticeStudentOptionResponse>>> GetStudents([FromQuery] int specialtyId)
+    public async Task<ActionResult<List<PracticeStudentOptionResponse>>> GetStudents([FromQuery] int? specialtyId = null)
     {
-        var items = await _context.Users
+        var query = _context.Users
             .Include(x => x.Role)
             .Include(x => x.Group)
+                .ThenInclude(x => x!.Specialty)
             .Where(x =>
                 x.Role.Name == "Student" &&
                 x.IsActive &&
                 x.Group != null &&
-                x.Group.SpecialtyId == specialtyId)
-            .OrderBy(x => x.FullName)
+                x.Group.Specialty != null);
+
+        if (specialtyId.HasValue && specialtyId.Value > 0)
+        {
+            query = query.Where(x => x.Group != null && x.Group.SpecialtyId == specialtyId.Value);
+        }
+
+        var items = await query
+            .OrderBy(x => x.Group!.Course)
+            .ThenBy(x => x.Group!.Name)
+            .ThenBy(x => x.FullName)
             .Select(x => new PracticeStudentOptionResponse
             {
                 Id = x.Id,
                 FullName = x.FullName,
-                GroupName = x.Group != null ? x.Group.Name : null
+                SpecialtyId = x.Group != null ? x.Group.SpecialtyId : null,
+                SpecialtyCode = x.Group != null && x.Group.Specialty != null ? x.Group.Specialty.Code : null,
+                SpecialtyName = x.Group != null && x.Group.Specialty != null ? x.Group.Specialty.Name : null,
+                GroupName = x.Group != null ? x.Group.Name : null,
+                Course = x.Group != null ? x.Group.Course : null
             })
             .ToListAsync();
 
@@ -122,7 +132,7 @@ public class DepartmentStaffPracticesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ProductionPracticeDetailsResponse>> Create(ProductionPracticeUpsertRequest request)
     {
-        var validationErrors = await ValidateRequestAsync(request);
+        var validationErrors = await ValidatePracticeRequestAsync(request);
         if (validationErrors.Count > 0)
         {
             return BadRequest(new
@@ -155,18 +165,10 @@ public class DepartmentStaffPracticesController : ControllerBase
             Hours = x.Hours
         }).ToList();
 
-        practice.StudentAssignments = await BuildAssignmentsAsync(request.StudentAssignments);
-
         _context.ProductionPractices.Add(practice);
         await _context.SaveChangesAsync();
 
-        practice = await _context.ProductionPractices
-            .Include(x => x.Specialty)
-            .Include(x => x.Competencies)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Student)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Supervisor)
+        practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == practice.Id);
 
         return Ok(MapDetails(practice));
@@ -183,7 +185,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         if (practice is null)
             return NotFound();
 
-        var validationErrors = await ValidateRequestAsync(request);
+        var validationErrors = await ValidatePracticeRequestAsync(request);
         if (validationErrors.Count > 0)
         {
             return BadRequest(new
@@ -205,7 +207,6 @@ public class DepartmentStaffPracticesController : ControllerBase
         practice.EndDate = EnsureUtc(request.EndDate);
 
         _context.ProductionPracticeCompetencies.RemoveRange(practice.Competencies);
-        _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
 
         practice.Competencies = request.Competencies.Select(x => new ProductionPracticeCompetency
         {
@@ -216,17 +217,41 @@ public class DepartmentStaffPracticesController : ControllerBase
             Hours = x.Hours
         }).ToList();
 
+        await _context.SaveChangesAsync();
+
+        practice = await LoadPracticeDetailsQuery()
+            .FirstAsync(x => x.Id == id);
+
+        return Ok(MapDetails(practice));
+    }
+
+    [HttpPut("{id:int}/assignments")]
+    public async Task<ActionResult<ProductionPracticeDetailsResponse>> UpdateAssignments(int id, ProductionPracticeAssignmentsUpsertRequest request)
+    {
+        var practice = await _context.ProductionPractices
+            .Include(x => x.Specialty)
+            .Include(x => x.StudentAssignments)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (practice is null)
+            return NotFound();
+
+        var validationErrors = await ValidateAssignmentsAsync(request.StudentAssignments, practice.SpecialtyId);
+        if (validationErrors.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "Исправьте ошибки назначения студентов.",
+                errors = validationErrors
+            });
+        }
+
+        _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
         practice.StudentAssignments = await BuildAssignmentsAsync(request.StudentAssignments, practice.Id);
 
         await _context.SaveChangesAsync();
 
-        practice = await _context.ProductionPractices
-            .Include(x => x.Specialty)
-            .Include(x => x.Competencies)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Student)
-            .Include(x => x.StudentAssignments)
-                .ThenInclude(x => x.Supervisor)
+        practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == id);
 
         return Ok(MapDetails(practice));
@@ -252,7 +277,20 @@ public class DepartmentStaffPracticesController : ControllerBase
         return Ok(new { message = "Производственная практика удалена." });
     }
 
-    private async Task<Dictionary<string, string[]>> ValidateRequestAsync(ProductionPracticeUpsertRequest request)
+    private IQueryable<ProductionPractice> LoadPracticeDetailsQuery()
+    {
+        return _context.ProductionPractices
+            .Include(x => x.Specialty)
+            .Include(x => x.Competencies)
+            .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Student)
+                    .ThenInclude(x => x!.Group)
+                        .ThenInclude(x => x!.Specialty)
+            .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Supervisor);
+    }
+
+    private async Task<Dictionary<string, string[]>> ValidatePracticeRequestAsync(ProductionPracticeUpsertRequest request)
     {
         var errors = new Dictionary<string, List<string>>();
 
@@ -331,46 +369,66 @@ public class DepartmentStaffPracticesController : ControllerBase
                 AddError(nameof(request.Competencies), $"Сумма часов по компетенциям ({competencyHoursSum}) должна быть равна общему количеству часов ({request.Hours}).");
         }
 
-        if (request.StudentAssignments is null || request.StudentAssignments.Count == 0)
+        return errors.ToDictionary(x => x.Key, x => x.Value.ToArray());
+    }
+
+    private async Task<Dictionary<string, string[]>> ValidateAssignmentsAsync(
+        List<ProductionPracticeStudentAssignmentRequest> assignments,
+        int specialtyId)
+    {
+        var errors = new Dictionary<string, List<string>>();
+
+        void AddError(string key, string message)
         {
-            AddError(nameof(request.StudentAssignments), "Назначьте хотя бы одного студента.");
+            if (!errors.ContainsKey(key))
+                errors[key] = new List<string>();
+
+            if (!errors[key].Contains(message))
+                errors[key].Add(message);
         }
-        else
+
+        var duplicateStudentIds = assignments
+            .Where(x => x.StudentId > 0)
+            .GroupBy(x => x.StudentId)
+            .Where(x => x.Count() > 1)
+            .Select(x => x.Key)
+            .ToHashSet();
+
+        for (var i = 0; i < assignments.Count; i++)
         {
-            for (var i = 0; i < request.StudentAssignments.Count; i++)
+            var assignment = assignments[i];
+
+            if (assignment.StudentId <= 0)
             {
-                var assignment = request.StudentAssignments[i];
+                AddError($"StudentAssignments[{i}].StudentId", "Выберите студента.");
+                continue;
+            }
 
-                if (assignment.StudentId <= 0)
-                {
-                    AddError($"StudentAssignments[{i}].StudentId", "Выберите студента.");
-                }
-                else
-                {
-                    var student = await _context.Users
-                        .Include(x => x.Role)
-                        .Include(x => x.Group)
-                        .FirstOrDefaultAsync(x => x.Id == assignment.StudentId);
+            if (duplicateStudentIds.Contains(assignment.StudentId))
+                AddError($"StudentAssignments[{i}].StudentId", "Этот студент выбран несколько раз.");
 
-                    if (student is null || student.Role.Name != "Student")
-                    {
-                        AddError($"StudentAssignments[{i}].StudentId", "Выбранный пользователь не является студентом.");
-                    }
-                    else if (request.SpecialtyId > 0 && (student.Group is null || student.Group.SpecialtyId != request.SpecialtyId))
-                    {
-                        AddError($"StudentAssignments[{i}].StudentId", $"Студент {student.FullName} не относится к выбранной специальности.");
-                    }
-                }
+            var student = await _context.Users
+                .Include(x => x.Role)
+                .Include(x => x.Group)
+                .FirstOrDefaultAsync(x => x.Id == assignment.StudentId);
 
-                if (assignment.SupervisorId.HasValue)
-                {
-                    var supervisor = await _context.Users
-                        .Include(x => x.Role)
-                        .FirstOrDefaultAsync(x => x.Id == assignment.SupervisorId.Value);
+            if (student is null || student.Role.Name != "Student")
+            {
+                AddError($"StudentAssignments[{i}].StudentId", "Выбранный пользователь не является студентом.");
+            }
+            else if (student.Group is null || student.Group.SpecialtyId != specialtyId)
+            {
+                AddError($"StudentAssignments[{i}].StudentId", $"Студент {student.FullName} не относится к выбранной специальности.");
+            }
 
-                    if (supervisor is null || supervisor.Role.Name != "Supervisor")
-                        AddError($"StudentAssignments[{i}].SupervisorId", "Выбранный руководитель не имеет роль Supervisor.");
-                }
+            if (assignment.SupervisorId.HasValue)
+            {
+                var supervisor = await _context.Users
+                    .Include(x => x.Role)
+                    .FirstOrDefaultAsync(x => x.Id == assignment.SupervisorId.Value);
+
+                if (supervisor is null || supervisor.Role.Name != "Supervisor")
+                    AddError($"StudentAssignments[{i}].SupervisorId", "Выбранный руководитель не имеет роль Supervisor.");
             }
         }
 
@@ -431,12 +489,19 @@ public class DepartmentStaffPracticesController : ControllerBase
                 })
                 .ToList(),
             StudentAssignments = x.StudentAssignments
-                .OrderBy(a => a.Student.FullName)
+                .OrderBy(a => a.Student.Group != null ? a.Student.Group.Course : 99)
+                .ThenBy(a => a.Student.Group != null ? a.Student.Group.Name : "")
+                .ThenBy(a => a.Student.FullName)
                 .Select(a => new ProductionPracticeStudentAssignmentItemResponse
                 {
                     Id = a.Id,
                     StudentId = a.StudentId,
                     StudentFullName = a.Student.FullName,
+                    StudentSpecialtyId = a.Student.Group != null ? a.Student.Group.SpecialtyId : null,
+                    StudentSpecialtyCode = a.Student.Group != null && a.Student.Group.Specialty != null ? a.Student.Group.Specialty.Code : null,
+                    StudentSpecialtyName = a.Student.Group != null && a.Student.Group.Specialty != null ? a.Student.Group.Specialty.Name : null,
+                    StudentGroupName = a.Student.Group != null ? a.Student.Group.Name : null,
+                    StudentCourse = a.Student.Group != null ? a.Student.Group.Course : null,
                     SupervisorId = a.SupervisorId,
                     SupervisorFullName = a.Supervisor != null ? a.Supervisor.FullName : null
                 })
@@ -459,18 +524,30 @@ public class DepartmentStaffPracticesController : ControllerBase
 public class PracticeSelectOptionResponse
 {
     public int Id { get; set; }
+
     public string Label { get; set; } = null!;
 }
 
 public class PracticeStudentOptionResponse
 {
     public int Id { get; set; }
+
     public string FullName { get; set; } = null!;
+
+    public int? SpecialtyId { get; set; }
+
+    public string? SpecialtyCode { get; set; }
+
+    public string? SpecialtyName { get; set; }
+
     public string? GroupName { get; set; }
+
+    public int? Course { get; set; }
 }
 
 public class PracticeSupervisorOptionResponse
 {
     public int Id { get; set; }
+
     public string FullName { get; set; } = null!;
 }

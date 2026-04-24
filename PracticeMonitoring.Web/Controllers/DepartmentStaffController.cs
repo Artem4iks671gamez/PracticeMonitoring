@@ -53,7 +53,7 @@ public class DepartmentStaffController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetFormData(int specialtyId = 0)
+    public async Task<IActionResult> GetFormData(int? specialtyId = null, bool includeAllStudents = false)
     {
         var token = HttpContext.Session.GetString("Token");
         if (string.IsNullOrWhiteSpace(token))
@@ -63,7 +63,7 @@ public class DepartmentStaffController : Controller
         {
             Specialties = await _departmentStaffApiService.GetSpecialtiesAsync(token),
             Supervisors = await _departmentStaffApiService.GetSupervisorsAsync(token),
-            Students = specialtyId > 0
+            Students = includeAllStudents || (specialtyId.HasValue && specialtyId.Value > 0)
                 ? await _departmentStaffApiService.GetStudentsAsync(token, specialtyId)
                 : new List<DepartmentStaffStudentOptionViewModel>()
         };
@@ -93,8 +93,7 @@ public class DepartmentStaffController : Controller
                     ["Hours"] = new[] { "Укажите количество часов." },
                     ["StartDate"] = new[] { "Укажите дату начала." },
                     ["EndDate"] = new[] { "Укажите дату окончания." },
-                    ["Competencies"] = new[] { "Добавьте хотя бы одну профессиональную компетенцию." },
-                    ["StudentAssignments"] = new[] { "Назначьте хотя бы одного студента." }
+                    ["Competencies"] = new[] { "Добавьте хотя бы одну профессиональную компетенцию." }
                 }
             });
         }
@@ -128,6 +127,56 @@ public class DepartmentStaffController : Controller
         }
 
         return Ok(new { message = "Практика успешно сохранена." });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SavePracticeAssignments([FromBody] DepartmentStaffPracticeAssignmentsUpsertViewModel? model)
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        if (model is null)
+        {
+            return BadRequest(new
+            {
+                message = "Исправьте ошибки назначения студентов.",
+                errors = new Dictionary<string, string[]>
+                {
+                    ["StudentAssignments"] = new[] { "Не удалось прочитать назначения студентов." }
+                }
+            });
+        }
+
+        if (!TryValidateModel(model))
+        {
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => NormalizeModelStateKey(x.Key),
+                    x => x.Value!.Errors
+                        .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Некорректное значение." : e.ErrorMessage)
+                        .ToArray());
+
+            return BadRequest(new
+            {
+                message = "Исправьте ошибки назначения студентов.",
+                errors
+            });
+        }
+
+        var result = await _departmentStaffApiService.SavePracticeAssignmentsAsync(token, model);
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = result.ErrorMessage ?? "Не удалось сохранить назначения студентов.",
+                errors = result.ValidationErrors
+            });
+        }
+
+        return Ok(new { message = "Назначения студентов сохранены." });
     }
 
     [HttpPost]

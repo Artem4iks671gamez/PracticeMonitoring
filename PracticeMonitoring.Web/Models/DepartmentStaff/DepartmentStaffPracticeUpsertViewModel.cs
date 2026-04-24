@@ -33,8 +33,6 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
 
     public List<DepartmentStaffPracticeCompetencyEditViewModel> Competencies { get; set; } = new();
 
-    public List<DepartmentStaffPracticeStudentAssignmentEditViewModel> StudentAssignments { get; set; } = new();
-
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (!StartDate.HasValue)
@@ -80,19 +78,6 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
                     new[] { nameof(Competencies) });
         }
 
-        if (StudentAssignments == null || StudentAssignments.Count == 0)
-        {
-            yield return new ValidationResult("Назначьте хотя бы одного студента.", new[] { nameof(StudentAssignments) });
-        }
-        else
-        {
-            for (var i = 0; i < StudentAssignments.Count; i++)
-            {
-                var a = StudentAssignments[i];
-                if (a.StudentId <= 0)
-                    yield return new ValidationResult("Выберите студента.", new[] { $"StudentAssignments[{i}].StudentId" });
-            }
-        }
     }
 }
 

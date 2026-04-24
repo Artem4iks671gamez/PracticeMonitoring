@@ -50,6 +50,16 @@ public class DepartmentStaffPracticeStudentAssignmentItemViewModel
 
     public string StudentFullName { get; set; } = string.Empty;
 
+    public int? StudentSpecialtyId { get; set; }
+
+    public string? StudentSpecialtyCode { get; set; }
+
+    public string? StudentSpecialtyName { get; set; }
+
+    public string? StudentGroupName { get; set; }
+
+    public int? StudentCourse { get; set; }
+
     public int? SupervisorId { get; set; }
 
     public string? SupervisorFullName { get; set; }

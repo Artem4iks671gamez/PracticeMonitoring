@@ -59,9 +59,13 @@ public class DepartmentStaffApiService
                ?? new List<DepartmentStaffSelectOptionViewModel>();
     }
 
-    public async Task<List<DepartmentStaffStudentOptionViewModel>> GetStudentsAsync(string token, int specialtyId)
+    public async Task<List<DepartmentStaffStudentOptionViewModel>> GetStudentsAsync(string token, int? specialtyId = null)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/practices/metadata/students?specialtyId={specialtyId}");
+        var url = specialtyId.HasValue && specialtyId.Value > 0
+            ? $"api/department-staff/practices/metadata/students?specialtyId={specialtyId.Value}"
+            : "api/department-staff/practices/metadata/students";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await _httpClient.SendAsync(request);
@@ -115,6 +119,33 @@ public class DepartmentStaffApiService
         }
 
         return ParseErrorResult(json, (int)response.StatusCode, "Не удалось сохранить производственную практику.");
+    }
+
+    public async Task<DepartmentStaffApiResult<object>> SavePracticeAssignmentsAsync(string token, DepartmentStaffPracticeAssignmentsUpsertViewModel model)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"api/department-staff/practices/{model.PracticeId}/assignments");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(model),
+            Encoding.UTF8,
+            "application/json");
+
+        var response = await _httpClient.SendAsync(request);
+        var json = await response.Content.ReadAsStringAsync();
+
+        if (response.IsSuccessStatusCode)
+        {
+            return new DepartmentStaffApiResult<object>
+            {
+                Success = true,
+                StatusCode = (int)response.StatusCode
+            };
+        }
+
+        return ParseErrorResult(json, (int)response.StatusCode, "Не удалось сохранить назначения студентов.");
     }
 
     public async Task<DepartmentStaffApiResult<object>> DeletePracticeAsync(string token, int id)

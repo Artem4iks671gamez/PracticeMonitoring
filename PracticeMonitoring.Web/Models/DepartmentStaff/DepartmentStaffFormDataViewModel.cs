@@ -1,4 +1,4 @@
-﻿namespace PracticeMonitoring.Web.Models.DepartmentStaff;
+namespace PracticeMonitoring.Web.Models.DepartmentStaff;
 
 public class DepartmentStaffFormDataViewModel
 {
@@ -22,7 +22,15 @@ public class DepartmentStaffStudentOptionViewModel
 
     public string FullName { get; set; } = string.Empty;
 
+    public int? SpecialtyId { get; set; }
+
+    public string? SpecialtyCode { get; set; }
+
+    public string? SpecialtyName { get; set; }
+
     public string? GroupName { get; set; }
+
+    public int? Course { get; set; }
 }
 
 public class DepartmentStaffSupervisorOptionViewModel

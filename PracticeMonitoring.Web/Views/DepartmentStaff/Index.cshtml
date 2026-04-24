@@ -162,6 +162,10 @@
                             </div>
 
                             <div class="practice-card-actions">
+                                <button type="button" class="department-ghost-button practice-assignments-button">
+                                    Назначение студентов
+                                </button>
+
                                 <button type="button" class="department-secondary-button practice-details-button">
                                     Сведения
                                 </button>
@@ -289,18 +293,6 @@
                 <div id="competenciesContainer" class="department-repeaters-container"></div>
             </div>
 
-            <div class="department-form-section">
-                <div class="department-form-section-header">
-                    <div class="department-form-section-title">Назначения студентов и руководителей</div>
-                    <button type="button" class="department-ghost-button" id="addAssignmentButton">
-                        Назначить студента
-                    </button>
-                </div>
-
-                <div class="field-error field-error-block" data-error-for="StudentAssignments"></div>
-                <div id="assignmentsContainer" class="department-repeaters-container"></div>
-            </div>
-
             <div class="department-modal-actions">
                 <button type="button" class="department-ghost-button" id="cancelPracticeEditModalButton">
                     Отмена
@@ -314,7 +306,7 @@
 </div>
 
 <div class="department-modal-backdrop" id="practiceDetailsModalBackdrop">
-    <div class="department-modal department-modal-large">
+    <div class="department-modal department-modal-large department-modal-details">
         <div class="department-modal-header">
             <div>
                 <h2 id="practiceDetailsTitle">Сведения о производственной практике</h2>
@@ -324,6 +316,20 @@
         </div>
 
         <div class="department-details-layout">
+            <section class="department-details-overview">
+                <div class="department-details-overview-main">
+                    <div class="department-details-overview-label">Карточка практики</div>
+                    <div class="department-details-overview-title" id="practiceDetailsOverviewTitle">
+                        Выберите производственную практику
+                    </div>
+                    <div class="department-details-overview-subtitle" id="practiceDetailsOverviewSubtitle">
+                        Здесь будет собрана основная информация, назначения и компетенции.
+                    </div>
+                </div>
+
+                <div class="department-details-overview-stats" id="practiceDetailsOverviewStats"></div>
+            </section>
+
             <div class="department-details-section">
                 <div class="department-details-title">Основная информация</div>
                 <div id="practiceDetailsInfo" class="department-details-grid"></div>
@@ -345,6 +351,10 @@
                 Удалить
             </button>
 
+            <button type="button" class="department-ghost-button" id="openAssignmentsFromDetailsButton">
+                Назначение студентов
+            </button>
+
             <button type="button" class="department-secondary-button" id="editPracticeFromDetailsButton">
                 Редактировать
             </button>
@@ -352,6 +362,149 @@
             <button type="button" class="department-primary-button" id="generateAttestationSheetButton">
                 Сформировать аттестационный лист
             </button>
+        </div>
+    </div>
+</div>
+
+<div class="department-modal-backdrop" id="practiceAssignmentsModalBackdrop">
+    <div class="department-modal department-modal-assignments">
+        <div class="department-modal-header">
+            <div>
+                <h2 id="practiceAssignmentsModalTitle">Назначение студентов</h2>
+                <p id="practiceAssignmentsModalSubtitle">Подберите состав практики и назначьте руководителей по строкам.</p>
+            </div>
+            <button type="button" class="department-modal-close" id="closePracticeAssignmentsModalButton">×</button>
+        </div>
+
+        <div class="student-assignment-shell">
+            <div class="field-error field-error-block" data-error-for="StudentAssignments"></div>
+
+            <div class="student-assignment-practice-bar">
+                <div class="student-assignment-practice-meta-label">Текущая специальность практики</div>
+                <div class="student-assignment-practice-meta" id="assignmentPracticeMeta">
+                    Сначала выберите специальность практики
+                </div>
+            </div>
+
+            <div class="student-assignment-tabs" id="assignmentTabs">
+                <button type="button" class="assignment-tab-button active" data-assignment-tab="assigned">
+                    <span class="assignment-tab-title">Назначенные студенты</span>
+                    <span class="assignment-tab-counter" id="assignedStudentsCounter">0</span>
+                </button>
+
+                <button type="button" class="assignment-tab-button" data-assignment-tab="all">
+                    <span class="assignment-tab-title">Полный список студентов</span>
+                    <span class="assignment-tab-counter" id="allStudentsCounter">0</span>
+                </button>
+            </div>
+
+            <div class="student-assignment-filters-card">
+                <div class="student-assignment-search-wrap">
+                    <label class="student-filter-label" for="studentAssignmentSearchInput">Поиск</label>
+                    <input type="text"
+                           id="studentAssignmentSearchInput"
+                           class="form-input department-search-input student-filter-control"
+                           placeholder="Поиск по ФИО, специальности или группе..." />
+                </div>
+
+                <div class="student-assignment-filter-grid">
+                    <div class="student-filter-field">
+                        <label class="student-filter-label" for="studentSpecialtyFilterSelect">Специальность</label>
+                        <select id="studentSpecialtyFilterSelect" class="native-select-hidden">
+                            <option value="">Все специальности</option>
+                        </select>
+                        <div class="custom-select student-filter-select" data-target="studentSpecialtyFilterSelect">
+                            <button type="button" class="custom-select-trigger">Все специальности</button>
+                            <div class="custom-select-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="student-filter-field">
+                        <label class="student-filter-label" for="studentCourseFilterSelect">Курс</label>
+                        <select id="studentCourseFilterSelect" class="native-select-hidden">
+                            <option value="">Все курсы</option>
+                        </select>
+                        <div class="custom-select student-filter-select" data-target="studentCourseFilterSelect">
+                            <button type="button" class="custom-select-trigger">Все курсы</button>
+                            <div class="custom-select-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="student-filter-field">
+                        <label class="student-filter-label" for="studentGroupFilterSelect">Группа</label>
+                        <select id="studentGroupFilterSelect" class="native-select-hidden">
+                            <option value="">Все группы</option>
+                        </select>
+                        <div class="custom-select student-filter-select" data-target="studentGroupFilterSelect">
+                            <button type="button" class="custom-select-trigger">Все группы</button>
+                            <div class="custom-select-menu"></div>
+                        </div>
+                    </div>
+
+                    <div class="student-filter-field">
+                        <label class="student-filter-label" for="studentSortSelect">Сортировка</label>
+                        <select id="studentSortSelect" class="native-select-hidden">
+                            <option value="name-asc">ФИО А-Я</option>
+                            <option value="name-desc">ФИО Я-А</option>
+                            <option value="course-asc">Сначала младшие курсы</option>
+                            <option value="course-desc">Сначала старшие курсы</option>
+                            <option value="group-asc">Группа А-Я</option>
+                            <option value="specialty-asc">Специальность А-Я</option>
+                        </select>
+                        <div class="custom-select student-filter-select" data-target="studentSortSelect">
+                            <button type="button" class="custom-select-trigger">ФИО А-Я</button>
+                            <div class="custom-select-menu"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="student-assignment-bulk-bar" id="studentAssignmentBulkBar">
+                <label class="student-bulk-checkbox-label">
+                    <input type="checkbox" id="assignAllFilteredCheckbox" />
+                    <span>Назначить всех найденных</span>
+                </label>
+
+                <div class="student-assignment-summary" id="studentAssignmentSummary">
+                    Показано студентов: 0
+                </div>
+            </div>
+
+            <div class="student-assignment-table-panel">
+                <div class="student-assignment-table-headline">
+                    <div>
+                        <div class="student-assignment-table-title">Таблица назначения</div>
+                        <div class="student-assignment-table-text">Компактный список с ключевыми данными по каждому студенту.</div>
+                    </div>
+                </div>
+
+                <div class="student-assignment-table-wrap">
+                    <table class="student-assignment-table">
+                        <thead>
+                            <tr>
+                                <th class="student-assignment-col-check">Назначить</th>
+                                <th>ФИО студента</th>
+                                <th>Специальность</th>
+                                <th>Группа</th>
+                                <th>Курс</th>
+                                <th class="student-assignment-col-supervisor">Руководитель</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentAssignmentTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="student-assignment-empty-state" id="studentAssignmentEmptyState"></div>
+            </div>
+
+            <div class="department-modal-actions">
+                <button type="button" class="department-ghost-button" id="cancelPracticeAssignmentsModalButton">
+                    Закрыть
+                </button>
+                <button type="button" class="department-primary-button" id="savePracticeAssignmentsButton">
+                    Сохранить назначения
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -411,46 +564,6 @@
         <div class="department-repeater-actions">
             <button type="button" class="department-danger-button remove-competency-button">
                 Удалить компетенцию
-            </button>
-        </div>
-    </div>
-</template>
-
-<template id="assignmentItemTemplate">
-    <div class="department-repeater-item assignment-item">
-        <div class="department-repeater-grid">
-            <div class="form-group">
-                <label class="form-label">Студент</label>
-                <select class="assignment-student-select native-select-hidden">
-                    <option value="">-- выберите студента --</option>
-                </select>
-
-                <div class="custom-select assignment-student-custom-select">
-                    <button type="button" class="custom-select-trigger">-- выберите студента --</button>
-                    <div class="custom-select-menu"></div>
-                </div>
-
-                <div class="field-error assignment-student-error"></div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Руководитель практики от техникума</label>
-                <select class="assignment-supervisor-select native-select-hidden">
-                    <option value="">-- выберите руководителя --</option>
-                </select>
-
-                <div class="custom-select assignment-supervisor-custom-select">
-                    <button type="button" class="custom-select-trigger">-- выберите руководителя --</button>
-                    <div class="custom-select-menu"></div>
-                </div>
-
-                <div class="field-error assignment-supervisor-error"></div>
-            </div>
-        </div>
-
-        <div class="department-repeater-actions">
-            <button type="button" class="department-danger-button remove-assignment-button">
-                Удалить назначение
             </button>
         </div>
     </div>
