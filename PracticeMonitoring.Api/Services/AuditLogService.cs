@@ -85,4 +85,32 @@ public class AuditLogService
             targetUserId: targetUserId,
             targetUserFullName: targetUserFullName);
     }
+
+    public Task LogProductionPracticeChangeAsync(
+        int actorUserId,
+        string actorFullName,
+        string action,
+        string description)
+    {
+        return LogAsync(
+            category: "ProductionPracticeChange",
+            action: action,
+            description: description,
+            actorUserId: actorUserId,
+            actorFullName: actorFullName);
+    }
+
+    public Task LogProductionPracticeAssignmentChangeAsync(
+        int actorUserId,
+        string actorFullName,
+        string action,
+        string description)
+    {
+        return LogAsync(
+            category: "ProductionPracticeAssignmentChange",
+            action: action,
+            description: description,
+            actorUserId: actorUserId,
+            actorFullName: actorFullName);
+    }
 }

@@ -25,4 +25,6 @@ public class DepartmentStaffPracticeListItemViewModel
     public DateTime EndDate { get; set; }
 
     public int AssignedStudentsCount { get; set; }
+
+    public bool IsCompleted { get; set; }
 }

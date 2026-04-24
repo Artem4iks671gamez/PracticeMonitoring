@@ -32,6 +32,16 @@ public class DepartmentStaffApiService
                ?? new List<DepartmentStaffPracticeListItemViewModel>();
     }
 
+    public Task<List<DepartmentStaffAuditLogItemViewModel>> GetPracticeChangeLogsAsync(string token)
+    {
+        return GetLogsAsync(token, "api/department-staff/practice-logs/practice-changes");
+    }
+
+    public Task<List<DepartmentStaffAuditLogItemViewModel>> GetAssignmentChangeLogsAsync(string token)
+    {
+        return GetLogsAsync(token, "api/department-staff/practice-logs/assignment-changes");
+    }
+
     public async Task<DepartmentStaffPracticeDetailsViewModel?> GetPracticeByIdAsync(string token, int id)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"api/department-staff/practices/{id}");
@@ -166,6 +176,20 @@ public class DepartmentStaffApiService
         }
 
         return ParseErrorResult(json, (int)response.StatusCode, "Не удалось удалить производственную практику.");
+    }
+
+    private async Task<List<DepartmentStaffAuditLogItemViewModel>> GetLogsAsync(string token, string url)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<DepartmentStaffAuditLogItemViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<DepartmentStaffAuditLogItemViewModel>>(json, _jsonOptions)
+               ?? new List<DepartmentStaffAuditLogItemViewModel>();
     }
 
     private DepartmentStaffApiResult<object> ParseErrorResult(string json, int statusCode, string fallbackMessage)

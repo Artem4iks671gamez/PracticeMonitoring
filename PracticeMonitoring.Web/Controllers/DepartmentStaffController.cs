@@ -28,11 +28,18 @@ public class DepartmentStaffController : Controller
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction("Login", "Account");
 
+        var practicesTask = _departmentStaffApiService.GetPracticesAsync(token);
+        var practiceLogsTask = _departmentStaffApiService.GetPracticeChangeLogsAsync(token);
+        var assignmentLogsTask = _departmentStaffApiService.GetAssignmentChangeLogsAsync(token);
+
+        await Task.WhenAll(practicesTask, practiceLogsTask, assignmentLogsTask);
+
         var model = new DepartmentStaffPageViewModel
         {
             FullName = HttpContext.Session.GetString("FullName") ?? "Работник отдела",
-            Practices = await _departmentStaffApiService.GetPracticesAsync(token),
-            Logs = new List<PracticeLogViewModel>()
+            Practices = practicesTask.Result,
+            PracticeChangeLogs = practiceLogsTask.Result,
+            AssignmentChangeLogs = assignmentLogsTask.Result
         };
 
         return View(model);

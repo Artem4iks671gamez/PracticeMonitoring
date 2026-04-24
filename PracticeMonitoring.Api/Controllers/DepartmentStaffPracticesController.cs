@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PracticeMonitoring.Api.Data;
 using PracticeMonitoring.Api.Dtos.DepartmentStaff;
 using PracticeMonitoring.Api.Entities;
+using PracticeMonitoring.Api.Services;
 
 namespace PracticeMonitoring.Api.Controllers;
 
@@ -13,10 +15,12 @@ namespace PracticeMonitoring.Api.Controllers;
 public class DepartmentStaffPracticesController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly AuditLogService _auditLogService;
 
-    public DepartmentStaffPracticesController(AppDbContext context)
+    public DepartmentStaffPracticesController(AppDbContext context, AuditLogService auditLogService)
     {
         _context = context;
+        _auditLogService = auditLogService;
     }
 
     [HttpGet]
@@ -40,7 +44,8 @@ public class DepartmentStaffPracticesController : ControllerBase
                 Hours = x.Hours,
                 StartDate = x.StartDate,
                 EndDate = x.EndDate,
-                AssignedStudentsCount = x.StudentAssignments.Count
+                AssignedStudentsCount = x.StudentAssignments.Count,
+                IsCompleted = IsCompleted(x.EndDate)
             })
             .ToListAsync();
 
@@ -168,6 +173,16 @@ public class DepartmentStaffPracticesController : ControllerBase
         _context.ProductionPractices.Add(practice);
         await _context.SaveChangesAsync();
 
+        await _auditLogService.LogProductionPracticeChangeAsync(
+            GetActorUserId(),
+            GetActorFullName(),
+            "PracticeCreated",
+            TruncateDescription(
+                $"Создана производственная практика {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                $"Специальность: {specialty.Code} — {specialty.Name}. " +
+                $"Сроки: {practice.StartDate:dd.MM.yyyy} - {practice.EndDate:dd.MM.yyyy}. " +
+                $"Часы: {practice.Hours}. Компетенций: {practice.Competencies.Count}."));
+
         practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == practice.Id);
 
@@ -178,8 +193,14 @@ public class DepartmentStaffPracticesController : ControllerBase
     public async Task<ActionResult<ProductionPracticeDetailsResponse>> Update(int id, ProductionPracticeUpsertRequest request)
     {
         var practice = await _context.ProductionPractices
+            .Include(x => x.Specialty)
             .Include(x => x.Competencies)
             .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Student)
+                    .ThenInclude(x => x!.Group)
+                        .ThenInclude(x => x!.Specialty)
+            .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Supervisor)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (practice is null)
@@ -196,10 +217,37 @@ public class DepartmentStaffPracticesController : ControllerBase
         }
 
         var specialty = await _context.Specialties.FirstAsync(x => x.Id == request.SpecialtyId);
+        var specialtyChanged = practice.SpecialtyId != specialty.Id;
+        var previousSnapshot = CreatePracticeSnapshot(practice);
+        var removedAssignmentsBySpecialtyChange = practice.StudentAssignments
+            .Select(CreateAssignmentSnapshot)
+            .ToList();
+
+        if (specialtyChanged && removedAssignmentsBySpecialtyChange.Count > 0 && !request.ConfirmSpecialtyChangeStudentReset)
+        {
+            return BadRequest(new
+            {
+                message = "В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Подтвердите действие.",
+                errors = new Dictionary<string, string[]>
+                {
+                    [nameof(request.SpecialtyId)] = new[]
+                    {
+                        "В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Подтвердите действие."
+                    }
+                }
+            });
+        }
+
+        if (specialtyChanged && removedAssignmentsBySpecialtyChange.Count > 0)
+        {
+            _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
+            practice.StudentAssignments = new List<ProductionPracticeStudentAssignment>();
+        }
 
         practice.PracticeIndex = request.PracticeIndex.Trim();
         practice.Name = request.Name.Trim();
         practice.SpecialtyId = specialty.Id;
+        practice.Specialty = specialty;
         practice.ProfessionalModuleCode = request.ProfessionalModuleCode.Trim();
         practice.ProfessionalModuleName = request.ProfessionalModuleName.Trim();
         practice.Hours = request.Hours;
@@ -219,6 +267,30 @@ public class DepartmentStaffPracticesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        var changedFields = BuildPracticeChangedFields(previousSnapshot, request, specialty);
+        if (changedFields.Count > 0)
+        {
+            await _auditLogService.LogProductionPracticeChangeAsync(
+                GetActorUserId(),
+                GetActorFullName(),
+                "PracticeUpdated",
+                TruncateDescription(
+                    $"Изменена производственная практика {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                    $"Изменено: {string.Join("; ", changedFields)}."));
+        }
+
+        if (specialtyChanged && removedAssignmentsBySpecialtyChange.Count > 0)
+        {
+            await _auditLogService.LogProductionPracticeAssignmentChangeAsync(
+                GetActorUserId(),
+                GetActorFullName(),
+                "AssignmentsClearedBySpecialtyChange",
+                TruncateDescription(
+                    $"При смене специальности у практики {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)} " +
+                    $"автоматически удалены назначения студентов ({removedAssignmentsBySpecialtyChange.Count}): " +
+                    $"{JoinAssignmentNames(removedAssignmentsBySpecialtyChange)}."));
+        }
+
         practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == id);
 
@@ -231,6 +303,11 @@ public class DepartmentStaffPracticesController : ControllerBase
         var practice = await _context.ProductionPractices
             .Include(x => x.Specialty)
             .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Student)
+                    .ThenInclude(x => x!.Group)
+                        .ThenInclude(x => x!.Specialty)
+            .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Supervisor)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (practice is null)
@@ -246,10 +323,20 @@ public class DepartmentStaffPracticesController : ControllerBase
             });
         }
 
+        var previousAssignments = practice.StudentAssignments
+            .Select(CreateAssignmentSnapshot)
+            .ToList();
+
         _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
         practice.StudentAssignments = await BuildAssignmentsAsync(request.StudentAssignments, practice.Id);
 
         await _context.SaveChangesAsync();
+
+        var currentAssignments = practice.StudentAssignments
+            .Select(CreateAssignmentSnapshot)
+            .ToList();
+
+        await LogAssignmentsDiffAsync(practice, previousAssignments, currentAssignments);
 
         practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == id);
@@ -261,18 +348,49 @@ public class DepartmentStaffPracticesController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var practice = await _context.ProductionPractices
+            .Include(x => x.Specialty)
             .Include(x => x.Competencies)
             .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Student)
+            .Include(x => x.StudentAssignments)
+                .ThenInclude(x => x.Supervisor)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (practice is null)
             return NotFound();
+
+        var removedAssignments = practice.StudentAssignments
+            .Select(CreateAssignmentSnapshot)
+            .ToList();
+        var competenciesCount = practice.Competencies.Count;
+        var practiceLabel = BuildPracticeDisplayName(practice.PracticeIndex, practice.Name);
+        var specialtyLabel = $"{practice.Specialty.Code} — {practice.Specialty.Name}";
 
         _context.ProductionPracticeCompetencies.RemoveRange(practice.Competencies);
         _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
         _context.ProductionPractices.Remove(practice);
 
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogProductionPracticeChangeAsync(
+            GetActorUserId(),
+            GetActorFullName(),
+            "PracticeDeleted",
+            TruncateDescription(
+                $"Удалена производственная практика {practiceLabel}. " +
+                $"Специальность: {specialtyLabel}. " +
+                $"Компетенций: {competenciesCount}. Назначенных студентов: {removedAssignments.Count}."));
+
+        if (removedAssignments.Count > 0)
+        {
+            await _auditLogService.LogProductionPracticeAssignmentChangeAsync(
+                GetActorUserId(),
+                GetActorFullName(),
+                "AssignmentsDeletedWithPractice",
+                TruncateDescription(
+                    $"При удалении практики {practiceLabel} сняты назначения студентов ({removedAssignments.Count}): " +
+                    $"{JoinAssignmentNames(removedAssignments)}."));
+        }
 
         return Ok(new { message = "Производственная практика удалена." });
     }
@@ -443,7 +561,11 @@ public class DepartmentStaffPracticesController : ControllerBase
 
         foreach (var assignment in assignments)
         {
-            var student = await _context.Users.FirstAsync(x => x.Id == assignment.StudentId);
+            var student = await _context.Users
+                .Include(x => x.Group)
+                    .ThenInclude(x => x!.Specialty)
+                .FirstAsync(x => x.Id == assignment.StudentId);
+
             User? supervisor = null;
 
             if (assignment.SupervisorId.HasValue)
@@ -462,6 +584,51 @@ public class DepartmentStaffPracticesController : ControllerBase
         return result;
     }
 
+    private async Task LogAssignmentsDiffAsync(
+        ProductionPractice practice,
+        List<AssignmentSnapshot> previousAssignments,
+        List<AssignmentSnapshot> currentAssignments)
+    {
+        var previousByStudent = previousAssignments.ToDictionary(x => x.StudentId);
+        var currentByStudent = currentAssignments.ToDictionary(x => x.StudentId);
+
+        var added = currentAssignments
+            .Where(x => !previousByStudent.ContainsKey(x.StudentId))
+            .ToList();
+        var removed = previousAssignments
+            .Where(x => !currentByStudent.ContainsKey(x.StudentId))
+            .ToList();
+        var supervisorChanged = currentAssignments
+            .Where(x => previousByStudent.TryGetValue(x.StudentId, out var previous) && previous.SupervisorId != x.SupervisorId)
+            .Select(x => new SupervisorChangeSnapshot(
+                x.StudentFullName,
+                previousByStudent[x.StudentId].SupervisorFullName,
+                x.SupervisorFullName))
+            .ToList();
+
+        if (added.Count == 0 && removed.Count == 0 && supervisorChanged.Count == 0)
+            return;
+
+        var parts = new List<string>();
+
+        if (added.Count > 0)
+            parts.Add($"добавлены {added.Count}: {JoinAssignmentNames(added)}");
+
+        if (removed.Count > 0)
+            parts.Add($"удалены {removed.Count}: {JoinAssignmentNames(removed)}");
+
+        if (supervisorChanged.Count > 0)
+            parts.Add($"изменён руководитель у {supervisorChanged.Count}: {JoinSupervisorChanges(supervisorChanged)}");
+
+        await _auditLogService.LogProductionPracticeAssignmentChangeAsync(
+            GetActorUserId(),
+            GetActorFullName(),
+            "AssignmentsUpdated",
+            TruncateDescription(
+                $"Обновлены назначения студентов для практики {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                $"{string.Join("; ", parts)}."));
+    }
+
     private static ProductionPracticeDetailsResponse MapDetails(ProductionPractice x)
     {
         return new ProductionPracticeDetailsResponse
@@ -477,6 +644,7 @@ public class DepartmentStaffPracticesController : ControllerBase
             Hours = x.Hours,
             StartDate = x.StartDate,
             EndDate = x.EndDate,
+            IsCompleted = IsCompleted(x.EndDate),
             Competencies = x.Competencies
                 .OrderBy(c => c.Id)
                 .Select(c => new ProductionPracticeCompetencyItemResponse
@@ -509,6 +677,147 @@ public class DepartmentStaffPracticesController : ControllerBase
         };
     }
 
+    private static List<string> BuildPracticeChangedFields(
+        PracticeSnapshot previous,
+        ProductionPracticeUpsertRequest request,
+        Specialty specialty)
+    {
+        var changedFields = new List<string>();
+
+        var practiceIndex = request.PracticeIndex.Trim();
+        var name = request.Name.Trim();
+        var professionalModuleCode = request.ProfessionalModuleCode.Trim();
+        var professionalModuleName = request.ProfessionalModuleName.Trim();
+        var startDate = EnsureUtc(request.StartDate);
+        var endDate = EnsureUtc(request.EndDate);
+        var specialtyLabel = $"{specialty.Code} — {specialty.Name}";
+        var competenciesSignature = BuildCompetenciesSignature(request.Competencies);
+
+        if (!string.Equals(previous.PracticeIndex, practiceIndex, StringComparison.Ordinal))
+            changedFields.Add($"индекс ПП: {previous.PracticeIndex} -> {practiceIndex}");
+
+        if (!string.Equals(previous.Name, name, StringComparison.Ordinal))
+            changedFields.Add($"название: {previous.Name} -> {name}");
+
+        if (previous.SpecialtyId != specialty.Id)
+            changedFields.Add($"специальность: {previous.SpecialtyLabel} -> {specialtyLabel}");
+
+        if (!string.Equals(previous.ProfessionalModuleCode, professionalModuleCode, StringComparison.Ordinal))
+            changedFields.Add($"код ПМ: {previous.ProfessionalModuleCode} -> {professionalModuleCode}");
+
+        if (!string.Equals(previous.ProfessionalModuleName, professionalModuleName, StringComparison.Ordinal))
+            changedFields.Add($"название ПМ: {previous.ProfessionalModuleName} -> {professionalModuleName}");
+
+        if (previous.Hours != request.Hours)
+            changedFields.Add($"часы: {previous.Hours} -> {request.Hours}");
+
+        if (previous.StartDate.Date != startDate.Date)
+            changedFields.Add($"дата начала: {previous.StartDate:dd.MM.yyyy} -> {startDate:dd.MM.yyyy}");
+
+        if (previous.EndDate.Date != endDate.Date)
+            changedFields.Add($"дата окончания: {previous.EndDate:dd.MM.yyyy} -> {endDate:dd.MM.yyyy}");
+
+        if (!string.Equals(previous.CompetenciesSignature, competenciesSignature, StringComparison.Ordinal))
+            changedFields.Add($"компетенции: {previous.CompetenciesCount} -> {request.Competencies.Count}");
+
+        return changedFields;
+    }
+
+    private static PracticeSnapshot CreatePracticeSnapshot(ProductionPractice practice)
+    {
+        return new PracticeSnapshot(
+            practice.PracticeIndex,
+            practice.Name,
+            practice.SpecialtyId,
+            $"{practice.Specialty.Code} — {practice.Specialty.Name}",
+            practice.ProfessionalModuleCode,
+            practice.ProfessionalModuleName,
+            practice.Hours,
+            practice.StartDate,
+            practice.EndDate,
+            practice.Competencies.Count,
+            BuildCompetenciesSignature(practice.Competencies));
+    }
+
+    private static AssignmentSnapshot CreateAssignmentSnapshot(ProductionPracticeStudentAssignment assignment)
+    {
+        return new AssignmentSnapshot(
+            assignment.StudentId,
+            assignment.Student.FullName,
+            assignment.SupervisorId,
+            assignment.Supervisor?.FullName);
+    }
+
+    private static string BuildCompetenciesSignature(IEnumerable<ProductionPracticeCompetencyRequest> competencies)
+    {
+        return string.Join(" | ", competencies
+            .Select(x => $"{x.CompetencyCode.Trim()}::{x.CompetencyDescription.Trim()}::{x.WorkTypes.Trim()}::{x.Hours}")
+            .OrderBy(x => x, StringComparer.Ordinal));
+    }
+
+    private static string BuildCompetenciesSignature(IEnumerable<ProductionPracticeCompetency> competencies)
+    {
+        return string.Join(" | ", competencies
+            .Select(x => $"{x.CompetencyCode.Trim()}::{x.CompetencyDescription.Trim()}::{x.WorkTypes.Trim()}::{x.Hours}")
+            .OrderBy(x => x, StringComparer.Ordinal));
+    }
+
+    private int GetActorUserId()
+    {
+        var rawValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(rawValue, out var value) ? value : 0;
+    }
+
+    private string GetActorFullName()
+    {
+        return User.FindFirstValue(ClaimTypes.Name) ?? "Работник отдела";
+    }
+
+    private static string BuildPracticeDisplayName(string practiceIndex, string name)
+    {
+        return $"{practiceIndex} \"{name}\"";
+    }
+
+    private static string JoinAssignmentNames(IEnumerable<AssignmentSnapshot> assignments)
+    {
+        return JoinLimited(assignments.Select(x => x.StudentFullName));
+    }
+
+    private static string JoinSupervisorChanges(IEnumerable<SupervisorChangeSnapshot> changes)
+    {
+        return JoinLimited(changes.Select(x =>
+            $"{x.StudentFullName} ({(string.IsNullOrWhiteSpace(x.PreviousSupervisorFullName) ? "без руководителя" : x.PreviousSupervisorFullName)} -> {(string.IsNullOrWhiteSpace(x.CurrentSupervisorFullName) ? "без руководителя" : x.CurrentSupervisorFullName)})"));
+    }
+
+    private static string JoinLimited(IEnumerable<string> items, int take = 6)
+    {
+        var materialized = items
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+
+        if (materialized.Count == 0)
+            return "нет данных";
+
+        if (materialized.Count <= take)
+            return string.Join(", ", materialized);
+
+        return $"{string.Join(", ", materialized.Take(take))} и ещё {materialized.Count - take}";
+    }
+
+    private static string TruncateDescription(string value)
+    {
+        const int maxLength = 1000;
+        if (value.Length <= maxLength)
+            return value;
+
+        return $"{value[..(maxLength - 3)]}...";
+    }
+
+    private static bool IsCompleted(DateTime endDate)
+    {
+        return endDate.Date < DateTime.UtcNow.Date;
+    }
+
     private static DateTime EnsureUtc(DateTime dt)
     {
         if (dt.Kind == DateTimeKind.Utc)
@@ -519,35 +828,28 @@ public class DepartmentStaffPracticesController : ControllerBase
 
         return dt.ToUniversalTime();
     }
-}
 
-public class PracticeSelectOptionResponse
-{
-    public int Id { get; set; }
+    private sealed record PracticeSnapshot(
+        string PracticeIndex,
+        string Name,
+        int SpecialtyId,
+        string SpecialtyLabel,
+        string ProfessionalModuleCode,
+        string ProfessionalModuleName,
+        int Hours,
+        DateTime StartDate,
+        DateTime EndDate,
+        int CompetenciesCount,
+        string CompetenciesSignature);
 
-    public string Label { get; set; } = null!;
-}
+    private sealed record AssignmentSnapshot(
+        int StudentId,
+        string StudentFullName,
+        int? SupervisorId,
+        string? SupervisorFullName);
 
-public class PracticeStudentOptionResponse
-{
-    public int Id { get; set; }
-
-    public string FullName { get; set; } = null!;
-
-    public int? SpecialtyId { get; set; }
-
-    public string? SpecialtyCode { get; set; }
-
-    public string? SpecialtyName { get; set; }
-
-    public string? GroupName { get; set; }
-
-    public int? Course { get; set; }
-}
-
-public class PracticeSupervisorOptionResponse
-{
-    public int Id { get; set; }
-
-    public string FullName { get; set; } = null!;
+    private sealed record SupervisorChangeSnapshot(
+        string StudentFullName,
+        string? PreviousSupervisorFullName,
+        string? CurrentSupervisorFullName);
 }

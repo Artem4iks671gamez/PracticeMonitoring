@@ -59,8 +59,20 @@
                 <div class="department-panel-header">
                     <div>
                         <h2>Производственные практики</h2>
-                        <p>Создание, поиск, сортировка и редактирование практик.</p>
+                        <p>Создание, поиск, редактирование и контроль статуса практик.</p>
                     </div>
+                </div>
+
+                <div class="department-subtabs department-practice-status-tabs">
+                    <button type="button" class="department-subtab-button active" data-practice-status="active">
+                        Активные практики
+                        <span class="department-subtab-counter">@Model.Practices.Count(x => !x.IsCompleted)</span>
+                    </button>
+
+                    <button type="button" class="department-subtab-button" data-practice-status="completed">
+                        Завершившиеся практики
+                        <span class="department-subtab-counter">@Model.Practices.Count(x => x.IsCompleted)</span>
+                    </button>
                 </div>
 
                 <div class="department-toolbar">
@@ -125,11 +137,17 @@
                                  data-hours="@practice.Hours"
                                  data-start-date="@practice.StartDate.ToString("yyyy-MM-dd")"
                                  data-end-date="@practice.EndDate.ToString("yyyy-MM-dd")"
-                                 data-students-count="@practice.AssignedStudentsCount">
+                                 data-students-count="@practice.AssignedStudentsCount"
+                                 data-is-completed="@practice.IsCompleted.ToString().ToLower()">
                             <div class="practice-card-main">
                                 <div class="practice-card-top">
                                     <div class="practice-card-title-block">
-                                        <div class="practice-index-chip">@practice.PracticeIndex</div>
+                                        <div class="practice-card-topline">
+                                            <div class="practice-index-chip">@practice.PracticeIndex</div>
+                                            <div class="practice-status-chip @(practice.IsCompleted ? "completed" : "active")">
+                                                @(practice.IsCompleted ? "Завершилась" : "Активна")
+                                            </div>
+                                        </div>
                                         <h3 class="practice-card-name">@practice.Name</h3>
                                     </div>
 
@@ -179,12 +197,68 @@
                 <div class="department-panel-header">
                     <div>
                         <h2>Журнал изменений</h2>
-                        <p>Здесь позже будет журнал действий по производственным практикам.</p>
+                        <p>Аудит действий работников отдела по карточкам практик и назначениям студентов.</p>
                     </div>
                 </div>
 
-                <div class="department-placeholder-card">
-                    Раздел журнала подготовлен как отдельная вкладка и будет подключён следующим этапом.
+                <div class="department-subtabs">
+                    <button type="button" class="department-subtab-button active" data-log-console="practiceChangesConsole">
+                        Изменения практик
+                        <span class="department-subtab-counter">@Model.PracticeChangeLogs.Count</span>
+                    </button>
+
+                    <button type="button" class="department-subtab-button" data-log-console="assignmentChangesConsole">
+                        Назначения студентов
+                        <span class="department-subtab-counter">@Model.AssignmentChangeLogs.Count</span>
+                    </button>
+                </div>
+
+                <div class="department-console-wrapper">
+                    <div class="department-console active" id="practiceChangesConsole">
+                        <div class="department-console-body">
+                            @if (Model.PracticeChangeLogs.Count == 0)
+                            {
+                                <div class="department-console-empty">Пока нет записей по карточкам практик.</div>
+                            }
+                            else
+                            {
+                                @foreach (var log in Model.PracticeChangeLogs)
+                                {
+                                    <div class="department-console-line">
+                                        <span class="department-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                        <span class="department-console-text"><strong>@(log.ActorFullName ?? "Работник отдела")</strong>: @log.Description</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="department-console-footer">
+                            <span class="department-console-footnote">Консоль изменений карточек производственных практик.</span>
+                        </div>
+                    </div>
+
+                    <div class="department-console" id="assignmentChangesConsole">
+                        <div class="department-console-body">
+                            @if (Model.AssignmentChangeLogs.Count == 0)
+                            {
+                                <div class="department-console-empty">Пока нет записей по назначениям студентов.</div>
+                            }
+                            else
+                            {
+                                @foreach (var log in Model.AssignmentChangeLogs)
+                                {
+                                    <div class="department-console-line">
+                                        <span class="department-console-date">@log.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span>
+                                        <span class="department-console-text"><strong>@(log.ActorFullName ?? "Работник отдела")</strong>: @log.Description</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="department-console-footer">
+                            <span class="department-console-footnote">Консоль назначений, снятия и переназначения студентов.</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 

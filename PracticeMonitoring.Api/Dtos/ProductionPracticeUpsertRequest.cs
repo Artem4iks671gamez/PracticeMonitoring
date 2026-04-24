@@ -28,6 +28,8 @@ public class ProductionPracticeUpsertRequest
     [Required(ErrorMessage = "Укажите дату окончания.")]
     public DateTime EndDate { get; set; }
 
+    public bool ConfirmSpecialtyChangeStudentReset { get; set; }
+
     public List<ProductionPracticeCompetencyRequest> Competencies { get; set; } = new();
 
     public List<ProductionPracticeStudentAssignmentRequest> StudentAssignments { get; set; } = new();

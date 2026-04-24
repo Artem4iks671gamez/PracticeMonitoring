@@ -1626,3 +1626,170 @@ select.form-input {
     border: 2px solid transparent;
     background-clip: padding-box;
 }
+
+.department-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.department-subtab-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(78, 95, 198, 0.14);
+    background: linear-gradient(180deg, #eef3ff, #dce7ff);
+    color: #17326e;
+    border-radius: 14px;
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.18s ease;
+}
+
+.department-subtab-button.active {
+    background: linear-gradient(135deg, var(--main-color), var(--main-color-dark));
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 12px 24px rgba(32, 70, 188, 0.18);
+}
+
+.department-subtab-counter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.28);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.department-subtab-button:not(.active) .department-subtab-counter {
+    background: rgba(23, 50, 110, 0.10);
+}
+
+.practice-card-topline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.practice-status-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+.practice-status-chip.active {
+    background: rgba(59, 130, 246, 0.10);
+    color: #1d4ed8;
+}
+
+.practice-status-chip.completed {
+    background: rgba(15, 23, 42, 0.09);
+    color: #334155;
+}
+
+.department-console-wrapper {
+    position: relative;
+}
+
+.department-console {
+    display: none;
+    min-height: 520px;
+    background: #0f172a;
+    color: #d1d5db;
+    border-radius: 20px;
+    padding: 18px;
+    border: 1px solid rgba(78, 95, 198, 0.20);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    font-family: Consolas, "Courier New", monospace;
+    flex-direction: column;
+}
+
+.department-console.active {
+    display: flex;
+}
+
+.department-console-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.department-console-empty {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.department-console-line {
+    display: flex;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.department-console-line:last-child {
+    border-bottom: none;
+}
+
+.department-console-date {
+    flex: 0 0 165px;
+    color: #60a5fa;
+}
+
+.department-console-text {
+    flex: 1;
+    color: #e5e7eb;
+}
+
+.department-console-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding-top: 18px;
+}
+
+.department-console-footnote {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(78, 95, 198, 0.24);
+    background: rgba(78, 95, 198, 0.10);
+    color: #dbe4ff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.department-console-body::-webkit-scrollbar {
+    width: 10px;
+}
+
+.department-console-body::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.35);
+    border-radius: 999px;
+}
+
+.department-console-body::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.38);
+    border-radius: 999px;
+}

@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const panelButtons = Array.from(document.querySelectorAll('.department-nav-button'));
     const panels = Array.from(document.querySelectorAll('.department-panel'));
+    const practiceStatusButtons = Array.from(document.querySelectorAll('[data-practice-status]'));
+    const logConsoleButtons = Array.from(document.querySelectorAll('[data-log-console]'));
+    const logConsoles = Array.from(document.querySelectorAll('.department-console'));
 
     const practiceSearchInput = document.getElementById('practiceSearchInput');
     const practicesList = document.getElementById('practicesList');
@@ -88,10 +91,14 @@ document.addEventListener('DOMContentLoaded', function () {
     let assignmentCatalogLoaded = false;
     let assignmentCatalogLoading = false;
     let assignmentTab = 'all';
+    let practiceStatusTab = 'active';
     let assignmentFilters = createDefaultAssignmentFilters();
     let assignmentSelections = new Map();
     let assignmentRowErrors = {};
     let submittedAssignmentSnapshot = [];
+    let originalEditSpecialtyId = null;
+    let originalEditAssignedStudentsCount = 0;
+    let specialtyChangeStudentResetConfirmed = false;
 
     function createDefaultAssignmentFilters() {
         return {
@@ -111,8 +118,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function formatDate(value) {
         if (!value) return '-';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return value;
+
+        const text = String(value);
+        if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+            const [year, month, day] = text.slice(0, 10).split('-');
+            return `${day}.${month}.${year}`;
+        }
+
+        const date = new Date(text);
+        if (Number.isNaN(date.getTime())) return text;
         return date.toLocaleDateString('ru-RU');
     }
 
@@ -126,23 +140,37 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    panelButtons.forEach(button => {
-        button.addEventListener('click', function () {
-            switchPanel(button.dataset.panelTarget);
+    function setPracticeStatusTab(status) {
+        practiceStatusTab = status === 'completed' ? 'completed' : 'active';
+
+        practiceStatusButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.practiceStatus === practiceStatusTab);
         });
-    });
+
+        applyPracticeFilters();
+    }
+
+    function switchLogConsole(targetId) {
+        logConsoleButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.logConsole === targetId);
+        });
+
+        logConsoles.forEach(consoleElement => {
+            consoleElement.classList.toggle('active', consoleElement.id === targetId);
+        });
+    }
 
     function resetAssignmentRowErrors() {
         assignmentRowErrors = {};
     }
 
     function clearFieldErrors() {
-        document.querySelectorAll('.field-error').forEach(x => {
-            x.textContent = '';
+        document.querySelectorAll('.field-error').forEach(block => {
+            block.textContent = '';
         });
 
-        document.querySelectorAll('.input-error').forEach(x => {
-            x.classList.remove('input-error');
+        document.querySelectorAll('.input-error').forEach(input => {
+            input.classList.remove('input-error');
         });
 
         resetAssignmentRowErrors();
@@ -182,24 +210,9 @@ document.addEventListener('DOMContentLoaded', function () {
         input.classList.add('input-error');
 
         if (input.tagName.toLowerCase() === 'select') {
-            const customTrigger = document.querySelector(`.custom-select[data-target="${input.id}"] .custom-select-trigger`);
-            customTrigger?.classList.add('input-error');
+            const trigger = document.querySelector(`.custom-select[data-target="${input.id}"] .custom-select-trigger`);
+            trigger?.classList.add('input-error');
         }
-    }
-
-    function getOrderedAssignments() {
-        return Array.from(assignmentSelections.values()).sort((left, right) => {
-            const leftStudent = getStudentById(left.studentId);
-            const rightStudent = getStudentById(right.studentId);
-
-            const byCourse = compareNullableNumbers(leftStudent?.course, rightStudent?.course);
-            if (byCourse !== 0) return byCourse;
-
-            const byGroup = compareStrings(leftStudent?.groupName, rightStudent?.groupName);
-            if (byGroup !== 0) return byGroup;
-
-            return compareStrings(leftStudent?.fullName, rightStudent?.fullName);
-        });
     }
 
     function applyValidationErrors(errors, globalMessage) {
@@ -209,10 +222,10 @@ document.addEventListener('DOMContentLoaded', function () {
             showGlobalError(globalMessage);
         }
 
-        let hasAssignmentRowErrors = false;
+        let hasAssignmentErrors = false;
 
         Object.entries(errors || {}).forEach(([key, messages]) => {
-            if (!messages || !messages.length) return;
+            if (!Array.isArray(messages) || messages.length === 0) return;
 
             if (key.startsWith('Competencies[')) {
                 const match = key.match(/^Competencies\[(\d+)\]\.(.+)$/);
@@ -220,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const index = Number(match[1]);
                 const field = match[2];
-                const card = competenciesContainer.querySelectorAll('.competency-item')[index];
+                const card = competenciesContainer?.querySelectorAll('.competency-item')[index];
                 if (!card) return;
 
                 const inputMap = {
@@ -252,7 +265,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const index = Number(match[1]);
                 const field = match[2];
                 const assignment = submittedAssignmentSnapshot[index];
-
                 if (!assignment) {
                     setSimpleFieldError('StudentAssignments', messages[0]);
                     return;
@@ -263,14 +275,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 assignmentRowErrors[assignment.studentId][field] = messages[0];
-                hasAssignmentRowErrors = true;
+                hasAssignmentErrors = true;
                 return;
             }
 
             setSimpleFieldError(key, messages[0]);
         });
 
-        if (hasAssignmentRowErrors) {
+        if (hasAssignmentErrors) {
             assignmentTab = 'assigned';
             renderAssignmentWorkspace();
         }
@@ -279,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function buildCustomSelect(selectId, onChange) {
         const nativeSelect = document.getElementById(selectId);
         const custom = document.querySelector(`.custom-select[data-target="${selectId}"]`);
-
         if (!nativeSelect || !custom) return;
 
         const trigger = custom.querySelector('.custom-select-trigger');
@@ -287,22 +298,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!trigger || !menu) return;
 
         const rebuild = () => {
-            menu.innerHTML = '';
             const options = Array.from(nativeSelect.options);
+            menu.innerHTML = '';
 
-            options.forEach(opt => {
+            options.forEach(option => {
                 const item = document.createElement('div');
                 item.className = 'custom-select-option';
-                item.textContent = opt.textContent;
-                item.dataset.value = opt.value;
+                item.dataset.value = option.value;
+                item.textContent = option.textContent || '';
 
-                if (opt.selected) {
+                if (option.selected) {
                     item.classList.add('selected');
-                    trigger.textContent = opt.textContent;
+                    trigger.textContent = option.textContent || '';
                 }
 
                 item.addEventListener('click', () => {
-                    nativeSelect.value = opt.value;
+                    nativeSelect.value = option.value;
                     nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     custom.classList.remove('open');
                 });
@@ -310,11 +321,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 menu.appendChild(item);
             });
 
-            const selected = options.find(x => x.selected) || options[0];
+            const selected = options.find(option => option.selected) || options[0];
             if (selected) {
-                trigger.textContent = selected.textContent;
-                menu.querySelectorAll('.custom-select-option').forEach(x => {
-                    x.classList.toggle('selected', x.dataset.value === selected.value);
+                trigger.textContent = selected.textContent || '';
+                menu.querySelectorAll('.custom-select-option').forEach(item => {
+                    item.classList.toggle('selected', item.dataset.value === selected.value);
                 });
             }
 
@@ -328,15 +339,18 @@ document.addEventListener('DOMContentLoaded', function () {
             trigger.addEventListener('click', () => {
                 if (nativeSelect.disabled) return;
 
-                document.querySelectorAll('.custom-select.open').forEach(x => {
-                    if (x !== custom) x.classList.remove('open');
+                document.querySelectorAll('.custom-select.open').forEach(item => {
+                    if (item !== custom) item.classList.remove('open');
                 });
+
                 custom.classList.toggle('open');
             });
 
             nativeSelect.addEventListener('change', () => {
                 rebuild();
-                if (onChange) onChange(nativeSelect.value);
+                if (typeof onChange === 'function') {
+                    onChange(nativeSelect.value);
+                }
             });
 
             custom.dataset.bound = 'true';
@@ -351,83 +365,11 @@ document.addEventListener('DOMContentLoaded', function () {
         select._customSelectRebuild();
     }
 
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('.custom-select')) {
-            document.querySelectorAll('.custom-select.open').forEach(x => x.classList.remove('open'));
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.custom-select')) {
+            document.querySelectorAll('.custom-select.open').forEach(item => item.classList.remove('open'));
         }
     });
-
-    function getPracticeCards() {
-        return Array.from(document.querySelectorAll('.practice-card'));
-    }
-
-    function getPracticeSearchText(card) {
-        return [
-            card.dataset.practiceIndex,
-            card.dataset.name,
-            card.dataset.specialtyCode,
-            card.dataset.specialtyName,
-            card.dataset.professionalModuleCode,
-            card.dataset.professionalModuleName
-        ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-    }
-
-    function applyPracticeFilters() {
-        const search = (practiceSearchInput?.value || '').trim().toLowerCase();
-        const specialtyId = specialtyFilterSelect?.value || '';
-        const dateFrom = dateFromFilter?.value || '';
-        const dateTo = dateToFilter?.value || '';
-        const sort = practiceSortSelect?.value || 'date-asc';
-
-        let cards = getPracticeCards();
-
-        cards.forEach(card => {
-            const cardSpecialtyId = card.dataset.specialtyId || '';
-            const startDate = card.dataset.startDate || '';
-            const endDate = card.dataset.endDate || '';
-
-            const matchesSearch = !search || getPracticeSearchText(card).includes(search);
-            const matchesSpecialty = !specialtyId || specialtyId === cardSpecialtyId;
-            const matchesDateFrom = !dateFrom || endDate >= dateFrom;
-            const matchesDateTo = !dateTo || startDate <= dateTo;
-
-            card.style.display = matchesSearch && matchesSpecialty && matchesDateFrom && matchesDateTo ? '' : 'none';
-        });
-
-        cards = cards.filter(card => card.style.display !== 'none');
-
-        cards.sort((a, b) => {
-            const aStart = a.dataset.startDate || '';
-            const bStart = b.dataset.startDate || '';
-            const aEnd = a.dataset.endDate || '';
-            const bEnd = b.dataset.endDate || '';
-            const aIndex = (a.dataset.practiceIndex || '').toLowerCase();
-            const bIndex = (b.dataset.practiceIndex || '').toLowerCase();
-            const aHours = Number(a.dataset.hours || 0);
-            const bHours = Number(b.dataset.hours || 0);
-
-            switch (sort) {
-                case 'date-desc':
-                    return bStart.localeCompare(aStart) || bEnd.localeCompare(aEnd);
-                case 'index-asc':
-                    return aIndex.localeCompare(bIndex, 'ru');
-                case 'hours-desc':
-                    return bHours - aHours || aStart.localeCompare(bStart);
-                case 'date-asc':
-                default:
-                    return aStart.localeCompare(bStart) || aEnd.localeCompare(bEnd);
-            }
-        });
-
-        cards.forEach(card => practicesList.appendChild(card));
-
-        if (practicesCountLabel) {
-            practicesCountLabel.textContent = `Показано практик: ${cards.length}`;
-        }
-    }
 
     function openModal(backdrop) {
         backdrop?.classList.add('open');
@@ -436,30 +378,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function closeModal(backdrop) {
         backdrop?.classList.remove('open');
     }
-
-    closePracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
-    cancelPracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
-    closePracticeDetailsModalButton?.addEventListener('click', () => closeModal(detailsModalBackdrop));
-    closePracticeAssignmentsModalButton?.addEventListener('click', () => closeModal(assignmentsModalBackdrop));
-    cancelPracticeAssignmentsModalButton?.addEventListener('click', () => closeModal(assignmentsModalBackdrop));
-    closeAttestationPreviewModalButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
-    cancelAttestationPreviewButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
-
-    editModalBackdrop?.addEventListener('click', function (e) {
-        if (e.target === editModalBackdrop) closeModal(editModalBackdrop);
-    });
-
-    detailsModalBackdrop?.addEventListener('click', function (e) {
-        if (e.target === detailsModalBackdrop) closeModal(detailsModalBackdrop);
-    });
-
-    assignmentsModalBackdrop?.addEventListener('click', function (e) {
-        if (e.target === assignmentsModalBackdrop) closeModal(assignmentsModalBackdrop);
-    });
-
-    attestationPreviewModalBackdrop?.addEventListener('click', function (e) {
-        if (e.target === attestationPreviewModalBackdrop) closeModal(attestationPreviewModalBackdrop);
-    });
 
     async function fetchJson(url, options = {}) {
         const response = await fetch(url, {
@@ -499,13 +417,11 @@ document.addEventListener('DOMContentLoaded', function () {
             select.appendChild(option);
         });
 
-        if (currentValue && Array.from(select.options).some(x => x.value === currentValue)) {
+        if (currentValue && Array.from(select.options).some(option => option.value === currentValue)) {
             select.value = currentValue;
         }
 
-        if (typeof select._customSelectRebuild === 'function') {
-            select._customSelectRebuild();
-        }
+        refreshCustomSelect(select);
     }
 
     function updateStudentLookup() {
@@ -558,8 +474,8 @@ document.addEventListener('DOMContentLoaded', function () {
             item => item.label
         );
 
-        specialtyFilterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        specialtyFilterSelect?.dispatchEvent(new Event('change', { bubbles: true }));
+        practiceSpecialtySelect?.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function updateAssignmentSpecialtyFilterOptions() {
@@ -570,6 +486,80 @@ document.addEventListener('DOMContentLoaded', function () {
             item => item.id,
             item => item.label
         );
+    }
+
+    function getPracticeCards() {
+        return Array.from(document.querySelectorAll('.practice-card'));
+    }
+
+    function getPracticeSearchText(card) {
+        return [
+            card.dataset.practiceIndex,
+            card.dataset.name,
+            card.dataset.specialtyCode,
+            card.dataset.specialtyName,
+            card.dataset.professionalModuleCode,
+            card.dataset.professionalModuleName
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+    }
+
+    function applyPracticeFilters() {
+        const search = (practiceSearchInput?.value || '').trim().toLowerCase();
+        const specialtyId = specialtyFilterSelect?.value || '';
+        const dateFrom = dateFromFilter?.value || '';
+        const dateTo = dateToFilter?.value || '';
+        const sort = practiceSortSelect?.value || 'date-asc';
+
+        let cards = getPracticeCards();
+
+        cards.forEach(card => {
+            const cardSpecialtyId = card.dataset.specialtyId || '';
+            const startDate = card.dataset.startDate || '';
+            const endDate = card.dataset.endDate || '';
+            const isCompleted = (card.dataset.isCompleted || 'false') === 'true';
+
+            const matchesSearch = !search || getPracticeSearchText(card).includes(search);
+            const matchesSpecialty = !specialtyId || specialtyId === cardSpecialtyId;
+            const matchesDateFrom = !dateFrom || endDate >= dateFrom;
+            const matchesDateTo = !dateTo || startDate <= dateTo;
+            const matchesStatus = practiceStatusTab === 'completed' ? isCompleted : !isCompleted;
+
+            card.style.display = matchesSearch && matchesSpecialty && matchesDateFrom && matchesDateTo && matchesStatus ? '' : 'none';
+        });
+
+        cards = cards.filter(card => card.style.display !== 'none');
+
+        cards.sort((left, right) => {
+            const leftStart = left.dataset.startDate || '';
+            const rightStart = right.dataset.startDate || '';
+            const leftEnd = left.dataset.endDate || '';
+            const rightEnd = right.dataset.endDate || '';
+            const leftIndex = (left.dataset.practiceIndex || '').toLowerCase();
+            const rightIndex = (right.dataset.practiceIndex || '').toLowerCase();
+            const leftHours = Number(left.dataset.hours || 0);
+            const rightHours = Number(right.dataset.hours || 0);
+
+            switch (sort) {
+                case 'date-desc':
+                    return rightStart.localeCompare(leftStart) || rightEnd.localeCompare(leftEnd);
+                case 'index-asc':
+                    return leftIndex.localeCompare(rightIndex, 'ru');
+                case 'hours-desc':
+                    return rightHours - leftHours || leftStart.localeCompare(rightStart);
+                case 'date-asc':
+                default:
+                    return leftStart.localeCompare(rightStart) || leftEnd.localeCompare(rightEnd);
+            }
+        });
+
+        cards.forEach(card => practicesList?.appendChild(card));
+
+        if (practicesCountLabel) {
+            practicesCountLabel.textContent = `Показано практик: ${cards.length}`;
+        }
     }
 
     function getPracticeSpecialtyId() {
@@ -618,7 +608,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         updateAssignmentPracticeMeta();
         updateAssignmentFilterOptions();
-        renderAssignmentWorkspace();
     }
 
     function getStudentById(studentId) {
@@ -724,7 +713,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (assignmentFilters.course && !courseValues.some(item => item.value === assignmentFilters.course)) {
             assignmentFilters.course = '';
-            studentCourseFilterSelect.value = '';
+            if (studentCourseFilterSelect) studentCourseFilterSelect.value = '';
             refreshCustomSelect(studentCourseFilterSelect);
         }
 
@@ -750,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (assignmentFilters.groupName && !groupValues.some(item => item.value === assignmentFilters.groupName)) {
             assignmentFilters.groupName = '';
-            studentGroupFilterSelect.value = '';
+            if (studentGroupFilterSelect) studentGroupFilterSelect.value = '';
             refreshCustomSelect(studentGroupFilterSelect);
         }
 
@@ -779,14 +768,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!assignmentCatalogLoaded) {
-            return 'Откройте создание или редактирование практики, чтобы загрузить список студентов.';
+            return 'Откройте окно назначения, чтобы загрузить каталог студентов.';
         }
 
         if (assignmentTab === 'assigned') {
             return 'Назначенных студентов пока нет. Переключитесь на полный список и отметьте нужных.';
         }
 
-        return 'По выбранным фильтрам студенты не найдены. Измените параметры поиска или сбросьте фильтры.';
+        return 'По текущим фильтрам студенты не найдены.';
+    }
+
+    function getOrderedAssignments() {
+        return Array.from(assignmentSelections.values()).sort((left, right) => {
+            const leftStudent = getStudentById(left.studentId);
+            const rightStudent = getStudentById(right.studentId);
+
+            const byCourse = compareNullableNumbers(leftStudent?.course, rightStudent?.course);
+            if (byCourse !== 0) return byCourse;
+
+            const byGroup = compareStrings(leftStudent?.groupName, rightStudent?.groupName);
+            if (byGroup !== 0) return byGroup;
+
+            return compareStrings(leftStudent?.fullName, rightStudent?.fullName);
+        });
     }
 
     function initializeAssignmentSupervisorSelects() {
@@ -831,14 +835,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const allAssignableSelected = assignableFilteredStudents.length > 0 &&
                 assignableFilteredStudents.every(student => assignmentSelections.has(Number(student.id)));
 
-            assignAllFilteredCheckbox.disabled = assignableFilteredStudents.length === 0;
-            assignAllFilteredCheckbox.checked = allAssignableSelected;
+            assignAllFilteredCheckbox.disabled = assignmentTab === 'assigned' || assignableFilteredStudents.length === 0;
+            assignAllFilteredCheckbox.checked = assignmentTab !== 'assigned' && allAssignableSelected;
         }
 
         if (studentAssignmentSummary) {
             const visibleAssignedCount = filteredStudents.filter(student => assignmentSelections.has(Number(student.id))).length;
-            studentAssignmentSummary.textContent =
-                `Видно ${filteredStudents.length} студентов, из них ${visibleAssignedCount} уже в текущей выборке. Всего назначено: ${assignedCount}.`;
+            studentAssignmentSummary.textContent = `Показано студентов: ${filteredStudents.length}. В текущей выборке назначено: ${visibleAssignedCount}. Всего назначено: ${assignedCount}.`;
         }
 
         if (filteredStudents.length === 0) {
@@ -856,12 +859,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const isAssigned = assignmentSelections.has(studentId);
             const assignment = assignmentSelections.get(studentId);
             const isAllowed = canAssignStudent(student);
-            const isCheckboxDisabled = !isAllowed && !isAssigned;
+            const checkboxDisabled = !isAllowed && !isAssigned;
             const rowErrors = assignmentRowErrors[studentId] || {};
             const studentError = rowErrors.StudentId || '';
             const supervisorError = rowErrors.SupervisorId || '';
             const supervisorSelectId = `assignmentSupervisorSelect-${studentId}`;
-            const statusBadges = [
+            const badges = [
                 isAssigned ? '<span class="student-assignment-badge">Назначен</span>' : '',
                 !isAllowed && getPracticeSpecialtyId()
                     ? '<span class="student-assignment-badge warning">Другая специальность</span>'
@@ -881,18 +884,18 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <input type="checkbox"
                                        class="assignment-row-checkbox"
                                        ${isAssigned ? 'checked' : ''}
-                                       ${isCheckboxDisabled ? 'disabled' : ''} />
-                                <span>${isAssigned ? 'На практике' : 'Назначить'}</span>
+                                       ${checkboxDisabled ? 'disabled' : ''} />
+                                <span>${isAssigned ? 'Включён' : 'Назначить'}</span>
                             </span>
                             <span class="student-assignment-toggle-state">
-                                ${isAssigned ? 'Студент включен в список практики' : 'Строка пока не включена'}
+                                ${isAssigned ? 'Студент входит в состав практики' : 'Строка пока не включена'}
                             </span>
                         </label>
                     </td>
                     <td>
                         <div class="student-assignment-student">
                             <div class="student-assignment-student-name">${escapeHtml(student.fullName)}</div>
-                            <div class="student-assignment-student-meta">${statusBadges}</div>
+                            <div class="student-assignment-student-meta">${badges}</div>
                             <div class="field-error">${escapeHtml(studentError)}</div>
                         </div>
                     </td>
@@ -904,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="student-assignment-cell-main">${escapeHtml(student.groupName || '-')}</div>
                     </td>
                     <td>
-                        <div class="student-assignment-cell-main">${escapeHtml(student.course != null ? `${student.course}` : '-')}</div>
+                        <div class="student-assignment-cell-main">${escapeHtml(student.course != null ? String(student.course) : '-')}</div>
                     </td>
                     <td>
                         <div class="student-assignment-supervisor-wrap">
@@ -925,12 +928,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 </tr>
             `;
         }).join('');
+
         initializeAssignmentSupervisorSelects();
     }
 
     function createCompetencyItem(value = {}) {
+        if (!competencyTemplate || !competenciesContainer) return;
+
         const fragment = competencyTemplate.content.cloneNode(true);
         const element = fragment.querySelector('.competency-item');
+        if (!element) return;
 
         element.querySelector('.competency-code-input').value = value.competencyCode || '';
         element.querySelector('.competency-description-input').value = value.competencyDescription || '';
@@ -946,32 +953,147 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function resetPracticeForm() {
-        practiceIdInput.value = '';
-        practiceIndexInput.value = '';
-        practiceNameInput.value = '';
-        practiceSpecialtySelect.value = '';
-        practiceHoursInput.value = '';
-        professionalModuleCodeInput.value = '';
-        professionalModuleNameInput.value = '';
-        practiceStartDateInput.value = '';
-        practiceEndDateInput.value = '';
-        competenciesContainer.innerHTML = '';
+        if (practiceIdInput) practiceIdInput.value = '';
+        if (practiceIndexInput) practiceIndexInput.value = '';
+        if (practiceNameInput) practiceNameInput.value = '';
+        if (practiceSpecialtySelect) practiceSpecialtySelect.value = '';
+        if (practiceHoursInput) practiceHoursInput.value = '';
+        if (professionalModuleCodeInput) professionalModuleCodeInput.value = '';
+        if (professionalModuleNameInput) professionalModuleNameInput.value = '';
+        if (practiceStartDateInput) practiceStartDateInput.value = '';
+        if (practiceEndDateInput) practiceEndDateInput.value = '';
+        if (competenciesContainer) competenciesContainer.innerHTML = '';
+
         currentAssignmentPractice = null;
         assignmentSelections = new Map();
         submittedAssignmentSnapshot = [];
         assignmentTab = 'all';
         assignmentFilters = createDefaultAssignmentFilters();
+        originalEditSpecialtyId = null;
+        originalEditAssignedStudentsCount = 0;
+        specialtyChangeStudentResetConfirmed = false;
 
-        if (studentAssignmentSearchInput) {
-            studentAssignmentSearchInput.value = '';
-        }
-
-        if (studentSortSelect) {
-            studentSortSelect.value = assignmentFilters.sort;
-        }
+        if (studentAssignmentSearchInput) studentAssignmentSearchInput.value = '';
+        if (studentSortSelect) studentSortSelect.value = assignmentFilters.sort;
 
         clearFieldErrors();
-        practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        practiceSpecialtySelect?.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function renderPracticeDetails(details) {
+        if (practiceDetailsTitle) {
+            practiceDetailsTitle.textContent = `${details.practiceIndex} - ${details.name}`;
+        }
+
+        if (practiceDetailsSubtitle) {
+            practiceDetailsSubtitle.textContent = `${details.specialtyCode} ${details.specialtyName}`;
+        }
+
+        if (practiceDetailsOverviewTitle) {
+            practiceDetailsOverviewTitle.textContent = details.name || 'Производственная практика';
+        }
+
+        if (practiceDetailsOverviewSubtitle) {
+            practiceDetailsOverviewSubtitle.textContent = `${details.practiceIndex} • ${details.specialtyCode} ${details.specialtyName}`;
+        }
+
+        if (practiceDetailsOverviewStats) {
+            practiceDetailsOverviewStats.innerHTML = `
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Часы</span>
+                    <span class="department-details-overview-stat-value">${details.hours}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Студенты</span>
+                    <span class="department-details-overview-stat-value">${details.studentAssignments.length}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Компетенции</span>
+                    <span class="department-details-overview-stat-value">${details.competencies.length}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Период</span>
+                    <span class="department-details-overview-stat-value">${formatDate(details.startDate)} - ${formatDate(details.endDate)}</span>
+                </div>
+                <div class="department-details-overview-stat">
+                    <span class="department-details-overview-stat-label">Статус</span>
+                    <span class="department-details-overview-stat-value">${details.isCompleted ? 'Завершилась' : 'Активна'}</span>
+                </div>
+            `;
+        }
+
+        if (practiceDetailsInfo) {
+            practiceDetailsInfo.innerHTML = `
+                <div class="department-details-item">
+                    <span class="department-details-label">Название практики</span>
+                    <span class="department-details-value department-details-value-strong">${escapeHtml(details.name)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Специальность</span>
+                    <span class="department-details-value">${escapeHtml(details.specialtyCode || '-')} ${escapeHtml(details.specialtyName || '')}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Индекс ПП</span>
+                    <span class="department-details-value">${escapeHtml(details.practiceIndex)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Количество часов</span>
+                    <span class="department-details-value">${details.hours}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Код ПМ</span>
+                    <span class="department-details-value">${escapeHtml(details.professionalModuleCode)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Название ПМ</span>
+                    <span class="department-details-value">${escapeHtml(details.professionalModuleName)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Дата начала</span>
+                    <span class="department-details-value">${formatDate(details.startDate)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Дата окончания</span>
+                    <span class="department-details-value">${formatDate(details.endDate)}</span>
+                </div>
+                <div class="department-details-item">
+                    <span class="department-details-label">Статус</span>
+                    <span class="department-details-value">${details.isCompleted ? 'Завершившаяся практика' : 'Активная практика'}</span>
+                </div>
+            `;
+        }
+
+        if (practiceDetailsAssignments) {
+            practiceDetailsAssignments.innerHTML = details.studentAssignments.length
+                ? details.studentAssignments.map(item => `
+                    <div class="department-details-card">
+                        <div class="department-details-card-header">
+                            <div class="department-details-card-title">${escapeHtml(item.studentFullName)}</div>
+                            <div class="department-details-chip">${escapeHtml(item.studentCourse != null ? `${item.studentCourse} курс` : 'Курс не указан')}</div>
+                        </div>
+                        <div class="department-details-card-meta">
+                            <span class="department-details-inline-chip">${escapeHtml(item.studentSpecialtyCode || '-')} ${escapeHtml(item.studentSpecialtyName || '')}</span>
+                            <span class="department-details-inline-chip">${escapeHtml(item.studentGroupName || 'Группа не указана')}</span>
+                        </div>
+                        <div class="department-details-card-text">Руководитель от техникума: ${escapeHtml(item.supervisorFullName || 'Не назначен')}</div>
+                    </div>
+                `).join('')
+                : '<div class="department-details-card"><div class="department-details-card-text">Студенты пока не назначены.</div></div>';
+        }
+
+        if (practiceDetailsCompetencies) {
+            practiceDetailsCompetencies.innerHTML = details.competencies.length
+                ? details.competencies.map(item => `
+                    <div class="department-details-card">
+                        <div class="department-details-card-header">
+                            <div class="department-details-card-title">${escapeHtml(item.competencyCode)} - ${escapeHtml(item.competencyDescription)}</div>
+                            <div class="department-details-chip">${item.hours} ч.</div>
+                        </div>
+                        <div class="department-details-card-text">${escapeHtml(item.workTypes)}</div>
+                    </div>
+                `).join('')
+                : '<div class="department-details-card"><div class="department-details-card-text">Компетенции пока не добавлены.</div></div>';
+        }
     }
 
     async function openDetails(practiceId) {
@@ -979,140 +1101,53 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!details) return;
 
         currentDetails = details;
-
-        practiceDetailsTitle.textContent = `${details.practiceIndex} - ${details.name}`;
-        practiceDetailsSubtitle.textContent = `${details.specialtyCode} ${details.specialtyName}`;
-        if (practiceDetailsOverviewTitle) {
-            practiceDetailsOverviewTitle.textContent = details.name || '\u041f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u0430\u044f \u043f\u0440\u0430\u043a\u0442\u0438\u043a\u0430';
-        }
-        if (practiceDetailsOverviewSubtitle) {
-            practiceDetailsOverviewSubtitle.textContent =
-                `${details.practiceIndex} \u2022 ${details.specialtyCode} ${details.specialtyName}`;
-        }
-        if (practiceDetailsOverviewStats) {
-            practiceDetailsOverviewStats.innerHTML = `
-                <div class="department-details-overview-stat">
-                    <span class="department-details-overview-stat-label">\u0427\u0430\u0441\u044b</span>
-                    <span class="department-details-overview-stat-value">${details.hours}</span>
-                </div>
-                <div class="department-details-overview-stat">
-                    <span class="department-details-overview-stat-label">\u0421\u0442\u0443\u0434\u0435\u043d\u0442\u044b</span>
-                    <span class="department-details-overview-stat-value">${details.studentAssignments.length}</span>
-                </div>
-                <div class="department-details-overview-stat">
-                    <span class="department-details-overview-stat-label">\u041a\u043e\u043c\u043f\u0435\u0442\u0435\u043d\u0446\u0438\u0438</span>
-                    <span class="department-details-overview-stat-value">${details.competencies.length}</span>
-                </div>
-                <div class="department-details-overview-stat">
-                    <span class="department-details-overview-stat-label">\u041f\u0435\u0440\u0438\u043e\u0434</span>
-                    <span class="department-details-overview-stat-value">${formatDate(details.startDate)} - ${formatDate(details.endDate)}</span>
-                </div>
-            `;
-        }
-
-        practiceDetailsInfo.innerHTML = `
-            <div class="department-details-item">
-                <span class="department-details-label">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u0430\u043a\u0442\u0438\u043a\u0438</span>
-                <span class="department-details-value department-details-value-strong">${escapeHtml(details.name)}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u0421\u043f\u0435\u0446\u0438\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c</span>
-                <span class="department-details-value">${escapeHtml(details.specialtyCode || '-')} ${escapeHtml(details.specialtyName || '')}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u0418\u043d\u0434\u0435\u043a\u0441 \u041f\u041f</span>
-                <span class="department-details-value">${escapeHtml(details.practiceIndex)}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e \u0447\u0430\u0441\u043e\u0432</span>
-                <span class="department-details-value">${details.hours}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u041a\u043e\u0434 \u041f\u041c</span>
-                <span class="department-details-value">${escapeHtml(details.professionalModuleCode)}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u041f\u041c</span>
-                <span class="department-details-value">${escapeHtml(details.professionalModuleName)}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u0414\u0430\u0442\u0430 \u043d\u0430\u0447\u0430\u043b\u0430</span>
-                <span class="department-details-value">${formatDate(details.startDate)}</span>
-            </div>
-            <div class="department-details-item">
-                <span class="department-details-label">\u0414\u0430\u0442\u0430 \u043e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f</span>
-                <span class="department-details-value">${formatDate(details.endDate)}</span>
-            </div>
-        `;
-
-        practiceDetailsAssignments.innerHTML = details.studentAssignments.length
-            ? details.studentAssignments.map(x => `
-                <div class="department-details-card">
-                    <div class="department-details-card-header">
-                        <div class="department-details-card-title">${escapeHtml(x.studentFullName)}</div>
-                        <div class="department-details-chip">${escapeHtml(x.studentCourse != null ? `${x.studentCourse} \u043a\u0443\u0440\u0441` : '\u041a\u0443\u0440\u0441 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d')}</div>
-                    </div>
-                    <div class="department-details-card-meta">
-                        <span class="department-details-inline-chip">
-                            ${escapeHtml(x.studentSpecialtyCode || '-')} ${escapeHtml(x.studentSpecialtyName || '')}
-                        </span>
-                        <span class="department-details-inline-chip">${escapeHtml(x.studentGroupName || '\u0413\u0440\u0443\u043f\u043f\u0430 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u0430')}</span>
-                    </div>
-                    <div class="department-details-card-text">
-                        \u0420\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c \u043e\u0442 \u0442\u0435\u0445\u043d\u0438\u043a\u0443\u043c\u0430: ${escapeHtml(x.supervisorFullName || '\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d')}
-                    </div>
-                </div>
-            `).join('')
-            : '<div class="department-details-card"><div class="department-details-card-text">\u0421\u0442\u0443\u0434\u0435\u043d\u0442\u044b \u043f\u043e\u043a\u0430 \u043d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u044b.</div></div>';
-
-        practiceDetailsCompetencies.innerHTML = details.competencies.length
-            ? details.competencies.map(x => `
-                <div class="department-details-card">
-                    <div class="department-details-card-header">
-                        <div class="department-details-card-title">${escapeHtml(x.competencyCode)} - ${escapeHtml(x.competencyDescription)}</div>
-                        <div class="department-details-chip">${x.hours} \u0447.</div>
-                    </div>
-                    <div class="department-details-card-text">${escapeHtml(x.workTypes)}</div>
-                </div>
-            `).join('')
-            : '<div class="department-details-card"><div class="department-details-card-text">\u041a\u043e\u043c\u043f\u0435\u0442\u0435\u043d\u0446\u0438\u0438 \u043f\u043e\u043a\u0430 \u043d\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b.</div></div>';
-
-        openModal(detailsModalBackdrop);        openModal(detailsModalBackdrop);
+        renderPracticeDetails(details);
+        openModal(detailsModalBackdrop);
     }
 
     async function fillEditFormFromDetails(details) {
         resetPracticeForm();
 
-        practiceIdInput.value = details.id;
-        practiceIndexInput.value = details.practiceIndex || '';
-        practiceNameInput.value = details.name || '';
-        practiceSpecialtySelect.value = String(details.specialtyId || '');
-        practiceHoursInput.value = details.hours || '';
-        professionalModuleCodeInput.value = details.professionalModuleCode || '';
-        professionalModuleNameInput.value = details.professionalModuleName || '';
-        practiceStartDateInput.value = (details.startDate || '').slice(0, 10);
-        practiceEndDateInput.value = (details.endDate || '').slice(0, 10);
+        if (practiceIdInput) practiceIdInput.value = details.id;
+        if (practiceIndexInput) practiceIndexInput.value = details.practiceIndex || '';
+        if (practiceNameInput) practiceNameInput.value = details.name || '';
+        if (practiceSpecialtySelect) practiceSpecialtySelect.value = String(details.specialtyId || '');
+        if (practiceHoursInput) practiceHoursInput.value = details.hours || '';
+        if (professionalModuleCodeInput) professionalModuleCodeInput.value = details.professionalModuleCode || '';
+        if (professionalModuleNameInput) professionalModuleNameInput.value = details.professionalModuleName || '';
+        if (practiceStartDateInput) practiceStartDateInput.value = String(details.startDate || '').slice(0, 10);
+        if (practiceEndDateInput) practiceEndDateInput.value = String(details.endDate || '').slice(0, 10);
 
-        practiceSpecialtySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        originalEditSpecialtyId = Number(details.specialtyId || 0);
+        originalEditAssignedStudentsCount = Array.isArray(details.studentAssignments) ? details.studentAssignments.length : 0;
+        specialtyChangeStudentResetConfirmed = false;
+
+        practiceSpecialtySelect?.dispatchEvent(new Event('change', { bubbles: true }));
 
         (details.competencies || []).forEach(item => createCompetencyItem(item));
 
-        practiceEditModalTitle.textContent = 'Редактирование производственной практики';
-        practiceEditModalSubtitle.textContent = 'Измените параметры практики и компетенции. Назначение студентов открывается отдельным окном.';
+        if (practiceEditModalTitle) {
+            practiceEditModalTitle.textContent = 'Редактирование производственной практики';
+        }
+
+        if (practiceEditModalSubtitle) {
+            practiceEditModalSubtitle.textContent = 'Измените параметры практики и перечень компетенций. Назначение студентов открывается отдельным окном.';
+        }
     }
 
     function buildPayload() {
         return {
-            id: practiceIdInput.value ? Number(practiceIdInput.value) : null,
-            practiceIndex: practiceIndexInput.value.trim(),
-            name: practiceNameInput.value.trim(),
-            specialtyId: Number(practiceSpecialtySelect.value || 0),
-            professionalModuleCode: professionalModuleCodeInput.value.trim(),
-            professionalModuleName: professionalModuleNameInput.value.trim(),
-            hours: Number(practiceHoursInput.value || 0),
-            startDate: practiceStartDateInput.value ? practiceStartDateInput.value : null,
-            endDate: practiceEndDateInput.value ? practiceEndDateInput.value : null,
-            competencies: Array.from(competenciesContainer.querySelectorAll('.competency-item')).map(item => ({
+            id: practiceIdInput?.value ? Number(practiceIdInput.value) : null,
+            practiceIndex: practiceIndexInput?.value.trim() || '',
+            name: practiceNameInput?.value.trim() || '',
+            specialtyId: Number(practiceSpecialtySelect?.value || 0),
+            professionalModuleCode: professionalModuleCodeInput?.value.trim() || '',
+            professionalModuleName: professionalModuleNameInput?.value.trim() || '',
+            hours: Number(practiceHoursInput?.value || 0),
+            startDate: practiceStartDateInput?.value || null,
+            endDate: practiceEndDateInput?.value || null,
+            confirmSpecialtyChangeStudentReset: specialtyChangeStudentResetConfirmed,
+            competencies: Array.from(competenciesContainer?.querySelectorAll('.competency-item') || []).map(item => ({
                 competencyCode: item.querySelector('.competency-code-input').value.trim(),
                 competencyDescription: item.querySelector('.competency-description-input').value.trim(),
                 workTypes: item.querySelector('.competency-worktypes-input').value.trim(),
@@ -1152,18 +1187,66 @@ document.addEventListener('DOMContentLoaded', function () {
 
         assignmentFilters = createDefaultAssignmentFilters();
         assignmentTab = assignmentSelections.size > 0 ? 'assigned' : 'all';
+        submittedAssignmentSnapshot = [];
         resetAssignmentRowErrors();
 
         if (studentAssignmentSearchInput) studentAssignmentSearchInput.value = '';
         if (studentSortSelect) studentSortSelect.value = assignmentFilters.sort;
 
-        practiceAssignmentsModalTitle.textContent = `Назначение студентов: ${details.practiceIndex}`;
-        practiceAssignmentsModalSubtitle.textContent = `${details.name}. ${details.specialtyCode} ${details.specialtyName}`;
+        if (practiceAssignmentsModalTitle) {
+            practiceAssignmentsModalTitle.textContent = `Назначение студентов: ${details.practiceIndex}`;
+        }
+
+        if (practiceAssignmentsModalSubtitle) {
+            practiceAssignmentsModalSubtitle.textContent = `${details.name}. ${details.specialtyCode} ${details.specialtyName}`;
+        }
 
         syncAssignmentFilterWithPracticeSpecialty();
         renderAssignmentWorkspace();
         openModal(assignmentsModalBackdrop);
     }
+
+    closePracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
+    cancelPracticeEditModalButton?.addEventListener('click', () => closeModal(editModalBackdrop));
+    closePracticeDetailsModalButton?.addEventListener('click', () => closeModal(detailsModalBackdrop));
+    closePracticeAssignmentsModalButton?.addEventListener('click', () => closeModal(assignmentsModalBackdrop));
+    cancelPracticeAssignmentsModalButton?.addEventListener('click', () => closeModal(assignmentsModalBackdrop));
+    closeAttestationPreviewModalButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
+    cancelAttestationPreviewButton?.addEventListener('click', () => closeModal(attestationPreviewModalBackdrop));
+
+    editModalBackdrop?.addEventListener('click', event => {
+        if (event.target === editModalBackdrop) closeModal(editModalBackdrop);
+    });
+
+    detailsModalBackdrop?.addEventListener('click', event => {
+        if (event.target === detailsModalBackdrop) closeModal(detailsModalBackdrop);
+    });
+
+    assignmentsModalBackdrop?.addEventListener('click', event => {
+        if (event.target === assignmentsModalBackdrop) closeModal(assignmentsModalBackdrop);
+    });
+
+    attestationPreviewModalBackdrop?.addEventListener('click', event => {
+        if (event.target === attestationPreviewModalBackdrop) closeModal(attestationPreviewModalBackdrop);
+    });
+
+    panelButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            switchPanel(button.dataset.panelTarget);
+        });
+    });
+
+    practiceStatusButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            setPracticeStatusTab(button.dataset.practiceStatus || 'active');
+        });
+    });
+
+    logConsoleButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            switchLogConsole(button.dataset.logConsole || 'practiceChangesConsole');
+        });
+    });
 
     addCompetencyButton?.addEventListener('click', () => {
         createCompetencyItem();
@@ -1171,8 +1254,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     openCreatePracticeButton?.addEventListener('click', () => {
         resetPracticeForm();
-        practiceEditModalTitle.textContent = 'Создание производственной практики';
-        practiceEditModalSubtitle.textContent = 'Сначала создайте практику и заполните компетенции. Назначение студентов открывается отдельным окном.';
+
+        if (practiceEditModalTitle) {
+            practiceEditModalTitle.textContent = 'Создание производственной практики';
+        }
+
+        if (practiceEditModalSubtitle) {
+            practiceEditModalSubtitle.textContent = 'Сначала создайте практику и заполните компетенции. Назначение студентов выполняется в отдельном окне.';
+        }
+
         createCompetencyItem();
         openModal(editModalBackdrop);
     });
@@ -1240,13 +1330,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     studentAssignmentTableBody?.addEventListener('change', event => {
-        const row = event.target.closest('tr[data-student-id]');
+        const target = event.target;
+        const row = target.closest('tr[data-student-id]');
         if (!row) return;
 
         const studentId = Number(row.dataset.studentId);
 
-        if (event.target.classList.contains('assignment-row-checkbox')) {
-            if (event.target.checked) {
+        if (target.classList.contains('assignment-row-checkbox')) {
+            if (target.checked) {
                 const existing = assignmentSelections.get(studentId);
                 assignmentSelections.set(studentId, {
                     studentId,
@@ -1261,11 +1352,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (event.target.classList.contains('student-assignment-supervisor-select')) {
+        if (target.classList.contains('student-assignment-supervisor-select')) {
             const existing = assignmentSelections.get(studentId);
             if (!existing) return;
 
-            existing.supervisorId = event.target.value ? Number(event.target.value) : null;
+            existing.supervisorId = target.value ? Number(target.value) : null;
 
             if (assignmentRowErrors[studentId] && assignmentRowErrors[studentId].SupervisorId) {
                 delete assignmentRowErrors[studentId].SupervisorId;
@@ -1274,16 +1365,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            const errorBlock = row.querySelector('.field-error');
-            const select = row.querySelector('.student-assignment-supervisor-select');
-            const selectTrigger = row.querySelector('.student-assignment-select .custom-select-trigger');
-            if (errorBlock && !assignmentRowErrors[studentId]?.SupervisorId) {
-                const errorBlocks = row.querySelectorAll('.field-error');
-                if (errorBlocks[1]) errorBlocks[1].textContent = '';
-            }
-            select?.classList.remove('input-error');
-            selectTrigger?.classList.remove('input-error');
+            const errorBlock = row.querySelector('.student-assignment-supervisor-wrap .field-error');
+            const trigger = row.querySelector('.student-assignment-select .custom-select-trigger');
+            if (errorBlock) errorBlock.textContent = '';
+            target.classList.remove('input-error');
+            trigger?.classList.remove('input-error');
         }
+    });
+
+    practiceSpecialtySelect?.addEventListener('change', () => {
+        const currentSpecialtyId = Number(practiceSpecialtySelect.value || 0);
+        specialtyChangeStudentResetConfirmed = currentSpecialtyId === originalEditSpecialtyId;
     });
 
     editPracticeFromDetailsButton?.addEventListener('click', async () => {
@@ -1315,8 +1407,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const result = await fetchJson(`/DepartmentStaff/PreviewAttestation?id=${currentDetails.id}`);
         currentAttestationPracticeId = currentDetails.id;
 
-        attestationPreviewContainer.innerHTML = result.html || '';
-        attestationPreviewFileName.textContent = result.fileName || 'Аттестационный лист';
+        if (attestationPreviewContainer) {
+            attestationPreviewContainer.innerHTML = result.html || '';
+        }
+
+        if (attestationPreviewFileName) {
+            attestationPreviewFileName.textContent = result.fileName || 'Аттестационный лист';
+        }
 
         openModal(attestationPreviewModalBackdrop);
     });
@@ -1340,11 +1437,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             closeModal(detailsModalBackdrop);
 
-            const card = practicesList.querySelector(`.practice-card[data-id="${currentDetails.id}"]`);
-            if (card) {
-                card.remove();
-            }
-
+            const card = practicesList?.querySelector(`.practice-card[data-id="${currentDetails.id}"]`);
+            card?.remove();
+            currentDetails = null;
             applyPracticeFilters();
         } catch (error) {
             alert(error.message || 'Не удалось удалить практику.');
@@ -1372,11 +1467,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    practiceForm?.addEventListener('submit', async function (e) {
-        e.preventDefault();
+    practiceForm?.addEventListener('submit', async event => {
+        event.preventDefault();
         clearFieldErrors();
 
         try {
+            const isEditMode = Boolean(practiceIdInput?.value);
+            const currentSpecialtyId = Number(practiceSpecialtySelect?.value || 0);
+            const specialtyChanged = isEditMode &&
+                originalEditAssignedStudentsCount > 0 &&
+                originalEditSpecialtyId > 0 &&
+                currentSpecialtyId > 0 &&
+                currentSpecialtyId !== originalEditSpecialtyId;
+
+            if (specialtyChanged && !specialtyChangeStudentResetConfirmed) {
+                const confirmed = confirm('В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Продолжить?');
+                if (!confirmed) return;
+                specialtyChangeStudentResetConfirmed = true;
+            }
+
             const payload = buildPayload();
 
             await fetchJson('/DepartmentStaff/SavePractice', {
@@ -1387,12 +1496,16 @@ document.addEventListener('DOMContentLoaded', function () {
             closeModal(editModalBackdrop);
             window.location.reload();
         } catch (error) {
+            if ((error.validationErrors || {}).SpecialtyId) {
+                specialtyChangeStudentResetConfirmed = false;
+            }
+
             applyValidationErrors(error.validationErrors || {}, error.message || 'Не удалось сохранить производственную практику.');
         }
     });
 
     document.querySelectorAll('.practice-details-button').forEach(button => {
-        button.addEventListener('click', function () {
+        button.addEventListener('click', () => {
             const card = button.closest('.practice-card');
             if (!card) return;
             openDetails(card.dataset.id);
@@ -1400,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.querySelectorAll('.practice-assignments-button').forEach(button => {
-        button.addEventListener('click', async function () {
+        button.addEventListener('click', async () => {
             const card = button.closest('.practice-card');
             if (!card) return;
 
@@ -1428,5 +1541,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applyPracticeFilters();
     });
 
+    setPracticeStatusTab('active');
+    switchLogConsole('practiceChangesConsole');
     switchPanel('practicesPanel');
 });

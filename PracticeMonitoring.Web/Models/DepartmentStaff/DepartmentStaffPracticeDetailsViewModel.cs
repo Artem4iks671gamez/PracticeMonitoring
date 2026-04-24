@@ -24,6 +24,8 @@ public class DepartmentStaffPracticeDetailsViewModel
 
     public DateTime EndDate { get; set; }
 
+    public bool IsCompleted { get; set; }
+
     public List<DepartmentStaffPracticeCompetencyItemViewModel> Competencies { get; set; } = new();
 
     public List<DepartmentStaffPracticeStudentAssignmentItemViewModel> StudentAssignments { get; set; } = new();

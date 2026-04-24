@@ -24,6 +24,8 @@ public class ProductionPracticeDetailsResponse
 
     public DateTime EndDate { get; set; }
 
+    public bool IsCompleted { get; set; }
+
     public List<ProductionPracticeCompetencyItemResponse> Competencies { get; set; } = new();
 
     public List<ProductionPracticeStudentAssignmentItemResponse> StudentAssignments { get; set; } = new();

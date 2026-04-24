@@ -31,6 +31,8 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
 
     public DateTime? EndDate { get; set; }
 
+    public bool ConfirmSpecialtyChangeStudentReset { get; set; }
+
     public List<DepartmentStaffPracticeCompetencyEditViewModel> Competencies { get; set; } = new();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
