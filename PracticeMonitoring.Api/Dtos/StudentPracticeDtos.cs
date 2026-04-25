@@ -174,10 +174,14 @@ public class StudentPracticeDiaryEntryRequest
     public string? DetailedReport { get; set; }
 
     public List<StudentPracticeDiaryFigureRequest> Figures { get; set; } = new();
+
+    public List<int> KeptAttachmentIds { get; set; } = new();
 }
 
 public class StudentPracticeDiaryFigureRequest
 {
+    public string? ClientId { get; set; }
+
     public string? Caption { get; set; }
 
     public string? FileName { get; set; }

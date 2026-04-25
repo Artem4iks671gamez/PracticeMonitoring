@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -102,8 +103,8 @@ public class StudentController : ControllerBase
             _notificationService.Add(
                 assignment.SupervisorId.Value,
                 "StudentPracticeDetails",
-                "РЎС‚СѓРґРµРЅС‚ Р·Р°РїРѕР»РЅРёР» СЃРІРµРґРµРЅРёСЏ Рѕ РїСЂР°РєС‚РёРєРµ",
-                $"{assignment.Student.FullName} СЃРѕС…СЂР°РЅРёР» РѕСЂРіР°РЅРёР·Р°С†РёСЋ, СЂСѓРєРѕРІРѕРґРёС‚РµР»СЏ РѕС‚ РѕСЂРіР°РЅРёР·Р°С†РёРё Рё СЃРѕРґРµСЂР¶Р°РЅРёРµ Р·Р°РґР°РЅРёСЏ РїРѕ РїСЂР°РєС‚РёРєРµ {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\".",
+                "Студент заполнил сведения о практике",
+                $"{assignment.Student.FullName} сохранил организацию, руководителя от организации и содержание задания по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\".",
                 "/Supervisor");
         }
 
@@ -119,6 +120,7 @@ public class StudentController : ControllerBase
         StudentPracticeDiaryEntryRequest request)
     {
         request.Figures ??= new List<StudentPracticeDiaryFigureRequest>();
+        request.KeptAttachmentIds ??= new List<int>();
 
         var assignment = await LoadStudentAssignmentAsync(assignmentId);
         if (assignment is null)
@@ -145,27 +147,41 @@ public class StudentController : ControllerBase
 
         try
         {
+            var keptAttachmentIds = request.KeptAttachmentIds.ToHashSet();
+            var attachmentsToRemove = entry.Attachments
+                .Where(x => !keptAttachmentIds.Contains(x.Id))
+                .ToList();
+
+            if (attachmentsToRemove.Count > 0)
+            {
+                _context.StudentPracticeDiaryAttachments.RemoveRange(attachmentsToRemove);
+                foreach (var attachment in attachmentsToRemove)
+                    entry.Attachments.Remove(attachment);
+            }
+
+            var pendingAttachments = BuildDiaryAttachments(request.Figures);
+            foreach (var pending in pendingAttachments)
+                entry.Attachments.Add(pending.Attachment);
+
             entry.ShortDescription = request.ShortDescription!.Trim();
             entry.DetailedReport = request.DetailedReport!.Trim();
             entry.UpdatedAtUtc = now;
 
-            if (request.Figures.Count > 0 && entry.Attachments.Count > 0)
-                _context.StudentPracticeDiaryAttachments.RemoveRange(entry.Attachments);
+            await _context.SaveChangesAsync();
 
-            if (request.Figures.Count > 0)
-                entry.Attachments = BuildDiaryAttachments(request.Figures);
+            entry.DetailedReport = BindDiaryAttachmentIds(entry.DetailedReport, pendingAttachments);
+            ApplyDiaryAttachmentMetadata(entry, entry.DetailedReport);
+
+            await _context.SaveChangesAsync();
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
 
-        await _context.SaveChangesAsync();
-
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
         return Ok(MapDetails(assignment!));
     }
-
     [HttpPut("practices/{assignmentId:int}/report-items")]
     public async Task<ActionResult<StudentPracticeDetailsResponse>> SaveReportItems(
         int assignmentId,
@@ -444,9 +460,9 @@ public class StudentController : ControllerBase
 
         return errors;
     }
-    private static List<StudentPracticeDiaryAttachment> BuildDiaryAttachments(List<StudentPracticeDiaryFigureRequest> figures)
+    private static List<PendingDiaryAttachment> BuildDiaryAttachments(List<StudentPracticeDiaryFigureRequest> figures)
     {
-        var attachments = new List<StudentPracticeDiaryAttachment>();
+        var attachments = new List<PendingDiaryAttachment>();
 
         foreach (var figure in figures.Where(x => !string.IsNullOrWhiteSpace(x.Base64Content)))
         {
@@ -464,20 +480,153 @@ public class StudentController : ControllerBase
             if (bytes.Length > MaxDiaryFigureSizeBytes)
                 throw new InvalidOperationException("Размер рисунка не должен превышать 8 МБ.");
 
-            attachments.Add(new StudentPracticeDiaryAttachment
-            {
-                Caption = figure.Caption?.Trim() ?? "Рисунок",
-                FileName = string.IsNullOrWhiteSpace(figure.FileName) ? "figure.png" : Path.GetFileName(figure.FileName),
-                ContentType = string.IsNullOrWhiteSpace(figure.ContentType) ? "image/png" : figure.ContentType.Trim(),
-                SizeBytes = bytes.Length,
-                Content = bytes,
-                SortOrder = figure.SortOrder
-            });
+            attachments.Add(new PendingDiaryAttachment(
+                figure.ClientId?.Trim(),
+                new StudentPracticeDiaryAttachment
+                {
+                    Caption = figure.Caption?.Trim() ?? "Рисунок",
+                    FileName = string.IsNullOrWhiteSpace(figure.FileName) ? "figure.png" : Path.GetFileName(figure.FileName),
+                    ContentType = string.IsNullOrWhiteSpace(figure.ContentType) ? "image/png" : figure.ContentType.Trim(),
+                    SizeBytes = bytes.Length,
+                    Content = bytes,
+                    SortOrder = figure.SortOrder
+                }));
         }
 
         return attachments;
     }
 
+    private static string BindDiaryAttachmentIds(string reportJson, List<PendingDiaryAttachment> pendingAttachments)
+    {
+        if (pendingAttachments.Count == 0)
+            return reportJson;
+
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(reportJson);
+        }
+        catch
+        {
+            return reportJson;
+        }
+
+        if (root is not JsonObject document)
+            return reportJson;
+
+        var content = GetReportBlocks(document);
+        if (content is null)
+            return reportJson;
+
+        var byClientId = pendingAttachments
+            .Where(x => !string.IsNullOrWhiteSpace(x.ClientId))
+            .ToDictionary(x => x.ClientId!, x => x.Attachment, StringComparer.Ordinal);
+
+        foreach (var node in content.OfType<JsonObject>())
+        {
+            if (!IsReportImageNode(node))
+                continue;
+
+            var clientId = node["uploadClientId"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(clientId) || !byClientId.TryGetValue(clientId, out var attachment))
+                continue;
+
+            node["attachmentId"] = attachment.Id;
+            node["fileName"] = attachment.FileName;
+            node["mimeType"] = attachment.ContentType;
+            node["size"] = attachment.SizeBytes;
+            node.Remove("uploadClientId");
+            node.Remove("previewUrl");
+        }
+
+        RebuildReportAttachmentIndex(document, content);
+        return document.ToJsonString();
+    }
+
+    private static void ApplyDiaryAttachmentMetadata(StudentPracticeDiaryEntry entry, string reportJson)
+    {
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(reportJson);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (root is not JsonObject document)
+            return;
+
+        var content = GetReportBlocks(document);
+        if (content is null)
+            return;
+
+        var order = 1;
+        var metadata = new Dictionary<int, (string? Caption, string? Alt, int SortOrder)>();
+        foreach (var node in content.OfType<JsonObject>())
+        {
+            if (!IsReportImageNode(node))
+                continue;
+
+            var attachmentId = node["attachmentId"]?.GetValue<int?>();
+            if (!attachmentId.HasValue)
+                continue;
+
+            metadata[attachmentId.Value] = (
+                node["title"]?.GetValue<string>() ?? node["caption"]?.GetValue<string>(),
+                node["alt"]?.GetValue<string>(),
+                order++);
+        }
+
+        foreach (var attachment in entry.Attachments)
+        {
+            if (!metadata.TryGetValue(attachment.Id, out var item))
+                continue;
+
+            attachment.Caption = string.IsNullOrWhiteSpace(item.Caption) ? attachment.Caption : item.Caption.Trim();
+            attachment.SortOrder = item.SortOrder;
+        }
+    }
+
+    private static void RebuildReportAttachmentIndex(JsonObject document, JsonArray content)
+    {
+        var attachments = new JsonArray();
+        foreach (var node in content.OfType<JsonObject>())
+        {
+            if (!IsReportImageNode(node))
+                continue;
+
+            var attachmentId = node["attachmentId"]?.GetValue<int?>();
+            if (!attachmentId.HasValue)
+                continue;
+
+            attachments.Add(new JsonObject
+            {
+                ["id"] = attachmentId.Value,
+                ["type"] = "image",
+                ["filename"] = node["fileName"]?.GetValue<string>() ?? string.Empty,
+                ["mimeType"] = node["mimeType"]?.GetValue<string>() ?? string.Empty,
+                ["size"] = node["size"]?.GetValue<long?>() ?? 0
+            });
+        }
+
+        document["attachments"] = attachments;
+    }
+
+    private static JsonArray? GetReportBlocks(JsonObject document)
+    {
+        return document["blocks"] as JsonArray ?? document["content"] as JsonArray;
+    }
+
+    private static bool IsReportImageNode(JsonObject node)
+    {
+        var type = node["type"]?.GetValue<string>();
+        return string.Equals(type, "image", StringComparison.Ordinal) ||
+               string.Equals(type, "figure", StringComparison.Ordinal);
+    }
+
+    private sealed record PendingDiaryAttachment(string? ClientId, StudentPracticeDiaryAttachment Attachment);
     private static Dictionary<string, string[]> ValidateReportItems(StudentPracticeReportItemsRequest request)
     {
         var errors = new Dictionary<string, string[]>();
@@ -707,6 +856,10 @@ public class StudentController : ControllerBase
         return int.TryParse(rawValue, out var userId) ? userId : null;
     }
 }
+
+
+
+
 
 
 

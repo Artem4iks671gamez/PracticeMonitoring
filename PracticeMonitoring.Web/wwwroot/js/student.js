@@ -26,7 +26,14 @@ function initStudentWorkspace(workspace) {
         activeStatus: 'active',
         currentDetails: null,
         selectedDate: '',
-        organizationConfirmArmed: false
+        organizationConfirmArmed: false,
+        reportDocument: createEmptyReportDocument(),
+        reportSelectedBlockId: null,
+        reportTableSelection: null,
+        reportDirty: false,
+        reportSaving: false,
+        reportAutosaveTimer: null,
+        reportEditorOpen: false
     };
 
     const reportCategories = [
@@ -55,16 +62,16 @@ function initStudentWorkspace(workspace) {
         $('#studentPracticeSearch')?.addEventListener('input', renderPractices);
         $('#studentPracticeSort')?.addEventListener('change', renderPractices);
         $('#studentPracticesList')?.addEventListener('click', event => {
-            const button = event.target.closest('[data-open-practice]');
+            const button = getClosest(event, '[data-open-practice]');
             if (button) {
                 openPractice(Number(button.dataset.openPractice || '0'));
             }
         });
 
-        $('#closeStudentPracticeModal')?.addEventListener('click', closeModal);
+        $('#closeStudentPracticeModal')?.addEventListener('click', closePracticeModal);
         $('#studentPracticeModal')?.addEventListener('click', event => {
             if (event.target.id === 'studentPracticeModal') {
-                closeModal();
+                closePracticeModal();
             }
         });
 
@@ -100,54 +107,316 @@ function initStudentWorkspace(workspace) {
         $('#appendixFile')?.addEventListener('change', updateAppendixFileName);
 
         $('#studentDiaryCalendar')?.addEventListener('click', event => {
-            const button = event.target.closest('[data-calendar-date]');
+            const button = getClosest(event, '[data-calendar-date]');
             if (button && !button.disabled) {
                 selectDiaryDate(button.dataset.calendarDate);
             }
         });
 
-        workspace.addEventListener('click', event => {
-            const addBlock = event.target.closest('[data-add-report-block]');
-            if (addBlock) {
-                addRichBlock(addBlock.dataset.addReportBlock || 'text');
-            }
+        $('#openDayReportEditorButton')?.addEventListener('click', openReportEditor);
+        $('#closeDayReportEditorButton')?.addEventListener('click', requestCloseReportEditor);
+        $('#saveDayReportEditorButton')?.addEventListener('click', () => saveCurrentDiaryFromReportEditor(false));
+        $('#cancelReportCloseButton')?.addEventListener('click', hideReportCloseGuard);
+        $('#discardReportChangesButton')?.addEventListener('click', () => closeReportEditor(true));
+        $('#studentReportImageInput')?.addEventListener('change', handleReportImageSelected);
 
-            const addTableRow = event.target.closest('[data-add-table-row]');
-            if (addTableRow) {
-                addRichTableRow(addTableRow.closest('[data-rich-block]'));
-            }
-
-            const remove = event.target.closest('[data-remove-rich-block], [data-remove-table-row], [data-remove-report-row], [data-remove-source-row]');
-            if (remove) {
-                remove.closest('[data-rich-block], [data-rich-table-row], [data-report-row], [data-source-row]')?.remove();
-            }
-
-            const addReportRowButton = event.target.closest('[data-add-report-row]');
-            if (addReportRowButton) {
-                addReportRow(addReportRowButton.dataset.addReportRow || 'TechnicalTool');
-            }
-
-            const deleteAppendixButton = event.target.closest('[data-delete-appendix]');
-            if (deleteAppendixButton) {
-                deleteAppendix(Number(deleteAppendixButton.dataset.deleteAppendix || '0'));
-            }
-
-            const figurePicker = event.target.closest('[data-pick-figure]');
-            if (figurePicker) {
-                figurePicker.closest('[data-rich-block]')?.querySelector('[data-figure-file]')?.click();
+        $('#studentReportEditorModal')?.addEventListener('click', event => {
+            if (event.target.id === 'studentReportEditorModal') {
+                requestCloseReportEditor();
             }
         });
+        $('#studentReportToolbar')?.addEventListener('click', handleReportToolbarClick);
+        $('#studentReportDocumentCanvas')?.addEventListener('click', handleReportCanvasClick);
+        $('#studentReportDocumentCanvas')?.addEventListener('contextmenu', handleReportCanvasContextMenu);
+        $('#studentReportDocumentCanvas')?.addEventListener('input', handleReportCanvasInput);
+        $('#studentReportDocumentCanvas')?.addEventListener('change', handleReportCanvasChange);
+        $('#studentReportOutline')?.addEventListener('click', handleReportOutlineClick);
+        $('#studentReportProperties')?.addEventListener('click', handleReportPropertiesClick);
+        $('#studentReportValidationSummary')?.addEventListener('click', handleReportProblemClick);
+        $('#studentTableContextMenu')?.addEventListener('click', handleReportTableMenuClick);
 
-        workspace.addEventListener('change', event => {
-            if (event.target.matches('[data-figure-file]')) {
-                const file = event.target.files?.[0];
-                const label = event.target.closest('[data-rich-block]')?.querySelector('[data-figure-file-name]');
-                if (label) {
-                    label.textContent = file ? `${file.name} · ${formatBytes(file.size)}` : 'Файл не выбран';
-                }
-                clearFieldError('DetailedReport');
+        workspace.addEventListener('click', handleWorkspaceClick);
+        workspace.addEventListener('input', handleWorkspaceInput);
+        workspace.addEventListener('change', handleWorkspaceChange);
+        workspace.addEventListener('focusin', event => {
+            const block = getClosest(event, '[data-report-block-id]');
+            if (block) {
+                selectReportBlock(block.dataset.reportBlockId);
             }
         });
+    }
+
+    function handleReportToolbarClick(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) {
+            return;
+        }
+
+        const insertButton = target.closest('[data-report-insert]');
+        if (insertButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            insertReportBlock(insertButton.dataset.reportInsert || 'text');
+        }
+    }
+
+    function handleReportCanvasClick(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) {
+            return;
+        }
+
+        const insertButton = target.closest('[data-report-insert-empty]');
+        if (insertButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            insertReportBlock(insertButton.dataset.reportInsertEmpty || 'text');
+            return;
+        }
+
+        const tableCell = target.closest('[data-table-cell]');
+        if (tableCell) {
+            event.stopPropagation();
+            selectReportTableCell(tableCell.dataset.blockId, tableCell.dataset.rowId, tableCell.dataset.cellId, event.shiftKey);
+        } else if (!target.closest('#studentTableContextMenu')) {
+            hideReportTableContextMenu();
+        }
+
+        const selectBlock = target.closest('[data-report-block-id]');
+        if (selectBlock) {
+            selectReportBlock(selectBlock.dataset.reportBlockId);
+        }
+
+        const moveButton = target.closest('[data-report-move]');
+        if (moveButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            moveReportBlock(moveButton.dataset.reportBlockId, moveButton.dataset.reportMove);
+            return;
+        }
+
+        const deleteButton = target.closest('[data-report-delete]');
+        if (deleteButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            deleteReportBlock(deleteButton.dataset.reportDelete);
+            return;
+        }
+
+        const addAfterButton = target.closest('[data-report-add-after]');
+        if (addAfterButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.reportSelectedBlockId = addAfterButton.dataset.reportAddAfter;
+            insertReportBlock(addAfterButton.dataset.reportType || 'text');
+            return;
+        }
+
+        const imageButton = target.closest('[data-report-pick-image]');
+        if (imageButton) {
+            event.preventDefault();
+            event.stopPropagation();
+            selectReportBlock(imageButton.dataset.reportPickImage);
+            $('#studentReportImageInput').click();
+            return;
+        }
+
+        const tableAction = target.closest('[data-table-action]');
+        if (tableAction) {
+            event.preventDefault();
+            event.stopPropagation();
+            mutateReportTable(tableAction.dataset.blockId, tableAction.dataset.tableAction, tableAction.dataset.rowId, tableAction.dataset.cellId);
+        }
+    }
+
+    function handleReportCanvasContextMenu(event) {
+        const cell = event.target instanceof Element ? event.target.closest('[data-table-cell]') : null;
+        if (!cell) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        selectReportTableCell(cell.dataset.blockId, cell.dataset.rowId, cell.dataset.cellId, event.shiftKey);
+        showReportTableContextMenu(cell.dataset.blockId, cell.dataset.rowId, cell.dataset.cellId, event.clientX, event.clientY);
+    }
+
+    function handleReportCanvasInput(event) {
+        event.stopPropagation();
+        updateReportBlockFromInput(event.target);
+    }
+
+    function handleReportCanvasChange(event) {
+        event.stopPropagation();
+        updateReportBlockFromChange(event.target);
+    }
+
+    function handleReportOutlineClick(event) {
+        const outlineItem = event.target instanceof Element ? event.target.closest('[data-outline-block]') : null;
+        if (!outlineItem) {
+            return;
+        }
+        selectReportBlock(outlineItem.dataset.outlineBlock);
+        document.querySelector(`[data-report-block-id="${outlineItem.dataset.outlineBlock}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleReportPropertiesClick(event) {
+        const addAfterButton = event.target instanceof Element ? event.target.closest('[data-report-add-after]') : null;
+        if (!addAfterButton) {
+            return;
+        }
+        state.reportSelectedBlockId = addAfterButton.dataset.reportAddAfter;
+        insertReportBlock(addAfterButton.dataset.reportType || 'text');
+    }
+
+    function handleWorkspaceClick(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) {
+            return;
+        }
+
+        if (target.closest('#studentReportEditorModal')) {
+            return;
+        }
+
+        const addReportRowButton = target.closest('[data-add-report-row]');
+        if (addReportRowButton) {
+            addReportRow(addReportRowButton.dataset.addReportRow || 'TechnicalTool');
+            return;
+        }
+
+        const removeReportRowButton = target.closest('[data-remove-report-row]');
+        if (removeReportRowButton) {
+            removeReportRowButton.closest('[data-report-row]')?.remove();
+            return;
+        }
+
+        const removeSourceRowButton = target.closest('[data-remove-source-row]');
+        if (removeSourceRowButton) {
+            removeSourceRowButton.closest('[data-source-row]')?.remove();
+            return;
+        }
+
+        const outlineItem = target.closest('[data-outline-block]');
+        if (outlineItem) {
+            selectReportBlock(outlineItem.dataset.outlineBlock);
+            document.querySelector(`[data-report-block-id="${outlineItem.dataset.outlineBlock}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
+        const deleteAppendixButton = target.closest('[data-delete-appendix]');
+        if (deleteAppendixButton) {
+            deleteAppendix(Number(deleteAppendixButton.dataset.deleteAppendix || '0'));
+        }
+    }
+
+    function handleWorkspaceInput(event) {
+        if (event.target instanceof Element && event.target.closest('#studentReportEditorModal')) {
+            return;
+        }
+        updateReportBlockFromInput(event.target);
+    }
+
+    function updateReportBlockFromInput(rawTarget) {
+        const target = rawTarget instanceof Element ? rawTarget : null;
+        if (!target) {
+            return;
+        }
+
+        const textBlock = target.closest('[data-report-text]');
+        if (textBlock) {
+            const block = getReportBlock(textBlock.dataset.blockId);
+            if (block?.type === 'text') {
+                block.content = textBlock.value;
+                markReportDirty();
+                renderReportSummary();
+                renderReportValidationSummary();
+            }
+            return;
+        }
+
+        const editable = target.closest('[data-report-editable]');
+        if (editable) {
+            const block = getReportBlock(editable.dataset.blockId);
+            if (block) {
+                block.html = editable.innerHTML.trim();
+                markReportDirty();
+                renderReportSummary();
+            }
+            return;
+        }
+
+        const tableCell = target.closest('[data-table-cell]');
+        if (tableCell) {
+            const block = getReportBlock(tableCell.dataset.blockId);
+            const cell = getReportTableCell(block, tableCell.dataset.rowId, tableCell.dataset.cellId);
+            if (cell) {
+                cell.text = tableCell.value;
+                markReportDirty();
+                renderReportSummary();
+                renderReportValidationSummary();
+            }
+            return;
+        }
+
+        const caption = target.closest('[data-report-caption]');
+        if (caption) {
+            const block = getReportBlock(caption.dataset.blockId);
+            if (block) {
+                block.title = caption.value;
+                block.caption = caption.value;
+                markReportDirty();
+                renderReportSummary();
+                renderReportValidationSummary();
+            }
+            return;
+        }
+
+        const alt = target.closest('[data-report-alt]');
+        if (alt) {
+            const block = getReportBlock(alt.dataset.blockId);
+            if (block) {
+                block.alt = alt.value;
+                markReportDirty();
+            }
+        }
+    }
+
+    function handleWorkspaceChange(event) {
+        if (event.target instanceof Element && event.target.closest('#studentReportEditorModal')) {
+            return;
+        }
+        updateReportBlockFromChange(event.target);
+    }
+
+    function updateReportBlockFromChange(rawTarget) {
+        const target = rawTarget instanceof Element ? rawTarget : null;
+        if (!target) {
+            return;
+        }
+
+        const textMode = target.closest('[data-report-text-mode]');
+        if (textMode) {
+            const block = getReportBlock(textMode.dataset.blockId);
+            if (block?.type === 'text') {
+                block.mode = textMode.value || 'paragraph';
+                markReportDirty();
+                renderReportSummary();
+                renderReportEditor();
+            }
+            return;
+        }
+
+        const hasHeader = target.closest('[data-table-header-toggle]');
+        if (hasHeader) {
+            const block = getReportBlock(hasHeader.dataset.blockId);
+            if (block?.type === 'table') {
+                block.hasHeaderRow = hasHeader.checked;
+                block.hasHeader = hasHeader.checked;
+                markReportDirty();
+                renderReportEditor();
+            }
+        }
     }
 
     function activatePanel(targetId) {
@@ -332,7 +601,7 @@ function initStudentWorkspace(workspace) {
 
         if (state.currentDetails.hasRequiredDetails && !state.organizationConfirmArmed) {
             state.organizationConfirmArmed = true;
-            showStatus('После сохранения руководитель практики получит уведомление об изменении сведений. Это важно, потому что эти данные используются в отчётных документах и при проверке практики. Нажмите “Сохранить сведения” ещё раз, чтобы подтвердить изменение.', true);
+            showStatus('После сохранения руководитель практики получит уведомление об изменении сведений. Эти данные используются в отчётных документах и при проверке практики. Нажмите “Сохранить сведения” ещё раз, чтобы подтвердить изменение.', true);
             return;
         }
 
@@ -381,183 +650,933 @@ function initStudentWorkspace(workspace) {
 
         state.selectedDate = date;
         $('#diaryWorkDate').value = date;
-        $('#diaryEditorTitle').textContent = `Рабочий день · ${formatDate(date)}`;
-        const entry = (state.currentDetails.diaryEntries || []).find(item => toDateInputValue(item.workDate) === date);
+        $('#diaryEditorTitle').textContent = `Рабочий день — ${formatDate(date)}`;
+        const entry = getSelectedDiaryEntry();
         $('#diaryShortDescription').value = entry?.shortDescription || '';
-        renderRichBlocks(parseReportBlocks(entry?.detailedReport), entry?.attachments || []);
+        state.reportDocument = parseReportDocument(entry?.detailedReport, entry?.attachments || []);
+        state.reportSelectedBlockId = state.reportDocument.content[0]?.id || null;
+        state.reportDirty = false;
+        hideReportCloseGuard();
+        setReportSaveState('saved', entry?.updatedAtUtc ? `Сохранено ${formatDateTime(entry.updatedAtUtc)}` : 'Сохранено');
         renderDiaryCalendar(state.currentDetails);
+        renderReportSummary();
+        if (state.reportEditorOpen) {
+            renderReportEditor();
+        }
         if (scrollIntoView) {
             $('#studentDiaryForm')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
     }
 
-    function renderRichBlocks(blocks, attachments) {
-        const builder = $('#studentRichReportBuilder');
-        const normalized = Array.isArray(blocks) && blocks.length ? blocks : [{ type: 'text', text: '' }];
-        builder.innerHTML = normalized.map(buildRichBlock).join('');
+    function renderReportSummary() {
+        const stats = getReportStats(state.reportDocument);
+        $('#studentReportPreviewStats').textContent = `${stats.text} текстовых блоков · ${stats.tables} таблиц · ${stats.figures} рисунков`;
+        const entry = getSelectedDiaryEntry();
+        $('#studentReportPreviewUpdated').textContent = entry?.updatedAtUtc ? `Обновлено ${formatDateTime(entry.updatedAtUtc)}` : 'Не сохранялся';
+        $('#studentReportPreviewExcerpt').textContent = buildReportExcerpt(state.reportDocument);
+        $('#diaryDetailedReport').value = JSON.stringify(prepareReportDocumentForSave(state.reportDocument).document);
+    }
 
-        if (attachments?.length) {
-            builder.insertAdjacentHTML('beforeend', `
-                <div class="student-existing-figures">
-                    <strong>Загруженные рисунки</strong>
-                    ${attachments.map(file => `
-                        <a class="student-existing-figure" href="${urls.downloadDiaryAttachment}?attachmentId=${encodeURIComponent(file.id)}">
-                            <span>${escapeHtml(file.caption || file.fileName)}</span>
-                            <small>${escapeHtml(file.fileName)} · ${formatBytes(file.sizeBytes)}</small>
-                        </a>`).join('')}
-                </div>`);
+    function openReportEditor() {
+        if (!state.currentDetails || !state.selectedDate) {
+            return;
+        }
+        state.reportEditorOpen = true;
+        $('#studentReportEditorTitle').textContent = `Рабочий день — ${formatDate(state.selectedDate)}`;
+        $('#studentReportEditorModal').hidden = false;
+        document.body.style.overflow = 'hidden';
+        hideReportCloseGuard();
+        renderReportEditor();
+    }
+
+    function requestCloseReportEditor() {
+        if (!state.reportDirty) {
+            closeReportEditor(false);
+            return;
+        }
+        $('#studentReportCloseGuard').hidden = false;
+    }
+
+    function closeReportEditor(discardChanges) {
+        if (discardChanges) {
+            const entry = getSelectedDiaryEntry();
+            state.reportDocument = parseReportDocument(entry?.detailedReport, entry?.attachments || []);
+            state.reportDirty = false;
+            renderReportSummary();
+        }
+        state.reportEditorOpen = false;
+        $('#studentReportEditorModal').hidden = true;
+        $('#studentReportImageInput').value = '';
+        hideReportCloseGuard();
+        document.body.style.overflow = $('#studentPracticeModal')?.hidden ? '' : 'hidden';
+    }
+
+    function hideReportCloseGuard() {
+        const guard = $('#studentReportCloseGuard');
+        if (guard) {
+            guard.hidden = true;
         }
     }
 
-    function addRichBlock(type) {
-        $('#studentRichReportBuilder').insertAdjacentHTML('beforeend', buildRichBlock({ type }));
-    }
+    function renderReportEditor() {
+        const canvas = $('#studentReportDocumentCanvas');
+        if (!canvas) {
+            return;
+        }
 
-    function buildRichBlock(block) {
-        const type = block?.type || 'text';
-        if (type === 'table') {
-            const rows = Array.isArray(block.rows) && block.rows.length ? block.rows : [['', '', '']];
-            return `
-                <section class="student-rich-block" data-rich-block="table">
-                    ${richBlockHeader('Таблица в отчёте')}
-                    <div class="student-rich-table">
-                        ${rows.map(row => buildRichTableRow(row)).join('')}
+        ensureReportDocumentShape(state.reportDocument);
+        hideReportTableContextMenu();
+
+        if (!state.reportDocument.content.length) {
+            canvas.innerHTML = `
+                <div class="student-report-empty-state">
+                    <strong>Отчёт пока пустой</strong>
+                    <span>Добавьте первый смысловой блок. Оформление будет применено автоматически при генерации DOCX.</span>
+                    <div class="student-report-empty-actions">
+                        <button type="button" data-report-insert-empty="text">Добавить текст</button>
+                        <button type="button" data-report-insert-empty="table">Добавить таблицу</button>
+                        <button type="button" data-report-insert-empty="image">Добавить рисунок</button>
                     </div>
-                    <button type="button" class="student-mini-button" data-add-table-row>Добавить строку</button>
-                </section>`;
+                </div>`;
+        } else {
+            canvas.innerHTML = state.reportDocument.content.map((block, index) => renderReportBlock(block, index)).join('');
         }
 
-        if (type === 'figure') {
-            return `
-                <section class="student-rich-block" data-rich-block="figure">
-                    ${richBlockHeader('Рисунок')}
-                    <input class="form-input" data-figure-caption maxlength="220" value="${escapeHtmlAttribute(block.caption || '')}" placeholder="Название рисунка, например: Рисунок 1 - Структура базы данных" />
-                    <input type="file" accept="image/png,image/jpeg,image/webp" data-figure-file hidden />
-                    <button type="button" class="student-file-dropzone student-figure-dropzone" data-pick-figure>
-                        <strong>Выберите изображение</strong>
-                        <span>PNG, JPG или WEBP до 8 МБ</span>
-                        <small data-figure-file-name>${escapeHtml(block.fileName || 'Файл не выбран')}</small>
-                    </button>
-                </section>`;
-        }
+        renderReportOutline();
+        renderReportProperties();
+        renderReportValidationSummary();
+    }
 
+    function renderReportBlock(block, index) {
+        const selected = block.id === state.reportSelectedBlockId ? 'selected' : '';
+        const controls = `
+            <div class="student-report-block-controls" aria-label="Управление блоком">
+                <button type="button" title="Переместить выше" data-report-move="up" data-report-block-id="${block.id}" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button type="button" title="Переместить ниже" data-report-move="down" data-report-block-id="${block.id}" ${index === state.reportDocument.content.length - 1 ? 'disabled' : ''}>↓</button>
+                <button type="button" title="Удалить блок" data-report-delete="${block.id}">×</button>
+            </div>`;
+
+        const blockHtml = block.type === 'table'
+            ? renderReportTableBlock(block, controls, selected)
+            : block.type === 'image'
+                ? renderReportImageBlock(block, controls, selected)
+                : renderReportTextBlock(block, controls, selected);
+
+        return `${blockHtml}${renderReportBlockInsertionRow(block.id)}`;
+    }
+
+    function renderReportBlockInsertionRow(blockId) {
         return `
-            <section class="student-rich-block" data-rich-block="text">
-                ${richBlockHeader('Текстовый блок')}
-                <textarea class="form-input student-rich-textarea" data-rich-text rows="6" placeholder="Опишите выполненную работу, решения, проблемы и результат дня...">${escapeHtml(block.text || '')}</textarea>
+            <div class="student-report-insert-row" aria-label="Добавить блок после текущего">
+                <span></span>
+                <button type="button" data-report-add-after="${blockId}" data-report-type="text">+ Текст</button>
+                <button type="button" data-report-add-after="${blockId}" data-report-type="table">+ Таблица</button>
+                <button type="button" data-report-add-after="${blockId}" data-report-type="image">+ Рисунок</button>
+                <span></span>
+            </div>`;
+    }
+
+    function renderReportTextBlock(block, controls, selected) {
+        const mode = block.mode || 'paragraph';
+        return `
+            <section class="student-report-block student-report-text-block ${selected}" data-report-block-id="${block.id}">
+                ${controls}
+                <div class="student-report-block-label">Текстовый блок</div>
+                <select class="student-report-mode-select" data-report-text-mode data-block-id="${block.id}" aria-label="Тип текстового блока">
+                    <option value="paragraph" ${mode === 'paragraph' ? 'selected' : ''}>Обычный текст</option>
+                    <option value="bullet_list" ${mode === 'bullet_list' ? 'selected' : ''}>Маркированный список</option>
+                    <option value="numbered_list" ${mode === 'numbered_list' ? 'selected' : ''}>Нумерованный список</option>
+                </select>
+                <textarea class="student-report-textarea"
+                          data-report-text
+                          data-block-id="${block.id}"
+                          rows="7"
+                          placeholder="Опишите выполненную работу, решения, проблемы и результат дня...">${escapeHtml(block.content || '')}</textarea>
+                <small>Шрифт, интервалы и отступы будут применены автоматически по шаблону DOCX.</small>
             </section>`;
     }
 
-    function richBlockHeader(title) {
+    function renderReportTableBlock(block, controls, selected) {
+        block.rows = normalizeReportTableRows(block.rows);
+        const selectedCellIds = getSelectedTableCellIds(block.id);
+        const tableNumber = getBlockNumber('table', block.id);
         return `
-            <div class="student-rich-block-header">
-                <span>${title}</span>
-                <button type="button" class="student-mini-button" data-remove-rich-block>Удалить</button>
+            <section class="student-report-block student-report-table-block-editor ${selected}" data-report-block-id="${block.id}">
+                ${controls}
+                <div class="student-report-block-label">Таблица ${tableNumber}</div>
+                <input class="student-report-caption-input" data-report-caption data-block-id="${block.id}" value="${escapeHtmlAttribute(block.title || block.caption || '')}" placeholder="Название таблицы без префикса “Таблица ${tableNumber} —”" />
+                ${renderReportTableContextToolbar(block)}
+                <table class="student-report-structured-table">
+                    <tbody>
+                        ${block.rows.map((row, rowIndex) => `
+                            <tr data-row-id="${row.id}">
+                                ${(row.cells || []).filter(cell => !cell.hidden).map(cell => {
+                                    const tag = (block.hasHeaderRow || block.hasHeader) && rowIndex === 0 ? 'th' : 'td';
+                                    const isSelected = selectedCellIds.includes(cell.id) ? 'selected' : '';
+                                    return `<${tag} class="${isSelected}" colspan="${cell.colspan || 1}" rowspan="${cell.rowspan || 1}">
+                                        <textarea data-table-cell data-block-id="${block.id}" data-row-id="${row.id}" data-cell-id="${cell.id}" rows="2" placeholder="Текст ячейки">${escapeHtml(cell.text || '')}</textarea>
+                                    </${tag}>`;
+                                }).join('')}
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+                <label class="student-report-table-header-toggle"><input type="checkbox" data-table-header-toggle data-block-id="${block.id}" ${(block.hasHeaderRow || block.hasHeader) ? 'checked' : ''}> первая строка является заголовком</label>
+            </section>`;
+    }
+
+    function renderReportTableContextToolbar(block) {
+        const canMerge = canMergeSelectedTableCells(block);
+        const canSplit = canSplitSelectedTableCell(block);
+        return `
+            <div class="student-table-context-panel">
+                <button type="button" data-table-action="add-row-above" data-block-id="${block.id}">Строка выше</button>
+                <button type="button" data-table-action="add-row-below" data-block-id="${block.id}">Строка ниже</button>
+                <button type="button" data-table-action="add-column-left" data-block-id="${block.id}">Столбец слева</button>
+                <button type="button" data-table-action="add-column-right" data-block-id="${block.id}">Столбец справа</button>
+                <button type="button" data-table-action="delete-row" data-block-id="${block.id}">Удалить строку</button>
+                <button type="button" data-table-action="delete-column" data-block-id="${block.id}">Удалить столбец</button>
+                <button type="button" data-table-action="merge-cells" data-block-id="${block.id}" ${canMerge ? '' : 'disabled'}>Объединить</button>
+                <button type="button" data-table-action="split-cell" data-block-id="${block.id}" ${canSplit ? '' : 'disabled'}>Разделить</button>
             </div>`;
     }
 
-    function buildRichTableRow(cells) {
-        const safeCells = Array.isArray(cells) ? cells : ['', '', ''];
+    function renderReportImageBlock(block, controls, selected) {
+        const imageSrc = block.previewUrl || block.imageUrl || (block.attachmentId ? `${urls.downloadDiaryAttachment}?attachmentId=${encodeURIComponent(block.attachmentId)}` : '');
+        const imageNumber = getBlockNumber('image', block.id);
         return `
-            <div class="student-rich-table-row" data-rich-table-row>
-                <input class="form-input" value="${escapeHtmlAttribute(safeCells[0] || '')}" placeholder="Параметр" />
-                <input class="form-input" value="${escapeHtmlAttribute(safeCells[1] || '')}" placeholder="Значение" />
-                <input class="form-input" value="${escapeHtmlAttribute(safeCells[2] || '')}" placeholder="Комментарий" />
-                <button type="button" class="student-mini-button" data-remove-table-row>×</button>
+            <section class="student-report-block student-report-figure-block ${selected}" data-report-block-id="${block.id}">
+                ${controls}
+                <div class="student-report-block-label">Рисунок ${imageNumber}</div>
+                <div class="student-report-figure-preview ${imageSrc ? '' : 'empty'}">
+                    ${imageSrc
+                        ? `<img src="${escapeHtmlAttribute(imageSrc)}" alt="${escapeHtmlAttribute(block.alt || block.title || 'Рисунок')}" />`
+                        : '<span>Изображение не выбрано</span>'}
+                </div>
+                <input class="student-report-caption-input" data-report-caption data-block-id="${block.id}" value="${escapeHtmlAttribute(block.title || block.caption || '')}" placeholder="Название рисунка без префикса “Рисунок ${imageNumber} —”" />
+                <input class="student-report-alt-input" data-report-alt data-block-id="${block.id}" value="${escapeHtmlAttribute(block.alt || '')}" placeholder="Описание изображения для будущего DOCX" />
+                <button type="button" class="student-mini-button" data-report-pick-image="${block.id}">${imageSrc ? 'Заменить изображение' : 'Выбрать изображение'}</button>
+            </section>`;
+    }
+
+    function renderReportOutline() {
+        const outline = $('#studentReportOutline');
+        if (!outline) {
+            return;
+        }
+        const problemsByBlock = groupReportProblemsByBlock(collectReportProblems(state.reportDocument));
+        if (!state.reportDocument.content.length) {
+            outline.innerHTML = '<div class="student-report-outline-empty">Структура появится после добавления блоков.</div>';
+            return;
+        }
+        outline.innerHTML = state.reportDocument.content.map((block, index) => {
+            const problemCount = problemsByBlock.get(block.id)?.length || 0;
+            return `
+                <button type="button" class="${block.id === state.reportSelectedBlockId ? 'active' : ''} ${problemCount ? 'has-problems' : ''}" data-outline-block="${block.id}">
+                    <span>${index + 1}. ${getReportBlockTitle(block)}</span>
+                    <small>${getReportBlockKind(block)} ${problemCount ? `<b>${problemCount}</b>` : ''}</small>
+                </button>`;
+        }).join('');
+    }
+
+    function renderReportProperties() {
+        const panel = $('#studentReportProperties');
+        const block = getReportBlock(state.reportSelectedBlockId);
+        if (!panel) {
+            return;
+        }
+        if (!block) {
+            panel.innerHTML = '<p>Выберите блок на листе.</p>';
+            return;
+        }
+
+        const position = state.reportDocument.content.findIndex(item => item.id === block.id) + 1;
+        const tableHint = block.type === 'table'
+            ? '<p>Выделите ячейку. Shift+клик выбирает несколько соседних ячеек для объединения.</p>'
+            : '';
+        const imageHint = block.type === 'image'
+            ? '<p>Размер и выравнивание рисунка задаст DOCX-шаблон. Здесь нужна только подпись и изображение.</p>'
+            : '';
+        const textHint = block.type === 'text'
+            ? '<p>Допустим только текст и режим списка. Ручное оформление не используется.</p>'
+            : '';
+
+        panel.innerHTML = `
+            <div class="student-report-property-card">
+                <span>Тип блока</span>
+                <strong>${getReportBlockKind(block)}</strong>
+            </div>
+            <div class="student-report-property-card">
+                <span>Позиция</span>
+                <strong>${position} из ${state.reportDocument.content.length}</strong>
+            </div>
+            <div class="student-report-property-card muted">
+                ${tableHint || imageHint || textHint}
+            </div>
+            <div class="student-report-property-actions">
+                <button type="button" class="student-mini-button" data-report-add-after="${block.id}" data-report-type="text">Добавить текст после</button>
+                <button type="button" class="student-mini-button" data-report-add-after="${block.id}" data-report-type="table">Добавить таблицу после</button>
+                <button type="button" class="student-mini-button" data-report-add-after="${block.id}" data-report-type="image">Добавить рисунок после</button>
             </div>`;
     }
 
-    function addRichTableRow(block) {
-        block?.querySelector('.student-rich-table')?.insertAdjacentHTML('beforeend', buildRichTableRow(['', '', '']));
+    function insertReportBlock(type) {
+        const normalizedType = type === 'figure' ? 'image' : type;
+        const block = createReportBlock(normalizedType);
+        const selectedIndex = state.reportDocument.content.findIndex(item => item.id === state.reportSelectedBlockId);
+        const insertAt = selectedIndex >= 0 ? selectedIndex + 1 : state.reportDocument.content.length;
+        state.reportDocument.content.splice(insertAt, 0, block);
+        state.reportSelectedBlockId = block.id;
+        state.reportTableSelection = null;
+        markReportDirty();
+        renderReportEditor();
+        renderReportSummary();
+        setTimeout(() => {
+            const element = document.querySelector(`[data-report-block-id="${block.id}"] textarea, [data-report-block-id="${block.id}"] input`);
+            element?.focus();
+        }, 0);
+    }
+
+    function createReportBlock(type) {
+        if (type === 'table') {
+            return {
+                id: makeId('table'),
+                type: 'table',
+                title: '',
+                hasHeaderRow: true,
+                rows: [
+                    createReportTableRow(3, ['Показатель', 'Значение', 'Комментарий']),
+                    createReportTableRow(3)
+                ]
+            };
+        }
+        if (type === 'image') {
+            return { id: makeId('image'), type: 'image', title: '', alt: '', attachmentId: null, imageUrl: '', fileName: '', mimeType: '', size: 0 };
+        }
+        return { id: makeId('text'), type: 'text', content: '', mode: 'paragraph' };
+    }
+
+    function selectReportBlock(blockId) {
+        if (!blockId) {
+            return;
+        }
+        if (state.reportSelectedBlockId === blockId) {
+            return;
+        }
+        state.reportSelectedBlockId = blockId;
+        if (getReportBlock(blockId)?.type !== 'table') {
+            state.reportTableSelection = null;
+        }
+        updateReportSelectionUi();
+        renderReportOutline();
+        renderReportProperties();
+        renderReportValidationSummary();
+    }
+
+    function updateReportSelectionUi() {
+        $('#studentReportDocumentCanvas')?.querySelectorAll('[data-report-block-id]').forEach(element => {
+            element.classList.toggle('selected', element.dataset.reportBlockId === state.reportSelectedBlockId);
+        });
+    }
+
+    function moveReportBlock(blockId, direction) {
+        const index = state.reportDocument.content.findIndex(block => block.id === blockId);
+        if (index < 0) {
+            return;
+        }
+        const target = direction === 'up' ? index - 1 : index + 1;
+        if (target < 0 || target >= state.reportDocument.content.length) {
+            return;
+        }
+        const [block] = state.reportDocument.content.splice(index, 1);
+        state.reportDocument.content.splice(target, 0, block);
+        state.reportSelectedBlockId = block.id;
+        markReportDirty();
+        renderReportEditor();
+        renderReportSummary();
+    }
+
+    function deleteReportBlock(blockId) {
+        const index = state.reportDocument.content.findIndex(block => block.id === blockId);
+        if (index < 0) {
+            return;
+        }
+        state.reportDocument.content.splice(index, 1);
+        state.reportSelectedBlockId = state.reportDocument.content[Math.min(index, state.reportDocument.content.length - 1)]?.id || null;
+        state.reportTableSelection = null;
+        markReportDirty();
+        renderReportEditor();
+        renderReportSummary();
+    }
+
+    function mutateReportTable(blockId, action, rowId, cellId) {
+        const block = getReportBlock(blockId);
+        if (!block || block.type !== 'table') {
+            return;
+        }
+
+        block.rows = normalizeReportTableRows(block.rows);
+        const selection = getPrimaryTableSelection(block, rowId, cellId);
+        const columnCount = getReportTableColumnCount(block);
+        const rowIndex = Math.max(0, selection.rowIndex);
+        const colIndex = Math.max(0, selection.colIndex);
+
+        if (action === 'add-row' || action === 'add-row-below') {
+            block.rows.splice(rowIndex + 1, 0, createReportTableRow(columnCount));
+        }
+        if (action === 'add-row-above') {
+            block.rows.splice(rowIndex, 0, createReportTableRow(columnCount));
+        }
+        if (action === 'add-column' || action === 'add-column-right') {
+            block.rows.forEach(row => row.cells.splice(colIndex + 1, 0, createReportTableCell('')));
+        }
+        if (action === 'add-column-left') {
+            block.rows.forEach(row => row.cells.splice(colIndex, 0, createReportTableCell('')));
+        }
+        if (action === 'remove-row' || action === 'delete-row') {
+            if (block.rows.length > 1) {
+                block.rows.splice(rowIndex, 1);
+            }
+        }
+        if (action === 'remove-column' || action === 'delete-column') {
+            if (columnCount > 1) {
+                block.rows.forEach(row => removeReportTableColumn(row, colIndex));
+            }
+        }
+        if (action === 'merge-cells') {
+            mergeSelectedReportTableCells(block);
+        }
+        if (action === 'split-cell') {
+            splitSelectedReportTableCell(block);
+        }
+
+        hideReportTableContextMenu();
+        markReportDirty();
+        renderReportEditor();
+        renderReportSummary();
+    }
+
+    function handleReportProblemClick(event) {
+        const problemButton = event.target instanceof Element ? event.target.closest('[data-report-problem-block]') : null;
+        if (!problemButton) {
+            return;
+        }
+
+        const blockId = problemButton.dataset.reportProblemBlock;
+        selectReportBlock(blockId);
+        document.querySelector(`[data-report-block-id="${blockId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleReportTableMenuClick(event) {
+        const actionButton = event.target instanceof Element ? event.target.closest('[data-table-action]') : null;
+        if (!actionButton) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        mutateReportTable(actionButton.dataset.blockId, actionButton.dataset.tableAction, actionButton.dataset.rowId, actionButton.dataset.cellId);
+    }
+
+    function selectReportTableCell(blockId, rowId, cellId, extendSelection) {
+        const block = getReportBlock(blockId);
+        if (!block || block.type !== 'table' || !getReportTableCell(block, rowId, cellId)) {
+            return;
+        }
+
+        state.reportSelectedBlockId = blockId;
+        const current = state.reportTableSelection?.blockId === blockId ? state.reportTableSelection.cellIds : [];
+        let next = [cellId];
+        if (extendSelection && current.length) {
+            next = current.includes(cellId) ? current.filter(id => id !== cellId) : [...current, cellId];
+            if (!next.length) {
+                next = [cellId];
+            }
+        }
+        state.reportTableSelection = { blockId, cellIds: next };
+        renderReportEditor();
+        setTimeout(() => {
+            document.querySelector(`[data-table-cell][data-block-id="${blockId}"][data-cell-id="${cellId}"]`)?.focus();
+        }, 0);
+    }
+
+    function getSelectedTableCellIds(blockId) {
+        return state.reportTableSelection?.blockId === blockId ? state.reportTableSelection.cellIds : [];
+    }
+
+    function showReportTableContextMenu(blockId, rowId, cellId, clientX, clientY) {
+        const menu = $('#studentTableContextMenu');
+        const block = getReportBlock(blockId);
+        if (!menu || !block) {
+            return;
+        }
+
+        const canMerge = canMergeSelectedTableCells(block);
+        const canSplit = canSplitSelectedTableCell(block);
+        menu.innerHTML = `
+            <button type="button" data-table-action="add-row-above" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Добавить строку выше</button>
+            <button type="button" data-table-action="add-row-below" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Добавить строку ниже</button>
+            <button type="button" data-table-action="add-column-left" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Добавить столбец слева</button>
+            <button type="button" data-table-action="add-column-right" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Добавить столбец справа</button>
+            <hr>
+            <button type="button" data-table-action="merge-cells" data-block-id="${blockId}" ${canMerge ? '' : 'disabled'}>Объединить выделенные</button>
+            <button type="button" data-table-action="split-cell" data-block-id="${blockId}" ${canSplit ? '' : 'disabled'}>Разделить ячейку</button>
+            <hr>
+            <button type="button" data-table-action="delete-row" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Удалить строку</button>
+            <button type="button" data-table-action="delete-column" data-block-id="${blockId}" data-row-id="${rowId}" data-cell-id="${cellId}">Удалить столбец</button>`;
+        menu.hidden = false;
+        menu.style.left = `${Math.min(clientX, window.innerWidth - 240)}px`;
+        menu.style.top = `${Math.min(clientY, window.innerHeight - 280)}px`;
+    }
+
+    function hideReportTableContextMenu() {
+        const menu = $('#studentTableContextMenu');
+        if (menu) {
+            menu.hidden = true;
+            menu.innerHTML = '';
+        }
+    }
+
+    function createReportTableCell(text) {
+        return { id: makeId('cell'), text: String(text || ''), colspan: 1, rowspan: 1 };
+    }
+
+    function createReportTableRow(columnCount, values) {
+        const rowValues = Array.isArray(values) ? values : [];
+        return {
+            id: makeId('row'),
+            cells: Array.from({ length: Math.max(1, columnCount || rowValues.length || 1) }, (_, index) => createReportTableCell(rowValues[index] || ''))
+        };
+    }
+
+    function normalizeReportTableRows(rows) {
+        if (!Array.isArray(rows) || !rows.length) {
+            return [createReportTableRow(3, ['Показатель', 'Значение', 'Комментарий']), createReportTableRow(3)];
+        }
+
+        return rows.map(row => {
+            if (Array.isArray(row)) {
+                return createReportTableRow(Math.max(1, row.length), row);
+            }
+
+            return {
+                id: row.id || makeId('row'),
+                cells: Array.isArray(row.cells) && row.cells.length
+                    ? row.cells.map(cell => ({
+                        id: cell.id || makeId('cell'),
+                        text: String(cell.text || ''),
+                        colspan: Math.max(1, Number(cell.colspan || 1)),
+                        rowspan: Math.max(1, Number(cell.rowspan || 1)),
+                        hidden: Boolean(cell.hidden)
+                    }))
+                    : [createReportTableCell('')]
+            };
+        });
+    }
+
+    function getReportTableCell(block, rowId, cellId) {
+        if (!block || block.type !== 'table') {
+            return null;
+        }
+        const row = block.rows?.find(item => item.id === rowId);
+        return row?.cells?.find(cell => cell.id === cellId) || null;
+    }
+
+    function getReportTableColumnCount(block) {
+        return Math.max(1, ...(block.rows || []).map(row => (row.cells || []).filter(cell => !cell.hidden).length));
+    }
+
+    function getPrimaryTableSelection(block, rowId, cellId) {
+        const selectedCellId = state.reportTableSelection?.blockId === block.id ? state.reportTableSelection.cellIds[0] : cellId;
+        for (let rowIndex = 0; rowIndex < block.rows.length; rowIndex += 1) {
+            const visibleCells = block.rows[rowIndex].cells.filter(cell => !cell.hidden);
+            const colIndex = visibleCells.findIndex(cell => cell.id === selectedCellId);
+            if (colIndex >= 0) {
+                return { rowIndex, colIndex, rowId: block.rows[rowIndex].id, cellId: selectedCellId };
+            }
+        }
+        return { rowIndex: 0, colIndex: 0, rowId: block.rows[0]?.id, cellId: block.rows[0]?.cells?.[0]?.id };
+    }
+
+    function removeReportTableColumn(row, visibleColIndex) {
+        const visibleCells = row.cells.filter(cell => !cell.hidden);
+        const target = visibleCells[visibleColIndex];
+        const physicalIndex = row.cells.findIndex(cell => cell.id === target?.id);
+        if (physicalIndex >= 0) {
+            row.cells.splice(physicalIndex, 1);
+        }
+        if (!row.cells.some(cell => !cell.hidden)) {
+            row.cells.push(createReportTableCell(''));
+        }
+    }
+
+    function getSelectedTablePositions(block) {
+        const selectedIds = getSelectedTableCellIds(block.id);
+        const positions = [];
+        block.rows.forEach((row, rowIndex) => {
+            let colIndex = 0;
+            row.cells.forEach((cell, physicalIndex) => {
+                if (cell.hidden) {
+                    return;
+                }
+                if (selectedIds.includes(cell.id)) {
+                    positions.push({ row, rowIndex, cell, colIndex, physicalIndex });
+                }
+                colIndex += 1;
+            });
+        });
+        return positions;
+    }
+
+    function canMergeSelectedTableCells(block) {
+        const positions = getSelectedTablePositions(block);
+        if (positions.length < 2) {
+            return false;
+        }
+        if (!positions.every(item => (item.cell.colspan || 1) === 1 && (item.cell.rowspan || 1) === 1)) {
+            return false;
+        }
+        const rows = [...new Set(positions.map(item => item.rowIndex))].sort((a, b) => a - b);
+        const cols = [...new Set(positions.map(item => item.colIndex))].sort((a, b) => a - b);
+        const rowsAreAdjacent = rows.every((row, index) => index === 0 || row === rows[index - 1] + 1);
+        const colsAreAdjacent = cols.every((col, index) => index === 0 || col === cols[index - 1] + 1);
+        return rowsAreAdjacent && colsAreAdjacent && positions.length === rows.length * cols.length;
+    }
+
+    function canSplitSelectedTableCell(block) {
+        const positions = getSelectedTablePositions(block);
+        return positions.length === 1 && ((positions[0].cell.colspan || 1) > 1 || (positions[0].cell.rowspan || 1) > 1);
+    }
+
+    function mergeSelectedReportTableCells(block) {
+        if (!canMergeSelectedTableCells(block)) {
+            return;
+        }
+        const positions = getSelectedTablePositions(block);
+        const rows = [...new Set(positions.map(item => item.rowIndex))].sort((a, b) => a - b);
+        const cols = [...new Set(positions.map(item => item.colIndex))].sort((a, b) => a - b);
+        const primaryPosition = positions.find(item => item.rowIndex === rows[0] && item.colIndex === cols[0]) || positions[0];
+        const primary = primaryPosition.cell;
+        primary.colspan = cols.length;
+        primary.rowspan = rows.length;
+        primary.text = primary.text || positions.map(item => item.cell.text).filter(Boolean).join(' ');
+        positions.forEach(item => {
+            if (item.cell.id !== primary.id) {
+                item.cell.hidden = true;
+            }
+        });
+        state.reportTableSelection = { blockId: block.id, cellIds: [primary.id] };
+    }
+
+    function splitSelectedReportTableCell(block) {
+        if (!canSplitSelectedTableCell(block)) {
+            return;
+        }
+        const [{ rowIndex, colIndex, physicalIndex, cell }] = getSelectedTablePositions(block);
+        const span = Math.max(1, Number(cell.colspan || 1));
+        const rowSpan = Math.max(1, Number(cell.rowspan || 1));
+        cell.colspan = 1;
+        cell.rowspan = 1;
+        for (let currentRowIndex = rowIndex; currentRowIndex < rowIndex + rowSpan; currentRowIndex += 1) {
+            const currentRow = block.rows[currentRowIndex];
+            if (!currentRow) {
+                continue;
+            }
+            for (let currentColIndex = 0; currentColIndex < span; currentColIndex += 1) {
+                if (currentRowIndex === rowIndex && currentColIndex === 0) {
+                    continue;
+                }
+                const targetIndex = currentRowIndex === rowIndex ? physicalIndex + currentColIndex : colIndex + currentColIndex;
+                const target = currentRow.cells[targetIndex];
+                if (target) {
+                    target.hidden = false;
+                    target.colspan = 1;
+                    target.rowspan = 1;
+                } else {
+                    currentRow.cells.splice(targetIndex, 0, createReportTableCell(''));
+                }
+            }
+        }
+        state.reportTableSelection = { blockId: block.id, cellIds: [cell.id] };
+    }
+
+    async function handleReportImageSelected(event) {
+        const file = event.target.files?.[0];
+        const block = getReportBlock(state.reportSelectedBlockId);
+        if (!file || !block || block.type !== 'image') {
+            return;
+        }
+        const errors = validateImageFile(file);
+        if (errors.length) {
+            setReportSaveState('error', errors.join(' '));
+            event.target.value = '';
+            return;
+        }
+        if (block.previewUrl?.startsWith('blob:')) {
+            URL.revokeObjectURL(block.previewUrl);
+        }
+        block.pendingFile = file;
+        block.uploadClientId = makeId('upload');
+        block.previewUrl = URL.createObjectURL(file);
+        block.fileName = file.name;
+        block.mimeType = file.type || 'application/octet-stream';
+        block.size = file.size;
+        block.attachmentId = null;
+        if (!block.title && !block.caption) {
+            block.title = file.name.replace(/\.[^.]+$/, '');
+            block.caption = block.title;
+        }
+        markReportDirty();
+        renderReportEditor();
+        renderReportSummary();
+        event.target.value = '';
+    }
+
+    function markReportDirty() {
+        state.reportDirty = true;
+        setReportSaveState('dirty', 'Есть несохранённые изменения');
+        clearTimeout(state.reportAutosaveTimer);
+        state.reportAutosaveTimer = setTimeout(() => {
+            if (state.reportEditorOpen && state.reportDirty && !state.reportSaving) {
+                saveCurrentDiaryFromReportEditor(true);
+            }
+        }, 2800);
     }
 
     async function saveDiaryEntry(event) {
         event.preventDefault();
-        clearStudentFieldErrors();
+        await saveCurrentDiary(false);
+    }
 
-        const figureValidation = validateFigureBlocks();
-        if (figureValidation.length) {
-            renderFieldErrors({ DetailedReport: figureValidation });
-            showStatus('Проверьте рисунки в подробном отчёте.', true);
+    async function saveCurrentDiaryFromReportEditor(isAutosave) {
+        await saveCurrentDiary(isAutosave);
+    }
+
+    async function saveCurrentDiary(isAutosave) {
+        if (!state.currentDetails || !state.selectedDate) {
             return;
         }
 
+        clearStudentFieldErrors();
+        const validation = validateReportDocument(state.reportDocument);
+        if (validation.length) {
+            renderFieldErrors({ DetailedReport: validation });
+            setReportSaveState('error', validation.join(' '));
+            showStatus('Проверьте подробный отчёт за день.', true);
+            return;
+        }
+
+        const prepared = prepareReportDocumentForSave(state.reportDocument);
+        const figures = await readFigurePayloadsFromReport(state.reportDocument);
         const payload = {
             workDate: $('#diaryWorkDate').value,
             shortDescription: $('#diaryShortDescription').value,
-            detailedReport: JSON.stringify(serializeRichReport()),
-            figures: await readFigurePayloads()
+            detailedReport: JSON.stringify(prepared.document),
+            keptAttachmentIds: prepared.keptAttachmentIds,
+            figures
         };
 
+        state.reportSaving = true;
+        setReportSaveState('saving', isAutosave ? 'Автосохранение...' : 'Сохранение...');
         const result = await postJson(withAssignment(urls.saveDiary, state.currentDetails.assignmentId), payload);
+        state.reportSaving = false;
+
         if (!result.ok) {
             renderFieldErrors(result.errors || {});
+            setReportSaveState('error', result.message || 'Ошибка сохранения');
             showStatus(result.message || 'Не удалось сохранить запись дневника.', true);
             return;
         }
 
         applyUpdatedDetails(result.data);
-        showStatus('Запись дневника сохранена.', false);
+        state.reportDirty = false;
+        hideReportCloseGuard();
+        setReportSaveState('saved', isAutosave ? 'Автосохранено' : 'Сохранено');
+        showStatus(isAutosave ? 'Черновик отчёта автосохранён.' : 'Запись дневника сохранена.', false);
+        if (state.reportEditorOpen) {
+            renderReportEditor();
+        }
     }
 
-    function serializeRichReport() {
-        return $$('#studentRichReportBuilder [data-rich-block]').map(block => {
-            const type = block.dataset.richBlock;
-            if (type === 'table') {
-                return {
-                    type,
-                    rows: Array.from(block.querySelectorAll('[data-rich-table-row]'))
-                        .map(row => Array.from(row.querySelectorAll('input')).map(input => input.value.trim()))
-                        .filter(row => row.some(Boolean))
-                };
-            }
-            if (type === 'figure') {
-                return {
-                    type,
-                    caption: block.querySelector('[data-figure-caption]')?.value.trim() || '',
-                    fileName: block.querySelector('[data-figure-file]')?.files?.[0]?.name || block.querySelector('[data-figure-file-name]')?.textContent || ''
-                };
-            }
-            return { type: 'text', text: block.querySelector('[data-rich-text]')?.value.trim() || '' };
-        }).filter(block => block.type !== 'text' || block.text);
+    function validateReportDocument(reportDocument) {
+        const problems = collectReportProblems(reportDocument);
+        return problems.length ? [buildReportProblemsSummary(problems)] : [];
     }
 
-    function validateFigureBlocks() {
-        const errors = [];
-        $$('#studentRichReportBuilder [data-rich-block="figure"]').forEach(block => {
-            const file = block.querySelector('[data-figure-file]')?.files?.[0];
-            const caption = block.querySelector('[data-figure-caption]')?.value.trim();
-            if (file && !file.type.startsWith('image/')) {
-                errors.push('К рисункам можно прикреплять только изображения.');
+    function collectReportProblems(reportDocument) {
+        const problems = [];
+        const blocks = reportDocument?.content || [];
+        if (!blocks.length) {
+            problems.push({ blockId: null, kind: 'empty-report', message: 'отчёт пока пустой' });
+            return problems;
+        }
+
+        blocks.forEach(block => {
+            if (block.type === 'text' && !String(block.content || '').trim()) {
+                problems.push({ blockId: block.id, kind: 'empty-text', message: 'текстовый блок пустой' });
             }
-            if (file && file.size > 8 * 1024 * 1024) {
-                errors.push('Размер одного рисунка не должен превышать 8 МБ.');
+            if (block.type === 'table') {
+                const rows = normalizeReportTableRows(block.rows);
+                const hasCells = rows.some(row => row.cells.some(cell => !cell.hidden && String(cell.text || '').trim()));
+                if (!String(block.title || block.caption || '').trim()) {
+                    problems.push({ blockId: block.id, kind: 'table-title', message: 'таблица без подписи' });
+                }
+                if (!hasCells) {
+                    problems.push({ blockId: block.id, kind: 'empty-table', message: 'таблица без данных' });
+                }
             }
-            if (file && !caption) {
-                errors.push('Укажите название для каждого нового рисунка.');
+            if (block.type === 'image') {
+                if (!block.attachmentId && !block.pendingFile) {
+                    problems.push({ blockId: block.id, kind: 'image-file', message: 'рисунок без изображения' });
+                }
+                if (!String(block.title || block.caption || '').trim()) {
+                    problems.push({ blockId: block.id, kind: 'image-title', message: 'рисунок без подписи' });
+                }
             }
         });
-        return errors;
+        return problems;
     }
 
-    async function readFigurePayloads() {
-        const payloads = [];
-        const blocks = $$('#studentRichReportBuilder [data-rich-block="figure"]');
-        for (let i = 0; i < blocks.length; i += 1) {
-            const block = blocks[i];
-            const file = block.querySelector('[data-figure-file]')?.files?.[0];
-            if (!file) {
-                continue;
+    function buildReportProblemsSummary(problems) {
+        const grouped = problems.reduce((acc, problem) => {
+            acc.set(problem.message, (acc.get(problem.message) || 0) + 1);
+            return acc;
+        }, new Map());
+        const details = Array.from(grouped.entries()).map(([message, count]) => `${count} ${message}`).join(', ');
+        return `Есть ${problems.length} ${getProblemWord(problems.length)}: ${details}.`;
+    }
+
+    function getProblemWord(count) {
+        const last = count % 10;
+        const lastTwo = count % 100;
+        if (last === 1 && lastTwo !== 11) return 'проблема';
+        if ([2, 3, 4].includes(last) && ![12, 13, 14].includes(lastTwo)) return 'проблемы';
+        return 'проблем';
+    }
+
+    function groupReportProblemsByBlock(problems) {
+        const map = new Map();
+        problems.forEach(problem => {
+            if (!problem.blockId) {
+                return;
             }
-            payloads.push({
-                caption: block.querySelector('[data-figure-caption]')?.value.trim() || file.name,
-                fileName: file.name,
-                contentType: file.type || 'application/octet-stream',
-                base64Content: await fileToBase64(file),
-                sortOrder: i + 1
+            const list = map.get(problem.blockId) || [];
+            list.push(problem);
+            map.set(problem.blockId, list);
+        });
+        return map;
+    }
+
+    function renderReportValidationSummary() {
+        const summary = $('#studentReportValidationSummary');
+        if (!summary) {
+            return;
+        }
+        const problems = collectReportProblems(state.reportDocument);
+        if (!problems.length) {
+            summary.hidden = true;
+            summary.innerHTML = '';
+            return;
+        }
+
+        summary.hidden = false;
+        summary.innerHTML = `
+            <strong>${buildReportProblemsSummary(problems)}</strong>
+            <div>
+                ${problems.filter(problem => problem.blockId).map(problem => `
+                    <button type="button" data-report-problem-block="${problem.blockId}">${escapeHtml(problem.message)}</button>
+                `).join('')}
+            </div>`;
+    }
+
+    function prepareReportDocumentForSave(reportDocument) {
+        const keptAttachmentIds = [];
+        const cleanContent = reportDocument.content.map(block => {
+            if (block.type === 'image') {
+                const clean = {
+                    id: block.id,
+                    type: 'image',
+                    title: block.title || block.caption || '',
+                    alt: block.alt || '',
+                    attachmentId: block.attachmentId || null,
+                    imageUrl: block.imageUrl || '',
+                    uploadClientId: block.pendingFile ? block.uploadClientId : undefined,
+                    fileName: block.fileName || '',
+                    mimeType: block.mimeType || '',
+                    size: block.size || 0
+                };
+                if (clean.attachmentId) {
+                    keptAttachmentIds.push(clean.attachmentId);
+                }
+                return clean;
+            }
+            if (block.type === 'table') {
+                return {
+                    id: block.id,
+                    type: 'table',
+                    title: block.title || block.caption || '',
+                    hasHeaderRow: Boolean(block.hasHeaderRow || block.hasHeader),
+                    rows: normalizeReportTableRows(block.rows).map(row => ({
+                        id: row.id,
+                        cells: row.cells.map(cell => ({
+                            id: cell.id,
+                            text: String(cell.text || '').trim(),
+                            colspan: Math.max(1, Number(cell.colspan || 1)),
+                            rowspan: Math.max(1, Number(cell.rowspan || 1)),
+                            hidden: Boolean(cell.hidden)
+                        }))
+                    }))
+                };
+            }
+            return {
+                id: block.id,
+                type: 'text',
+                content: String(block.content || stripHtml(block.html || '') || ''),
+                mode: block.mode || 'paragraph'
+            };
+        });
+
+        const cleanDocument = {
+            version: 3,
+            type: 'practice-day-report',
+            blocks: cleanContent,
+            attachments: cleanContent
+                .filter(block => block.type === 'image' && block.attachmentId)
+                .map(block => ({
+                    id: block.attachmentId,
+                    type: 'image',
+                    filename: block.fileName || '',
+                    mimeType: block.mimeType || '',
+                    size: block.size || 0
+                }))
+        };
+
+        return { document: cleanDocument, keptAttachmentIds };
+    }
+
+    async function readFigurePayloadsFromReport(reportDocument) {
+        const figures = [];
+        const figureBlocks = reportDocument.content.filter(block => block.type === 'image' && block.pendingFile);
+        for (let i = 0; i < figureBlocks.length; i += 1) {
+            const block = figureBlocks[i];
+            figures.push({
+                clientId: block.uploadClientId,
+                caption: block.title || block.caption || block.pendingFile.name,
+                fileName: block.pendingFile.name,
+                contentType: block.pendingFile.type || 'application/octet-stream',
+                base64Content: await fileToBase64(block.pendingFile),
+                sortOrder: getFigureSortOrder(block.id)
             });
         }
-        return payloads;
+        return figures;
+    }
+
+    function setReportSaveState(kind, text) {
+        const element = $('#studentReportSaveState');
+        if (!element) {
+            return;
+        }
+        element.className = `student-report-save-state ${kind}`;
+        element.textContent = text;
     }
 
     async function saveReportItems() {
@@ -725,7 +1744,11 @@ function initStudentWorkspace(workspace) {
         $$('[data-student-modal-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.studentModalPanel === tab));
     }
 
-    function closeModal() {
+    function closePracticeModal() {
+        if (state.reportEditorOpen) {
+            requestCloseReportEditor();
+            return;
+        }
         $('#studentPracticeModal').hidden = true;
         document.body.style.overflow = '';
         state.currentDetails = null;
@@ -760,6 +1783,22 @@ function initStudentWorkspace(workspace) {
         }
     }
 
+    function getSelectedDiaryEntry() {
+        return (state.currentDetails?.diaryEntries || []).find(item => toDateInputValue(item.workDate) === state.selectedDate) || null;
+    }
+
+    function getReportBlock(blockId) {
+        return state.reportDocument.content.find(block => block.id === blockId) || null;
+    }
+
+    function getBlockNumber(type, blockId) {
+        return state.reportDocument.content.filter(block => block.type === type).findIndex(block => block.id === blockId) + 1 || 1;
+    }
+
+    function getFigureSortOrder(blockId) {
+        return state.reportDocument.content.filter(block => block.type === 'image').findIndex(block => block.id === blockId) + 1 || 1;
+    }
+
     function toListItem(details) {
         return {
             assignmentId: details.assignmentId,
@@ -785,6 +1824,233 @@ function initStudentWorkspace(workspace) {
     }
 }
 
+function createEmptyReportDocument() {
+    return { version: 3, type: 'practice-day-report', content: [], attachments: [] };
+}
+
+function ensureReportDocumentShape(reportDocument) {
+    if (!reportDocument) {
+        return createEmptyReportDocument();
+    }
+    reportDocument.version = 3;
+    reportDocument.type = reportDocument.type || 'practice-day-report';
+    reportDocument.content = Array.isArray(reportDocument.content) ? reportDocument.content : [];
+    reportDocument.attachments = Array.isArray(reportDocument.attachments) ? reportDocument.attachments : [];
+    return reportDocument;
+}
+
+function createReportTableCell(text) {
+    return { id: makeId('cell'), text: String(text || ''), colspan: 1, rowspan: 1 };
+}
+
+function createReportTableRow(columnCount, values) {
+    const rowValues = Array.isArray(values) ? values : [];
+    return {
+        id: makeId('row'),
+        cells: Array.from({ length: Math.max(1, columnCount || rowValues.length || 1) }, (_, index) => createReportTableCell(rowValues[index] || ''))
+    };
+}
+
+function normalizeReportTableRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) {
+        return [createReportTableRow(3, ['Показатель', 'Значение', 'Комментарий']), createReportTableRow(3)];
+    }
+
+    return rows.map(row => {
+        if (Array.isArray(row)) {
+            return createReportTableRow(Math.max(1, row.length), row);
+        }
+
+        return {
+            id: row.id || makeId('row'),
+            cells: Array.isArray(row.cells) && row.cells.length
+                ? row.cells.map(cell => ({
+                    id: cell.id || makeId('cell'),
+                    text: String(cell.text || ''),
+                    colspan: Math.max(1, Number(cell.colspan || 1)),
+                    rowspan: Math.max(1, Number(cell.rowspan || 1)),
+                    hidden: Boolean(cell.hidden)
+                }))
+                : [createReportTableCell('')]
+        };
+    });
+}
+
+function parseReportDocument(value, attachments) {
+    const attachmentList = Array.isArray(attachments) ? attachments : [];
+    if (!value) {
+        return createEmptyReportDocument();
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (parsed?.version === 3 && Array.isArray(parsed.blocks)) {
+            const documentModel = {
+                version: 3,
+                type: parsed.type || 'practice-day-report',
+                content: parsed.blocks.map(block => normalizeReportBlock(block, attachmentList)).filter(Boolean),
+                attachments: parsed.attachments || []
+            };
+            appendUnreferencedAttachments(documentModel, attachmentList);
+            return documentModel;
+        }
+        if (parsed?.version === 2 && Array.isArray(parsed.content)) {
+            const documentModel = {
+                version: 3,
+                type: parsed.type || 'practice-day-report',
+                content: parsed.content.map(block => normalizeReportBlock(block, attachmentList)).filter(Boolean),
+                attachments: parsed.attachments || []
+            };
+            appendUnreferencedAttachments(documentModel, attachmentList);
+            return documentModel;
+        }
+        if (Array.isArray(parsed)) {
+            return convertLegacyBlocksToReportDocument(parsed, attachmentList);
+        }
+    } catch {
+        const fallbackDocument = {
+            version: 3,
+            type: 'practice-day-report',
+            content: [{ id: makeId('text'), type: 'text', content: String(value || ''), mode: 'paragraph' }],
+            attachments: []
+        };
+        appendUnreferencedAttachments(fallbackDocument, attachmentList);
+        return fallbackDocument;
+    }
+
+    return createEmptyReportDocument();
+}
+
+function normalizeReportBlock(block, attachments) {
+    if (!block || typeof block !== 'object') {
+        return null;
+    }
+    if (block.type === 'text' || block.type === 'paragraph' || block.type === 'heading') {
+        return {
+            id: block.id || makeId('text'),
+            type: 'text',
+            content: block.content || stripHtml(block.html || block.text || ''),
+            mode: ['paragraph', 'bullet_list', 'numbered_list'].includes(block.mode) ? block.mode : 'paragraph'
+        };
+    }
+    if (block.type === 'table') {
+        return {
+            id: block.id || makeId('table'),
+            type: 'table',
+            title: block.title || block.caption || '',
+            caption: block.title || block.caption || '',
+            hasHeaderRow: Boolean(block.hasHeaderRow ?? block.hasHeader),
+            rows: normalizeReportTableRows(block.rows)
+        };
+    }
+    if (block.type === 'image' || block.type === 'figure') {
+        const attachment = attachments.find(item => item.id === block.attachmentId);
+        return {
+            id: block.id || makeId('image'),
+            type: 'image',
+            title: block.title || block.caption || attachment?.caption || '',
+            caption: block.title || block.caption || attachment?.caption || '',
+            alt: block.alt || '',
+            attachmentId: block.attachmentId || null,
+            imageUrl: block.imageUrl || '',
+            fileName: block.fileName || attachment?.fileName || '',
+            mimeType: block.mimeType || attachment?.contentType || '',
+            size: block.size || attachment?.sizeBytes || 0
+        };
+    }
+    return { id: block.id || makeId('text'), type: 'text', content: stripHtml(block.html || block.text || ''), mode: 'paragraph' };
+}
+
+function convertLegacyBlocksToReportDocument(blocks, attachments) {
+    let figureIndex = 0;
+    return {
+        version: 3,
+        type: 'practice-day-report',
+        content: blocks.map(block => {
+            if (block.type === 'table') {
+                return {
+                    id: makeId('table'),
+                    type: 'table',
+                    title: block.title || block.caption || '',
+                    caption: block.title || block.caption || '',
+                    hasHeaderRow: true,
+                    rows: normalizeReportTableRows(block.rows)
+                };
+            }
+            if (block.type === 'figure' || block.type === 'image') {
+                const attachment = attachments[figureIndex++];
+                return {
+                    id: makeId('image'),
+                    type: 'image',
+                    title: block.title || block.caption || attachment?.caption || '',
+                    caption: block.title || block.caption || attachment?.caption || '',
+                    alt: '',
+                    attachmentId: attachment?.id || null,
+                    imageUrl: block.imageUrl || '',
+                    fileName: attachment?.fileName || block.fileName || '',
+                    mimeType: attachment?.contentType || '',
+                    size: attachment?.sizeBytes || 0
+                };
+            }
+            return { id: makeId('text'), type: 'text', content: block.content || block.text || stripHtml(block.html || ''), mode: 'paragraph' };
+        }).filter(Boolean),
+        attachments: attachments.map(item => ({ id: item.id, type: 'image', filename: item.fileName, mimeType: item.contentType, size: item.sizeBytes }))
+    };
+}
+
+function appendUnreferencedAttachments(documentModel, attachments) {
+    const usedIds = new Set(documentModel.content.filter(block => block.type === 'image' && block.attachmentId).map(block => block.attachmentId));
+    attachments.filter(item => !usedIds.has(item.id)).forEach(item => {
+        documentModel.content.push({
+            id: makeId('image'),
+            type: 'image',
+            title: item.caption || '',
+            caption: item.caption || '',
+            alt: '',
+            attachmentId: item.id,
+            imageUrl: '',
+            fileName: item.fileName,
+            mimeType: item.contentType,
+            size: item.sizeBytes
+        });
+    });
+}
+
+function getReportStats(reportDocument) {
+    return {
+        text: reportDocument.content.filter(block => block.type === 'text').length,
+        tables: reportDocument.content.filter(block => block.type === 'table').length,
+        figures: reportDocument.content.filter(block => block.type === 'image').length
+    };
+}
+
+function buildReportExcerpt(reportDocument) {
+    if (!reportDocument.content.length) {
+        return 'Отчёт пока пустой. Откройте редактор и добавьте текст, таблицу или рисунок.';
+    }
+    const text = reportDocument.content
+        .map(block => {
+            if (block.type === 'table') return block.title || block.caption || 'Таблица без подписи';
+            if (block.type === 'image') return block.title || block.caption || 'Рисунок без подписи';
+            return block.content || stripHtml(block.html || '');
+        })
+        .filter(Boolean)
+        .join(' · ');
+    return text.length > 180 ? `${text.slice(0, 180)}...` : text;
+}
+
+function getReportBlockTitle(block) {
+    if (block.type === 'table') return block.title || block.caption || 'Таблица без подписи';
+    if (block.type === 'image') return block.title || block.caption || 'Рисунок без подписи';
+    return String(block.content || stripHtml(block.html || '')).slice(0, 48) || 'Пустой текстовый блок';
+}
+
+function getReportBlockKind(block) {
+    if (block.type === 'table') return 'Таблица';
+    if (block.type === 'image') return 'Рисунок';
+    return 'Текст';
+}
+
 function validateOrganizationClient(payload) {
     const errors = {};
     const phone = (payload.organizationSupervisorPhone || '').trim();
@@ -798,6 +2064,27 @@ function validateOrganizationClient(payload) {
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.OrganizationSupervisorEmail = ['Почта указана некорректно.'];
     if (!payload.practiceTaskContent?.trim()) errors.PracticeTaskContent = ['Опишите содержание задания.'];
     return errors;
+}
+
+function validateImageFile(file) {
+    const errors = [];
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+        errors.push('Можно загрузить только PNG, JPG или WEBP.');
+    }
+    if (file.size > 8 * 1024 * 1024) {
+        errors.push('Размер рисунка не должен превышать 8 МБ.');
+    }
+    return errors;
+}
+
+function normalizeEditableHtml(html) {
+    return String(html || '').trim();
+}
+
+function stripHtml(html) {
+    const element = document.createElement('div');
+    element.innerHTML = html || '';
+    return element.textContent.trim();
 }
 
 function withAssignment(url, assignmentId) {
@@ -853,18 +2140,6 @@ function getDefaultDiaryDate(details) {
         return today;
     }
     return toDateInputValue(workDays.find(day => !entries.has(toDateInputValue(day))) || workDays[0] || new Date(details.startDate));
-}
-
-function parseReportBlocks(value) {
-    if (!value) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [{ type: 'text', text: value }];
-    }
 }
 
 function fileToBase64(file) {
@@ -950,6 +2225,14 @@ function formatBytes(bytes) {
     return `${(value / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+function makeId(prefix) {
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getClosest(event, selector) {
+    return event.target instanceof Element ? event.target.closest(selector) : null;
+}
+
 function escapeHtml(value) {
     return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -964,4 +2247,18 @@ async function safeReadJson(response) {
     } catch {
         return null;
     }
+}
+
+// Future DOCX integration point: convert the canonical report JSON into blocks
+// that can be mapped to OpenXml paragraphs, tables and drawing elements.
+function normalizeReportDocumentForDocx(reportDocument) {
+    return (reportDocument?.content || []).map(block => {
+        if (block.type === 'table') {
+            return { kind: 'table', title: block.title || block.caption || '', hasHeaderRow: Boolean(block.hasHeaderRow || block.hasHeader), rows: normalizeReportTableRows(block.rows) };
+        }
+        if (block.type === 'image') {
+            return { kind: 'image', attachmentId: block.attachmentId, title: block.title || block.caption || '', alt: block.alt || '' };
+        }
+        return { kind: 'text', content: block.content || stripHtml(block.html || ''), mode: block.mode || 'paragraph' };
+    });
 }

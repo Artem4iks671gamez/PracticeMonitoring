@@ -326,19 +326,20 @@
                                 <textarea class="form-input student-textarea student-short-textarea" id="diaryShortDescription" name="shortDescription" rows="3" maxlength="1000"></textarea>
                                 <div class="student-field-error" data-field-error="ShortDescription"></div>
                             </div>
-                            <div class="form-group">
-                                <div class="student-rich-report-header">
-                                    <label class="form-label">Подробный отчёт за день</label>
-                                    <div class="student-rich-report-actions">
-                                        <button type="button" class="student-mini-button" data-add-report-block="text">Текст</button>
-                                        <button type="button" class="student-mini-button" data-add-report-block="table">Таблица</button>
-                                        <button type="button" class="student-mini-button" data-add-report-block="figure">Рисунок</button>
+                            <div class="student-report-summary-card" id="studentReportSummaryCard">
+                                <div>
+                                    <span class="student-report-summary-label">Подробный отчёт за день</span>
+                                    <h4>Отдельный документ для итогового отчёта</h4>
+                                    <p id="studentReportPreviewExcerpt">Отчёт пока пустой. Откройте редактор и добавьте текст, таблицу или рисунок.</p>
+                                    <div class="student-report-summary-meta">
+                                        <span id="studentReportPreviewStats">0 текстовых блоков · 0 таблиц · 0 рисунков</span>
+                                        <span id="studentReportPreviewUpdated">Не сохранялся</span>
                                     </div>
                                 </div>
-                                <input type="hidden" id="diaryDetailedReport" name="detailedReport" />
-                                <div class="student-rich-report-builder" id="studentRichReportBuilder"></div>
-                                <div class="student-field-error" data-field-error="DetailedReport"></div>
+                                <button type="button" class="student-primary-button" id="openDayReportEditorButton">Редактировать отчёт</button>
                             </div>
+                            <input type="hidden" id="diaryDetailedReport" name="detailedReport" />
+                            <div class="student-field-error" data-field-error="DetailedReport"></div>
                             <button type="submit" class="student-primary-button">Сохранить день</button>
                         </form>
                     </div>
@@ -406,6 +407,68 @@
                         </div>
                     </div>
                 </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="student-report-workspace-backdrop" id="studentReportEditorModal" hidden>
+        <div class="student-report-workspace" role="dialog" aria-modal="true" aria-labelledby="studentReportEditorTitle">
+            <header class="student-report-workspace-header">
+                <div>
+                    <span class="student-report-workspace-eyebrow">Редактор подробного отчёта</span>
+                    <h2 id="studentReportEditorTitle">Рабочий день</h2>
+                    <p>Краткое описание для дневника сюда не попадает. Здесь формируется документная часть для итогового отчёта.</p>
+                </div>
+                <div class="student-report-workspace-actions">
+                    <span class="student-report-save-state saved" id="studentReportSaveState">Сохранено</span>
+                    <button type="button" class="student-secondary-button" id="closeDayReportEditorButton">Закрыть</button>
+                    <button type="button" class="student-primary-button" id="saveDayReportEditorButton">Сохранить</button>
+                </div>
+            </header>
+
+            <div class="student-report-toolbar" id="studentReportToolbar">
+                <span class="student-report-toolbar-label">Добавить содержимое</span>
+                <button type="button" data-report-insert="text">+ Текст</button>
+                <button type="button" data-report-insert="table">+ Таблица</button>
+                <button type="button" data-report-insert="image">+ Рисунок</button>
+            </div>
+            <div class="student-report-validation-summary" id="studentReportValidationSummary" hidden></div>
+
+            <div class="student-report-workspace-grid">
+                <aside class="student-report-side-panel">
+                    <h3>Структура дня</h3>
+                    <div id="studentReportOutline" class="student-report-outline"></div>
+                    <div class="student-report-side-hint">
+                        Выберите блок на листе, чтобы переместить, удалить или вставить новый блок после него.
+                    </div>
+                </aside>
+
+                <main class="student-report-document-area">
+                    <div class="student-report-a4-page" id="studentReportDocumentCanvas">
+                        <div class="student-report-empty-state">
+                            <strong>Отчёт пока пустой</strong>
+                            <span>Добавьте текст, таблицу или рисунок через панель сверху.</span>
+                        </div>
+                    </div>
+                </main>
+
+                <aside class="student-report-properties-panel">
+                    <h3>Свойства блока</h3>
+                    <div id="studentReportProperties">
+                        <p>Выберите блок на листе.</p>
+                    </div>
+                </aside>
+            </div>
+
+            <input type="file" id="studentReportImageInput" accept="image/png,image/jpeg,image/webp" hidden />
+            <div class="student-table-context-menu" id="studentTableContextMenu" hidden></div>
+            <div class="student-report-close-guard" id="studentReportCloseGuard" hidden>
+                <div>
+                    <strong>Есть несохранённые изменения</strong>
+                    <span>Если закрыть редактор сейчас, последние правки подробного отчёта за день будут потеряны.</span>
+                </div>
+                <button type="button" class="student-secondary-button" id="cancelReportCloseButton">Остаться</button>
+                <button type="button" class="student-primary-button" id="discardReportChangesButton">Закрыть без сохранения</button>
             </div>
         </div>
     </div>
