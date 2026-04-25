@@ -1,8 +1,13 @@
-﻿namespace PracticeMonitoring.Web.Models.DepartmentStaff;
+using PracticeMonitoring.Web.Models.Auth;
+using PracticeMonitoring.Web.Models.Messaging;
+
+namespace PracticeMonitoring.Web.Models.DepartmentStaff;
 
 public class DepartmentStaffPageViewModel
 {
     public string FullName { get; set; } = string.Empty;
+
+    public CurrentUserViewModel CurrentUser { get; set; } = new();
 
     public List<DepartmentStaffPracticeListItemViewModel> Practices { get; set; } = new();
 
@@ -11,4 +16,6 @@ public class DepartmentStaffPageViewModel
     public List<DepartmentStaffAuditLogItemViewModel> PracticeChangeLogs { get; set; } = new();
 
     public List<DepartmentStaffAuditLogItemViewModel> AssignmentChangeLogs { get; set; } = new();
+
+    public MessagingWorkspaceViewModel Messaging { get; set; } = new();
 }

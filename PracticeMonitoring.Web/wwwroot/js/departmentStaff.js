@@ -1352,10 +1352,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <span class="department-details-overview-stat-label">Практики</span>
                     <span class="department-details-overview-stat-value">${details.practicesCount}</span>
                 </div>
-                <div class="department-details-overview-stat">
-                    <span class="department-details-overview-stat-label">Email</span>
-                    <span class="department-details-overview-stat-value">${escapeHtml(details.email || '-')}</span>
-                </div>
+
             `;
         }
 
@@ -1990,3 +1987,4 @@ document.addEventListener('DOMContentLoaded', function () {
     switchLogConsole('practiceChangesConsole');
     switchPanel('practicesPanel');
 });
+

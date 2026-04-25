@@ -1,10 +1,14 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using PracticeMonitoring.Web.Models.Auth;
+using PracticeMonitoring.Web.Models.Messaging;
 
 namespace PracticeMonitoring.Web.Models.Admin;
 
 public class AdminUsersPageViewModel
 {
     public string AdminFullName { get; set; } = string.Empty;
+
+    public CurrentUserViewModel CurrentUser { get; set; } = new();
 
     public List<AdminLogItemViewModel> RegisteredUsersLogs { get; set; } = new();
 
@@ -13,4 +17,6 @@ public class AdminUsersPageViewModel
     public List<AdminLogItemViewModel> UserProfileChangesLogs { get; set; } = new();
 
     public List<AdminUserItemViewModel> Users { get; set; } = new();
+
+    public MessagingWorkspaceViewModel Messaging { get; set; } = new();
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Models.Admin;
+using PracticeMonitoring.Web.Models.Messaging;
 using PracticeMonitoring.Web.Services;
 
 namespace PracticeMonitoring.Web.Controllers;
@@ -7,11 +8,19 @@ namespace PracticeMonitoring.Web.Controllers;
 public class AdminController : Controller
 {
     private readonly AdminApiService _adminApiService;
+    private readonly AuthApiService _authApiService;
+    private readonly ChatApiService _chatApiService;
     private readonly IWebHostEnvironment _environment;
 
-    public AdminController(AdminApiService adminApiService, IWebHostEnvironment environment)
+    public AdminController(
+        AdminApiService adminApiService,
+        AuthApiService authApiService,
+        ChatApiService chatApiService,
+        IWebHostEnvironment environment)
     {
         _adminApiService = adminApiService;
+        _authApiService = authApiService;
+        _chatApiService = chatApiService;
         _environment = environment;
     }
 
@@ -26,13 +35,37 @@ public class AdminController : Controller
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction("Login", "Account");
 
+        var currentUserTask = _authApiService.GetCurrentUserAsync(token);
+        var threadsTask = _chatApiService.GetThreadsAsync(token);
+
+        await Task.WhenAll(currentUserTask, threadsTask);
+
+        if (currentUserTask.Result is null)
+        {
+            HttpContext.Session.Clear();
+            return RedirectToAction("Login", "Account");
+        }
+
+        var currentUser = currentUserTask.Result;
+        HttpContext.Session.SetString("FullName", currentUser.FullName);
+        HttpContext.Session.SetString("Theme", currentUser.Theme ?? "light");
+
         var model = new AdminUsersPageViewModel
         {
-            AdminFullName = HttpContext.Session.GetString("FullName") ?? "Администратор",
+            AdminFullName = currentUser.FullName,
+            CurrentUser = currentUser,
             RegisteredUsersLogs = await _adminApiService.GetRegisteredUsersLogsAsync(token),
             AdminActionsLogs = await _adminApiService.GetAdminActionsLogsAsync(token),
             UserProfileChangesLogs = await _adminApiService.GetUserProfileChangesLogsAsync(token),
-            Users = await _adminApiService.GetUsersAsync(token)
+            Users = await _adminApiService.GetUsersAsync(token),
+            Messaging = new MessagingWorkspaceViewModel
+            {
+                CurrentUserId = currentUser.Id,
+                CurrentUserRole = currentUser.Role,
+                CurrentUserFullName = currentUser.FullName,
+                CurrentUserAvatarUrl = currentUser.AvatarUrl,
+                Threads = threadsTask.Result
+            }
         };
 
         return View(model);
@@ -187,3 +220,4 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Index));
     }
 }
+

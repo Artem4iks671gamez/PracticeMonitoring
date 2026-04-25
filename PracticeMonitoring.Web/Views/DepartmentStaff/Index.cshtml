@@ -13,7 +13,23 @@
             <h1 class="department-title">Модуль производственной практики</h1>
             <p class="department-subtitle">@Model.FullName</p>
         </div>
+
+        <div class="department-hero-actions">
+            <button type="button" class="department-secondary-button" id="openProfileSettingsButton">
+                Профиль
+            </button>
+        </div>
     </section>
+
+    @if (TempData["ProfileSuccess"] is string profileSuccess)
+    {
+        <div class="student-alert student-alert-success">@profileSuccess</div>
+    }
+
+    @if (TempData["ProfileError"] is string profileError)
+    {
+        <div class="student-alert student-alert-error">@profileError</div>
+    }
 
     <div class="department-workspace">
         <aside class="department-sidebar-card">
@@ -35,6 +51,10 @@
 
                     <button type="button" class="department-nav-button" data-panel-target="chatsPanel">
                         Чаты
+                    </button>
+
+                    <button type="button" class="department-nav-button" data-panel-target="notificationsPanel">
+                        Уведомления
                     </button>
                 </div>
             </div>
@@ -314,11 +334,19 @@
                                  data-full-name="@supervisor.FullName"
                                  data-email="@supervisor.Email"
                                  data-students-count="@supervisor.AssignedStudentsCount"
-                                 data-practices-count="@supervisor.PracticesCount">
+                                 data-practices-count="@supervisor.PracticesCount"
+                                 data-avatar-url="@supervisor.AvatarUrl">
                             <div class="supervisor-card-main">
                                 <div class="supervisor-card-header">
                                     <div class="supervisor-card-avatar">
-                                        @(string.IsNullOrWhiteSpace(supervisor.FullName) ? "Р" : supervisor.FullName[0].ToString().ToUpper())
+                                        @if (!string.IsNullOrWhiteSpace(supervisor.AvatarUrl))
+                                        {
+                                            <img src="@supervisor.AvatarUrl" alt="Аватар руководителя" />
+                                        }
+                                        else
+                                        {
+                                            @(string.IsNullOrWhiteSpace(supervisor.FullName) ? "Р" : supervisor.FullName[0].ToString().ToUpper())
+                                        }
                                     </div>
                                     <div class="supervisor-card-headline">
                                         <h3 class="supervisor-card-name">@supervisor.FullName</h3>
@@ -353,13 +381,22 @@
                 <div class="department-panel-header">
                     <div>
                         <h2>Чаты</h2>
-                        <p>Будущий раздел для общения по практикам.</p>
+                        <p>Диалоги со студентами, руководителями, работниками отдела и администраторами.</p>
                     </div>
                 </div>
 
-                <div class="department-placeholder-card">
-                    Раздел чатов подготовлен как отдельная вкладка и будет реализован позже.
+                @await Html.PartialAsync("_MessagingWorkspace", Model.Messaging)
+            </div>
+
+            <div class="department-panel" id="notificationsPanel">
+                <div class="department-panel-header">
+                    <div>
+                        <h2>Уведомления</h2>
+                        <p>Будущий центр событий по практикам, чатам и назначениям.</p>
+                    </div>
                 </div>
+
+                @await Html.PartialAsync("_NotificationsPanel")
             </div>
         </section>
     </div>
@@ -372,7 +409,7 @@
                 <h2 id="supervisorDetailsTitle">Сведения о руководителе</h2>
                 <p id="supervisorDetailsSubtitle">Нагрузка по студентам и производственным практикам.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closeSupervisorDetailsModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closeSupervisorDetailsModalButton">?</button>
         </div>
 
         <div class="department-details-layout department-supervisor-layout">
@@ -432,7 +469,7 @@
                 <h2 id="practiceEditModalTitle">Создание производственной практики</h2>
                 <p id="practiceEditModalSubtitle">Заполните основную информацию, компетенции и назначения.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closePracticeEditModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closePracticeEditModalButton">?</button>
         </div>
 
         <form id="practiceForm" class="department-form" novalidate>
@@ -533,7 +570,7 @@
                 <h2 id="practiceDetailsTitle">Сведения о производственной практике</h2>
                 <p id="practiceDetailsSubtitle">Полная информация по практике, назначениям и компетенциям.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closePracticeDetailsModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closePracticeDetailsModalButton">?</button>
         </div>
 
         <div class="department-details-layout">
@@ -594,7 +631,7 @@
                 <h2 id="practiceAssignmentsModalTitle">Назначение студентов</h2>
                 <p id="practiceAssignmentsModalSubtitle">Подберите состав практики и назначьте руководителей по строкам.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closePracticeAssignmentsModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closePracticeAssignmentsModalButton">?</button>
         </div>
 
         <div class="student-assignment-shell">
@@ -737,7 +774,7 @@
                 <h2>Предпросмотр аттестационного листа</h2>
                 <p id="attestationPreviewFileName">Аттестационный лист</p>
             </div>
-            <button type="button" class="department-modal-close" id="closeAttestationPreviewModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closeAttestationPreviewModalButton">?</button>
         </div>
 
         <div class="attestation-preview-container" id="attestationPreviewContainer"></div>
@@ -761,7 +798,7 @@
                 <h2 id="warningModalTitle">Подтверждение действия</h2>
                 <p id="warningModalSubtitle">Проверьте последствия перед продолжением.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closeWarningModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closeWarningModalButton">?</button>
         </div>
 
         <div class="department-warning-body">
@@ -788,7 +825,7 @@
                 <h2 id="errorModalTitle">Не удалось выполнить действие</h2>
                 <p id="errorModalSubtitle">Система остановила операцию из-за ошибки.</p>
             </div>
-            <button type="button" class="department-modal-close" id="closeErrorModalButton">×</button>
+            <button type="button" class="department-modal-close" id="closeErrorModalButton">?</button>
         </div>
 
         <div class="department-warning-body">
@@ -841,9 +878,17 @@
     </div>
 </template>
 
+@await Html.PartialAsync("_ProfileSettingsModal", Model.CurrentUser)
+
 @section Scripts {
     <script>
         window.departmentStaffInitialPractices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Practices));
     </script>
+    <script src="~/js/student-profile.js"></script>
     <script src="~/js/departmentStaff.js"></script>
 }
+
+
+
+
+

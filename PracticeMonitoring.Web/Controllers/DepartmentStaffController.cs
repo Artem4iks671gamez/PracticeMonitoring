@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Models.DepartmentStaff;
+using PracticeMonitoring.Web.Models.Messaging;
 using PracticeMonitoring.Web.Services;
 
 namespace PracticeMonitoring.Web.Controllers;
@@ -7,13 +8,19 @@ namespace PracticeMonitoring.Web.Controllers;
 public class DepartmentStaffController : Controller
 {
     private readonly DepartmentStaffApiService _departmentStaffApiService;
+    private readonly AuthApiService _authApiService;
+    private readonly ChatApiService _chatApiService;
     private readonly AttestationSheetService _attestationSheetService;
 
     public DepartmentStaffController(
         DepartmentStaffApiService departmentStaffApiService,
+        AuthApiService authApiService,
+        ChatApiService chatApiService,
         AttestationSheetService attestationSheetService)
     {
         _departmentStaffApiService = departmentStaffApiService;
+        _authApiService = authApiService;
+        _chatApiService = chatApiService;
         _attestationSheetService = attestationSheetService;
     }
 
@@ -32,16 +39,37 @@ public class DepartmentStaffController : Controller
         var supervisorsTask = _departmentStaffApiService.GetSupervisorSummariesAsync(token);
         var practiceLogsTask = _departmentStaffApiService.GetPracticeChangeLogsAsync(token);
         var assignmentLogsTask = _departmentStaffApiService.GetAssignmentChangeLogsAsync(token);
+        var currentUserTask = _authApiService.GetCurrentUserAsync(token);
+        var threadsTask = _chatApiService.GetThreadsAsync(token);
 
-        await Task.WhenAll(practicesTask, supervisorsTask, practiceLogsTask, assignmentLogsTask);
+        await Task.WhenAll(practicesTask, supervisorsTask, practiceLogsTask, assignmentLogsTask, currentUserTask, threadsTask);
+
+        if (currentUserTask.Result is null)
+        {
+            HttpContext.Session.Clear();
+            return RedirectToAction("Login", "Account");
+        }
+
+        var currentUser = currentUserTask.Result;
+        HttpContext.Session.SetString("FullName", currentUser.FullName);
+        HttpContext.Session.SetString("Theme", currentUser.Theme ?? "light");
 
         var model = new DepartmentStaffPageViewModel
         {
-            FullName = HttpContext.Session.GetString("FullName") ?? "Работник отдела",
+            FullName = currentUser.FullName,
+            CurrentUser = currentUser,
             Practices = practicesTask.Result,
             Supervisors = supervisorsTask.Result,
             PracticeChangeLogs = practiceLogsTask.Result,
-            AssignmentChangeLogs = assignmentLogsTask.Result
+            AssignmentChangeLogs = assignmentLogsTask.Result,
+            Messaging = new MessagingWorkspaceViewModel
+            {
+                CurrentUserId = currentUser.Id,
+                CurrentUserRole = currentUser.Role,
+                CurrentUserFullName = currentUser.FullName,
+                CurrentUserAvatarUrl = currentUser.AvatarUrl,
+                Threads = threadsTask.Result
+            }
         };
 
         return View(model);
@@ -292,3 +320,4 @@ public class DepartmentStaffController : Controller
             : key;
     }
 }
+

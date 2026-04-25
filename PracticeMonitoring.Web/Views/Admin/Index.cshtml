@@ -13,8 +13,8 @@
         </div>
 
         <div class="admin-hero-actions">
-            <button type="button" class="admin-theme-toggle" id="adminThemeToggle">
-                Переключить тему
+            <button type="button" class="admin-secondary-button" id="openProfileSettingsButton">
+                Профиль
             </button>
 
             <form asp-controller="Account" asp-action="Logout" method="post">
@@ -33,6 +33,16 @@
         <div class="student-alert student-alert-error">@errorMessage</div>
     }
 
+    @if (TempData["ProfileSuccess"] is string profileSuccess)
+    {
+        <div class="student-alert student-alert-success">@profileSuccess</div>
+    }
+
+    @if (TempData["ProfileError"] is string profileError)
+    {
+        <div class="student-alert student-alert-error">@profileError</div>
+    }
+
     <section class="admin-workspace">
         <aside class="admin-sidebar-card">
             <div class="admin-sidebar-block">
@@ -45,6 +55,14 @@
 
                     <button type="button" class="admin-nav-button" data-panel="logs-panel">
                         Журнал
+                    </button>
+
+                    <button type="button" class="admin-nav-button" data-panel="chats-panel">
+                        Чаты
+                    </button>
+
+                    <button type="button" class="admin-nav-button" data-panel="notifications-panel">
+                        Уведомления
                     </button>
                 </div>
             </div>
@@ -82,7 +100,7 @@
                         </button>
                     </form>
 
-                    <form asp-controller="Admin" asp-action="RestoreDatabase" method="post" enctype="multipart/form-data" onsubmit="return confirm('Вы уверены? Текущие данные базы могут быть перезаписаны.');">
+                    <form asp-controller="Admin" asp-action="RestoreDatabase" method="post" enctype="multipart/form-data" id="restoreDatabaseForm">
                         @Html.AntiForgeryToken()
 
                         <div class="file-upload-control file-upload-control-column" style="margin-bottom: 13px">
@@ -384,6 +402,28 @@
                     </div>
                 </div>
             </div>
+
+            <div class="admin-panel" id="chats-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h2>Чаты</h2>
+                        <p>Диалоги между всеми ролями системы.</p>
+                    </div>
+                </div>
+
+                @await Html.PartialAsync("_MessagingWorkspace", Model.Messaging)
+            </div>
+
+            <div class="admin-panel" id="notifications-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h2>Уведомления</h2>
+                        <p>Раздел подготовлен для будущих системных событий.</p>
+                    </div>
+                </div>
+
+                @await Html.PartialAsync("_NotificationsPanel")
+            </div>
         </section>
     </section>
 </div>
@@ -519,6 +559,30 @@
     </div>
 </div>
 
+@await Html.PartialAsync("_ProfileSettingsModal", Model.CurrentUser)
+
+<div class="admin-modal-backdrop" id="restoreConfirmModalBackdrop">
+    <div class="admin-modal admin-modal-compact">
+        <div class="admin-modal-header">
+            <div>
+                <h2>Подтвердите восстановление</h2>
+                <p>База данных будет заменена содержимым выбранной резервной копии.</p>
+            </div>
+            <button type="button" class="admin-modal-close" id="closeRestoreConfirmModalButton">×</button>
+        </div>
+
+        <div class="admin-modal-body-text">
+            После восстановления текущие пользователи, практики, назначения, журналы и чаты вернутся к состоянию из backup-файла. Изменения, сделанные после создания этой копии, будут потеряны.
+        </div>
+
+        <div class="admin-modal-actions">
+            <button type="button" class="admin-ghost-button" id="cancelRestoreConfirmButton">Отмена</button>
+            <button type="button" class="admin-danger-button" id="approveRestoreConfirmButton">Восстановить базу</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
+    <script src="~/js/student-profile.js"></script>
     <script src="~/js/admin.js"></script>
 }

@@ -1,5 +1,7 @@
-п»їusing Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Models.Auth;
+using PracticeMonitoring.Web.Models.Messaging;
+using PracticeMonitoring.Web.Models.Student;
 using PracticeMonitoring.Web.Services;
 
 namespace PracticeMonitoring.Web.Controllers;
@@ -7,11 +9,16 @@ namespace PracticeMonitoring.Web.Controllers;
 public class StudentController : Controller
 {
     private readonly AuthApiService _authApiService;
+    private readonly ChatApiService _chatApiService;
     private readonly IWebHostEnvironment _environment;
 
-    public StudentController(AuthApiService authApiService, IWebHostEnvironment environment)
+    public StudentController(
+        AuthApiService authApiService,
+        ChatApiService chatApiService,
+        IWebHostEnvironment environment)
     {
         _authApiService = authApiService;
+        _chatApiService = chatApiService;
         _environment = environment;
     }
 
@@ -26,7 +33,12 @@ public class StudentController : Controller
         if (string.IsNullOrWhiteSpace(token))
             return RedirectToAction("Login", "Account");
 
-        var user = await _authApiService.GetCurrentUserAsync(token);
+        var userTask = _authApiService.GetCurrentUserAsync(token);
+        var threadsTask = _chatApiService.GetThreadsAsync(token);
+
+        await Task.WhenAll(userTask, threadsTask);
+
+        var user = userTask.Result;
         if (user is null)
         {
             HttpContext.Session.Clear();
@@ -36,7 +48,18 @@ public class StudentController : Controller
         HttpContext.Session.SetString("FullName", user.FullName);
         HttpContext.Session.SetString("Theme", user.Theme ?? "light");
 
-        return View(user);
+        return View(new StudentPageViewModel
+        {
+            CurrentUser = user,
+            Messaging = new MessagingWorkspaceViewModel
+            {
+                CurrentUserId = user.Id,
+                CurrentUserRole = user.Role,
+                CurrentUserFullName = user.FullName,
+                CurrentUserAvatarUrl = user.AvatarUrl,
+                Threads = threadsTask.Result
+            }
+        });
     }
 
     [HttpPost]
@@ -83,14 +106,14 @@ public class StudentController : Controller
 
         if (!result.Success || result.Data is null)
         {
-            TempData["ProfileError"] = result.ErrorMessage ?? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РёР·РјРµРЅРµРЅРёСЏ РїСЂРѕС„РёР»СЏ.";
+            TempData["ProfileError"] = result.ErrorMessage ?? "Не удалось сохранить изменения профиля.";
             return RedirectToAction("Index");
         }
 
         HttpContext.Session.SetString("FullName", result.Data.FullName);
         HttpContext.Session.SetString("Theme", result.Data.Theme);
 
-        TempData["ProfileSuccess"] = "Р”Р°РЅРЅС‹Рµ РїСЂРѕС„РёР»СЏ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅС‹.";
+        TempData["ProfileSuccess"] = "Данные профиля успешно обновлены.";
         return RedirectToAction("Index");
     }
 }

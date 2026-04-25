@@ -18,6 +18,10 @@ public class AppDbContext : DbContext
     public DbSet<ProductionPractice> ProductionPractices => Set<ProductionPractice>();
     public DbSet<ProductionPracticeCompetency> ProductionPracticeCompetencies => Set<ProductionPracticeCompetency>();
     public DbSet<ProductionPracticeStudentAssignment> ProductionPracticeStudentAssignments => Set<ProductionPracticeStudentAssignment>();
+    public DbSet<ChatThread> ChatThreads => Set<ChatThread>();
+    public DbSet<ChatParticipant> ChatParticipants => Set<ChatParticipant>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatMessageAttachment> ChatMessageAttachments => Set<ChatMessageAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +161,69 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.SupervisorId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ChatThread>(entity =>
+        {
+            entity.ToTable("chat_threads");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<ChatParticipant>(entity =>
+        {
+            entity.ToTable("chat_participants");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.JoinedAtUtc).IsRequired();
+            entity.Property(x => x.LastReadAtUtc);
+
+            entity.HasIndex(x => new { x.ChatThreadId, x.UserId }).IsUnique();
+            entity.HasIndex(x => x.UserId);
+
+            entity.HasOne(x => x.ChatThread)
+                .WithMany(x => x.Participants)
+                .HasForeignKey(x => x.ChatThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.ToTable("chat_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Text).HasMaxLength(4000);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+
+            entity.HasIndex(x => new { x.ChatThreadId, x.CreatedAtUtc });
+
+            entity.HasOne(x => x.ChatThread)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.ChatThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.SenderUser)
+                .WithMany()
+                .HasForeignKey(x => x.SenderUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ChatMessageAttachment>(entity =>
+        {
+            entity.ToTable("chat_message_attachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FileName).IsRequired().HasMaxLength(255);
+            entity.Property(x => x.ContentType).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.SizeBytes).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
+
+            entity.HasOne(x => x.ChatMessage)
+                .WithMany(x => x.Attachments)
+                .HasForeignKey(x => x.ChatMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

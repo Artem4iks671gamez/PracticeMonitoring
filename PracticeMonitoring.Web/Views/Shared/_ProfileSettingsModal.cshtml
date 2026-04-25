@@ -1,0 +1,105 @@
+﻿@model PracticeMonitoring.Web.Models.Auth.CurrentUserViewModel
+
+@{
+    var avatarInitials =
+        $"{(string.IsNullOrWhiteSpace(Model.Surname) ? "" : Model.Surname[0])}{(string.IsNullOrWhiteSpace(Model.FirstName) ? "" : Model.FirstName[0])}";
+}
+
+<div class="profile-modal-backdrop" id="profileModalBackdrop">
+    <div class="profile-modal">
+        <div class="profile-modal-header">
+            <div>
+                <h2>Настройки профиля</h2>
+                <p>ФИО, email, аватар и тема оформления</p>
+            </div>
+            <button type="button" class="profile-modal-close" id="closeProfileSettingsButton">×</button>
+        </div>
+
+        <form class="profile-settings-form" id="profileSettingsForm" asp-controller="Profile" asp-action="Update" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="CurrentAvatarUrl" value="@Model.AvatarUrl" id="currentAvatarUrl" />
+            <input type="hidden" id="initialSurname" value="@Model.Surname" />
+            <input type="hidden" id="initialFirstName" value="@Model.FirstName" />
+            <input type="hidden" id="initialPatronymic" value="@Model.Patronymic" />
+            <input type="hidden" id="initialEmail" value="@Model.Email" />
+            <input type="hidden" id="initialTheme" value="@Model.Theme" />
+            <input type="hidden" id="initialAvatarUrl" value="@Model.AvatarUrl" />
+
+            <div class="profile-settings-grid">
+                <div class="form-group">
+                    <label class="form-label" for="editSurname">Фамилия</label>
+                    <input id="editSurname" name="Surname" class="form-input" type="text" value="@Model.Surname" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editFirstName">Имя</label>
+                    <input id="editFirstName" name="FirstName" class="form-input" type="text" value="@Model.FirstName" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editPatronymic">Отчество</label>
+                    <input id="editPatronymic" name="Patronymic" class="form-input" type="text" value="@Model.Patronymic" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editEmail">Email</label>
+                    <input id="editEmail" name="Email" class="form-input" type="email" value="@Model.Email" />
+                </div>
+
+                <div class="form-group profile-theme-group">
+                    <label class="form-label" for="themeSelect">Тема оформления</label>
+                    <select id="themeSelect" name="Theme" class="native-select-hidden">
+                        <option value="light" selected="@(Model.Theme == "light")">Светлая</option>
+                        <option value="dark" selected="@(Model.Theme == "dark")">Тёмная</option>
+                    </select>
+                    <div class="custom-select custom-theme-select" data-target="themeSelect">
+                        <button type="button" class="custom-select-trigger">@(Model.Theme == "dark" ? "Тёмная" : "Светлая")</button>
+                        <div class="custom-select-menu"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-avatar-settings">
+                <div class="profile-avatar-settings-preview" id="modalAvatarPreview">
+                    @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
+                    {
+                        <img src="@Model.AvatarUrl" alt="Аватар пользователя" />
+                    }
+                    else
+                    {
+                        <span>@avatarInitials</span>
+                    }
+                </div>
+
+                <div class="profile-avatar-settings-controls">
+                    <label for="avatarUpload" class="student-secondary-button upload-label">Выбрать аватар</label>
+                    <input id="avatarUpload" name="AvatarFile" type="file" accept="image/*" hidden />
+                    <p>Изображение обновится после сохранения профиля.</p>
+                </div>
+            </div>
+
+            <div class="profile-modal-actions">
+                <button type="button" class="student-ghost-button" id="cancelProfileSettingsButton">Отмена</button>
+                <button type="submit" class="student-primary-button">Сохранить изменения</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="confirm-modal-backdrop" id="confirmModalBackdrop">
+    <div class="confirm-modal">
+        <div class="confirm-modal-header">
+            <h3>Подтвердите изменение профиля</h3>
+        </div>
+
+        <p class="confirm-modal-text">
+            При изменении ФИО или email запись попадёт в журнал аудита. Это важно для истории действий, документов и дальнейшей идентификации пользователя в системе.
+        </p>
+
+        <div class="confirm-modal-actions">
+            <button type="button" class="student-ghost-button" id="cancelConfirmButton">Отмена</button>
+            <button type="button" class="student-primary-button" id="approveConfirmButton">Подтвердить</button>
+        </div>
+    </div>
+</div>

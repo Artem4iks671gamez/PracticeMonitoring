@@ -1,17 +1,9 @@
-﻿@model PracticeMonitoring.Web.Models.Student.StudentPageViewModel
+﻿@model PracticeMonitoring.Web.Models.Supervisor.SupervisorPageViewModel
 
 @{
-    ViewData["Title"] = "Профиль студента";
+    ViewData["Title"] = "Руководитель практики";
 
     var user = Model.CurrentUser;
-    var groupText = !string.IsNullOrWhiteSpace(user.GroupName)
-        ? $"Студент группы {user.GroupName}"
-        : "Студент";
-
-    var specialtyText = !string.IsNullOrWhiteSpace(user.SpecialtyCode) || !string.IsNullOrWhiteSpace(user.SpecialtyName)
-        ? $"{user.SpecialtyCode} {user.SpecialtyName}".Trim()
-        : "Специальность пока не указана";
-
     var avatarInitials =
         $"{(string.IsNullOrWhiteSpace(user.Surname) ? "" : user.Surname[0])}{(string.IsNullOrWhiteSpace(user.FirstName) ? "" : user.FirstName[0])}";
 }
@@ -20,17 +12,17 @@
     <section class="student-topbar">
         <div class="student-identity">
             <div class="student-identity-text">
-                <div class="student-role-line">@groupText</div>
-                <h1 class="student-fullname" id="headerFullName">@user.FullName</h1>
-                <div class="student-specialty-line">@specialtyText</div>
-                <div class="student-email-line" id="headerEmail">@user.Email</div>
+                <div class="student-role-line">Руководитель практики</div>
+                <h1 class="student-fullname">@user.FullName</h1>
+                <div class="student-specialty-line">Общение со студентами, отделом и администрацией</div>
+                <div class="student-email-line">@user.Email</div>
             </div>
 
             <div class="student-avatar-block">
-                <div class="student-avatar" id="studentAvatarPreview">
+                <div class="student-avatar">
                     @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
                     {
-                        <img src="@user.AvatarUrl" alt="Аватар студента" />
+                        <img src="@user.AvatarUrl" alt="Аватар руководителя" />
                     }
                     else
                     {
@@ -64,60 +56,59 @@
     }
 
     <div class="role-page-tabs">
-        <button type="button" class="role-page-nav-button active" data-page-panel-target="studentOverviewPanel">
+        <button type="button" class="role-page-nav-button active" data-page-panel-target="supervisorOverviewPanel">
             Обзор
         </button>
-        <button type="button" class="role-page-nav-button" data-page-panel-target="studentChatsPanel">
+        <button type="button" class="role-page-nav-button" data-page-panel-target="supervisorChatsPanel">
             Чаты
         </button>
-        <button type="button" class="role-page-nav-button" data-page-panel-target="studentNotificationsPanel">
+        <button type="button" class="role-page-nav-button" data-page-panel-target="supervisorNotificationsPanel">
             Уведомления
         </button>
     </div>
 
-    <div class="role-page-panel active" id="studentOverviewPanel" data-page-panel>
+    <div class="role-page-panel active" id="supervisorOverviewPanel" data-page-panel>
         <section class="student-dashboard">
             <div class="dashboard-card dashboard-card-wide">
                 <div class="dashboard-card-header">
-                    <h2>Главная панель</h2>
-                    <span>Студент</span>
+                    <h2>Рабочее место руководителя</h2>
+                    <span>Supervisor</span>
                 </div>
                 <p>
-                    Здесь собран базовый профиль студента. Для связи с руководителем или другим доступным участником используйте вкладку `Чаты`.
+                    Основной канал взаимодействия с назначенными студентами, работниками отдела и администраторами вынесен во вкладку `Чаты`.
                 </p>
             </div>
 
             <div class="dashboard-grid">
                 <div class="dashboard-card">
                     <div class="dashboard-card-header">
-                        <h3>Мой профиль</h3>
+                        <h3>Профиль</h3>
                     </div>
                     <ul class="dashboard-list">
                         <li><strong>ФИО:</strong> @user.FullName</li>
                         <li><strong>Email:</strong> @user.Email</li>
-                        <li><strong>Группа:</strong> @(user.GroupName ?? "Не указана")</li>
-                        <li><strong>Специальность:</strong> @specialtyText</li>
+                        <li><strong>Роль:</strong> Руководитель практики</li>
                         <li><strong>Тема:</strong> @(user.Theme == "dark" ? "Тёмная" : "Светлая")</li>
                     </ul>
                 </div>
 
                 <div class="dashboard-card">
                     <div class="dashboard-card-header">
-                        <h3>Практика</h3>
+                        <h3>Коммуникации</h3>
                     </div>
                     <p class="dashboard-empty">
-                        Здесь позже можно отобразить место практики, руководителя, период и текущий статус.
+                        Вы можете инициировать диалоги со всеми ролями системы, а также принимать сообщения и файлы от студентов.
                     </p>
                 </div>
             </div>
         </section>
     </div>
 
-    <div class="role-page-panel" id="studentChatsPanel" data-page-panel>
+    <div class="role-page-panel" id="supervisorChatsPanel" data-page-panel>
         @await Html.PartialAsync("_MessagingWorkspace", Model.Messaging)
     </div>
 
-    <div class="role-page-panel" id="studentNotificationsPanel" data-page-panel>
+    <div class="role-page-panel" id="supervisorNotificationsPanel" data-page-panel>
         @await Html.PartialAsync("_NotificationsPanel")
     </div>
 </div>

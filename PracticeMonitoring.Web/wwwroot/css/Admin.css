@@ -53,7 +53,6 @@
     flex-wrap: wrap;
 }
 
-.admin-theme-toggle,
 .admin-danger-button,
 .admin-primary-button,
 .admin-secondary-button,
@@ -66,12 +65,6 @@
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-.admin-theme-toggle {
-    background: var(--input-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
 }
 
 .admin-danger-button {
@@ -97,7 +90,6 @@
     border: 1px dashed var(--border-color);
 }
 
-    .admin-theme-toggle:hover,
     .admin-danger-button:hover,
     .admin-primary-button:hover,
     .admin-secondary-button:hover,
@@ -890,6 +882,16 @@
 
 .admin-full-button {
     width: 100%;
+}
+
+.admin-modal-compact {
+    max-width: 560px;
+}
+
+.admin-modal-body-text {
+    color: var(--muted-text);
+    line-height: 1.65;
+    margin-bottom: 16px;
 }
 
 @media (max-width: 1250px) {

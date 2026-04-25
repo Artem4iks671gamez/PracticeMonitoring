@@ -138,13 +138,12 @@
         return themeChanged && !surnameChanged && !firstNameChanged && !patronymicChanged && !emailChanged && !hasNewAvatar;
     }
 
-    function hasProfileDataChanges() {
+    function hasImportantProfileDataChanges() {
         return (
             (editSurname?.value || '') !== initialSurname ||
             (editFirstName?.value || '') !== initialFirstName ||
             (editPatronymic?.value || '') !== initialPatronymic ||
-            (editEmail?.value || '') !== initialEmail ||
-            hasNewAvatar
+            (editEmail?.value || '') !== initialEmail
         );
     }
 
@@ -226,7 +225,7 @@
                 return;
             }
 
-            if (hasProfileDataChanges()) {
+            if (hasImportantProfileDataChanges()) {
                 e.preventDefault();
                 openConfirmModal();
             }

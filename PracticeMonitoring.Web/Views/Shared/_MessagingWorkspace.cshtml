@@ -1,0 +1,131 @@
+﻿@model PracticeMonitoring.Web.Models.Messaging.MessagingWorkspaceViewModel
+
+<div class="messaging-module"
+     data-current-user-id="@Model.CurrentUserId"
+     data-current-user-role="@Model.CurrentUserRole"
+     data-send-url="@Url.Action("SendMessage", "Messaging")"
+     data-start-url="@Url.Action("StartThread", "Messaging")"
+     data-thread-url-base="@Url.Action("GetThread", "Messaging")"
+     data-search-url="@Url.Action("SearchContacts", "Messaging")"
+     data-threads-url="@Url.Action("GetThreads", "Messaging")"
+     data-download-url-base="@Url.Action("DownloadAttachment", "Messaging")">
+    <div class="messaging-layout">
+        <aside class="messaging-sidebar">
+            <div class="messaging-sidebar-header">
+                <div>
+                    <h3>Чаты</h3>
+                </div>
+            </div>
+
+            <div class="messaging-search-block">
+                <input type="text"
+                       class="form-input messaging-search-input"
+                       data-chat-search-input
+                       placeholder="Найти пользователя для диалога..." />
+                <div class="messaging-search-results" data-chat-search-results></div>
+            </div>
+
+            <div class="messaging-thread-list" data-chat-thread-list>
+                @if (Model.Threads.Count == 0)
+                {
+                    <div class="messaging-empty-card">
+                        <div class="messaging-empty-title">Пока нет ни одного диалога</div>
+                        <div class="messaging-empty-text">Найдите доступного собеседника через поиск выше и отправьте первое сообщение. После этого диалог появится в списке чатов.</div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var thread in Model.Threads)
+                    {
+                        <button type="button"
+                                class="messaging-thread-card"
+                                data-thread-id="@thread.Id"
+                                data-user-id="@thread.OtherUser.Id"
+                                data-user-name="@thread.OtherUser.FullName"
+                                data-user-email="@thread.OtherUser.Email"
+                                data-user-role="@thread.OtherUser.Role"
+                                data-user-avatar-url="@thread.OtherUser.AvatarUrl"
+                                data-user-subtitle="@thread.OtherUser.Subtitle">
+                            <div class="messaging-thread-avatar">
+                                @if (!string.IsNullOrWhiteSpace(thread.OtherUser.AvatarUrl))
+                                {
+                                    <img src="@thread.OtherUser.AvatarUrl" alt="Аватар собеседника" />
+                                }
+                                else
+                                {
+                                    <span>@(string.IsNullOrWhiteSpace(thread.OtherUser.FullName) ? "?" : thread.OtherUser.FullName[0].ToString().ToUpper())</span>
+                                }
+                            </div>
+                            <div class="messaging-thread-main">
+                                <div class="messaging-thread-topline">
+                                    <span class="messaging-thread-name">@thread.OtherUser.FullName</span>
+                                    <span class="messaging-thread-date">@(thread.LastMessageAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "")</span>
+                                </div>
+                                <div class="messaging-thread-subtitle">@thread.OtherUser.Subtitle</div>
+                                <div class="messaging-thread-preview-row">
+                                    <span class="messaging-thread-preview">@thread.LastMessagePreview</span>
+                                    @if (thread.UnreadCount > 0)
+                                    {
+                                        <span class="messaging-thread-badge">@thread.UnreadCount</span>
+                                    }
+                                </div>
+                            </div>
+                        </button>
+                    }
+                }
+            </div>
+        </aside>
+
+        <section class="messaging-conversation">
+            <div class="messaging-status-banner" data-chat-status-banner></div>
+
+            <div class="messaging-welcome" data-chat-welcome>
+                <div class="messaging-welcome-card">
+                    <div class="messaging-welcome-icon">✉</div>
+                    <h3>Выберите диалог или начните новый</h3>
+                    <p>Найдите собеседника через поиск или откройте уже существующую переписку.</p>
+                </div>
+            </div>
+
+            <div class="messaging-active-shell" data-chat-active-shell hidden>
+                <div class="messaging-conversation-header">
+                    <div class="messaging-conversation-person">
+                        <div class="messaging-conversation-avatar" data-chat-header-avatar></div>
+                        <div>
+                            <div class="messaging-conversation-name" data-chat-header-name></div>
+                            <div class="messaging-conversation-subtitle" data-chat-header-subtitle></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="messaging-message-stage">
+                    <div class="messaging-message-list" data-chat-message-list></div>
+                </div>
+
+                <form class="messaging-compose-form" data-chat-message-form method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="threadId" value="0" data-chat-thread-id />
+                    <input type="hidden" name="targetUserId" value="" data-chat-target-user-id />
+
+                    <div class="messaging-attachment-list" data-chat-attachment-list></div>
+
+                    <div class="messaging-compose-row">
+                        <textarea name="text"
+                                  class="form-input messaging-compose-input"
+                                  data-chat-text-input
+                                  rows="3"
+                                  placeholder="Введите сообщение..."></textarea>
+
+                        <div class="messaging-compose-actions">
+                            <label class="messaging-attach-button">
+                                <input type="file" name="attachments" multiple data-chat-file-input hidden />
+                                Прикрепить
+                            </label>
+                            <button type="submit" class="messaging-send-button">Отправить</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>

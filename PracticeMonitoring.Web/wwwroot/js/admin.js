@@ -223,22 +223,6 @@
     initCustomSelect('sortSelect');
     applyAccountsFilters();
 
-    const adminThemeToggle = document.getElementById('adminThemeToggle');
-    const storageKey = 'admin-theme-preference';
-
-    const savedTheme = localStorage.getItem(storageKey);
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-
-    adminThemeToggle?.addEventListener('click', function () {
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem(storageKey, nextTheme);
-    });
-
     const userModalBackdrop = document.getElementById('userModalBackdrop');
     const closeUserModalButton = document.getElementById('closeUserModalButton');
     const cancelUserModalButton = document.getElementById('cancelUserModalButton');
@@ -537,6 +521,39 @@
     initCustomSelect('modalGroupSelect');
 
     applyAccountsFilters();
+
+    const restoreDatabaseForm = document.getElementById('restoreDatabaseForm');
+    const restoreConfirmModalBackdrop = document.getElementById('restoreConfirmModalBackdrop');
+    const closeRestoreConfirmModalButton = document.getElementById('closeRestoreConfirmModalButton');
+    const cancelRestoreConfirmButton = document.getElementById('cancelRestoreConfirmButton');
+    const approveRestoreConfirmButton = document.getElementById('approveRestoreConfirmButton');
+
+    function openRestoreConfirmModal() {
+        restoreConfirmModalBackdrop?.classList.add('open');
+    }
+
+    function closeRestoreConfirmModal() {
+        restoreConfirmModalBackdrop?.classList.remove('open');
+    }
+
+    restoreDatabaseForm?.addEventListener('submit', function (event) {
+        event.preventDefault();
+        openRestoreConfirmModal();
+    });
+
+    closeRestoreConfirmModalButton?.addEventListener('click', closeRestoreConfirmModal);
+    cancelRestoreConfirmButton?.addEventListener('click', closeRestoreConfirmModal);
+
+    restoreConfirmModalBackdrop?.addEventListener('click', function (event) {
+        if (event.target === restoreConfirmModalBackdrop) {
+            closeRestoreConfirmModal();
+        }
+    });
+
+    approveRestoreConfirmButton?.addEventListener('click', function () {
+        closeRestoreConfirmModal();
+        restoreDatabaseForm?.submit();
+    });
 
 });
 const restoreBackupFile = document.getElementById('restoreBackupFile');
