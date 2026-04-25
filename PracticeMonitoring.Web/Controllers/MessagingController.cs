@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+п»їusing Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Services;
 
 namespace PracticeMonitoring.Web.Controllers;
@@ -57,7 +57,7 @@ public class MessagingController : Controller
 
         var result = await _chatApiService.StartThreadAsync(token, targetUserId);
         if (!result.Success || result.Data is null)
-            return BadRequest(new { message = result.ErrorMessage ?? "Не удалось открыть диалог." });
+            return BadRequest(new { message = result.ErrorMessage ?? "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РґРёР°Р»РѕРі." });
 
         return Json(result.Data);
     }
@@ -72,7 +72,7 @@ public class MessagingController : Controller
 
         var result = await _chatApiService.SendMessageAsync(token, threadId, targetUserId, text, attachments);
         if (!result.Success || result.Data is null)
-            return BadRequest(new { message = result.ErrorMessage ?? "Не удалось отправить сообщение." });
+            return BadRequest(new { message = result.ErrorMessage ?? "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ." });
 
         return Json(result.Data);
     }
@@ -91,3 +91,4 @@ public class MessagingController : Controller
         return File(file.Content, file.ContentType, file.FileName);
     }
 }
+

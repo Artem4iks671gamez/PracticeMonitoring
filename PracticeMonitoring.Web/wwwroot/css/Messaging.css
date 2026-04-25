@@ -583,3 +583,200 @@ html[data-theme="dark"] .messaging-module {
         max-width: 92%;
     }
 }
+
+/* Navigation counters and notifications */
+.nav-button-with-badge {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.nav-unread-badge {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3f76ff, #2657e6);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 8px 16px rgba(38, 87, 230, 0.22);
+}
+
+.notifications-panel-card {
+    min-height: 320px;
+    padding: 22px;
+    border: 1px solid rgba(78, 95, 198, 0.10);
+    border-radius: 22px;
+    background: var(--card-bg);
+    box-shadow: 0 18px 45px rgba(27, 39, 68, 0.10);
+}
+
+.notifications-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.notifications-panel-header h3 {
+    color: var(--text-color);
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.notifications-panel-header p {
+    color: var(--muted-text);
+    line-height: 1.45;
+}
+
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notification-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--input-bg);
+    border: 1px solid rgba(78, 95, 198, 0.10);
+}
+
+.notification-item.is-unread {
+    border-color: rgba(37, 99, 235, 0.24);
+    box-shadow: inset 4px 0 0 #3f76ff;
+}
+
+.notification-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.notification-title-row h4 {
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+.notification-unread-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #3f76ff;
+    box-shadow: 0 0 0 5px rgba(63, 118, 255, 0.12);
+}
+
+.notification-item p {
+    color: var(--text-color);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.notification-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--muted-text);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.notifications-link-button,
+.notifications-read-all-button,
+.notifications-muted-button {
+    min-height: 36px;
+    border-radius: 12px;
+    border: 1px solid rgba(78, 95, 198, 0.16);
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.notifications-link-button,
+.notifications-read-all-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3f76ff, #2657e6);
+    color: #ffffff;
+}
+
+.notifications-muted-button {
+    background: var(--card-bg);
+    color: var(--text-color);
+}
+
+.notifications-empty-state {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 20px;
+    border-radius: 18px;
+    background: var(--input-bg);
+    color: var(--text-color);
+}
+
+.notifications-empty-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(78, 95, 198, 0.10);
+    color: var(--main-color);
+    font-weight: 900;
+}
+
+.notifications-empty-state span {
+    display: block;
+    color: var(--muted-text);
+    margin-top: 4px;
+}
+
+html[data-theme="dark"] .notifications-panel-card,
+html[data-theme="dark"] .notification-item,
+html[data-theme="dark"] .notifications-empty-state {
+    background: linear-gradient(180deg, #1f2937, #172033);
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+html[data-theme="dark"] .notifications-muted-button {
+    background: #111827;
+    color: var(--text-color);
+    border-color: rgba(148, 163, 184, 0.20);
+}
+
+@media (max-width: 760px) {
+    .notification-item,
+    .notifications-panel-header {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .notification-actions {
+        justify-content: flex-start;
+    }
+}

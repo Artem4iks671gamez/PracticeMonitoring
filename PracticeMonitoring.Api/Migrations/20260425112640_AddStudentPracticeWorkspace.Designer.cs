@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PracticeMonitoring.Api.Data;
@@ -11,9 +12,11 @@ using PracticeMonitoring.Api.Data;
 namespace PracticeMonitoring.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260425112640_AddStudentPracticeWorkspace")]
+    partial class AddStudentPracticeWorkspace
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -506,49 +509,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.ToTable("student_practice_appendices", (string)null);
                 });
 
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeDiaryAttachment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Caption")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<byte[]>("Content")
-                        .IsRequired()
-                        .HasColumnType("bytea");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<long>("SizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("StudentPracticeDiaryEntryId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StudentPracticeDiaryEntryId", "SortOrder");
-
-                    b.ToTable("student_practice_diary_attachments", (string)null);
-                });
-
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeDiaryEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -562,8 +522,8 @@ namespace PracticeMonitoring.Api.Migrations
 
                     b.Property<string>("DetailedReport")
                         .IsRequired()
-                        .HasMaxLength(20000)
-                        .HasColumnType("character varying(20000)");
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
 
                     b.Property<int>("ProductionPracticeStudentAssignmentId")
                         .HasColumnType("integer");
@@ -856,17 +816,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.Navigation("Assignment");
                 });
 
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeDiaryAttachment", b =>
-                {
-                    b.HasOne("PracticeMonitoring.Api.Entities.StudentPracticeDiaryEntry", "DiaryEntry")
-                        .WithMany("Attachments")
-                        .HasForeignKey("StudentPracticeDiaryEntryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("DiaryEntry");
-                });
-
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeDiaryEntry", b =>
                 {
                     b.HasOne("PracticeMonitoring.Api.Entities.ProductionPracticeStudentAssignment", "Assignment")
@@ -961,11 +910,6 @@ namespace PracticeMonitoring.Api.Migrations
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.Specialty", b =>
                 {
                     b.Navigation("Groups");
-                });
-
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeDiaryEntry", b =>
-                {
-                    b.Navigation("Attachments");
                 });
 #pragma warning restore 612, 618
         }

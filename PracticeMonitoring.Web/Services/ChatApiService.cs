@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+п»їusing System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using PracticeMonitoring.Web.Models.Messaging;
@@ -65,7 +65,7 @@ public class ChatApiService
             Encoding.UTF8,
             "application/json");
 
-        return await SendAsync<ChatThreadListItemViewModel>(request, "Не удалось открыть диалог.");
+        return await SendAsync<ChatThreadListItemViewModel>(request, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РґРёР°Р»РѕРі.");
     }
 
     public async Task<ChatApiResult<ChatMessageViewModel>> SendMessageAsync(
@@ -97,7 +97,7 @@ public class ChatApiService
         }
 
         request.Content = formData;
-        return await SendAsync<ChatMessageViewModel>(request, "Не удалось отправить сообщение.");
+        return await SendAsync<ChatMessageViewModel>(request, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ.");
     }
 
     public async Task<ChatFileResult?> DownloadAttachmentAsync(string token, int attachmentId)
@@ -169,3 +169,4 @@ public class ChatApiService
         return rawFileName.Trim('"');
     }
 }
+

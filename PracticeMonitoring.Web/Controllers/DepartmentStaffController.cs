@@ -10,17 +10,20 @@ public class DepartmentStaffController : Controller
     private readonly DepartmentStaffApiService _departmentStaffApiService;
     private readonly AuthApiService _authApiService;
     private readonly ChatApiService _chatApiService;
+    private readonly NotificationApiService _notificationApiService;
     private readonly AttestationSheetService _attestationSheetService;
 
     public DepartmentStaffController(
         DepartmentStaffApiService departmentStaffApiService,
         AuthApiService authApiService,
         ChatApiService chatApiService,
+        NotificationApiService notificationApiService,
         AttestationSheetService attestationSheetService)
     {
         _departmentStaffApiService = departmentStaffApiService;
         _authApiService = authApiService;
         _chatApiService = chatApiService;
+        _notificationApiService = notificationApiService;
         _attestationSheetService = attestationSheetService;
     }
 
@@ -41,8 +44,9 @@ public class DepartmentStaffController : Controller
         var assignmentLogsTask = _departmentStaffApiService.GetAssignmentChangeLogsAsync(token);
         var currentUserTask = _authApiService.GetCurrentUserAsync(token);
         var threadsTask = _chatApiService.GetThreadsAsync(token);
+        var notificationsTask = _notificationApiService.GetNotificationsAsync(token);
 
-        await Task.WhenAll(practicesTask, supervisorsTask, practiceLogsTask, assignmentLogsTask, currentUserTask, threadsTask);
+        await Task.WhenAll(practicesTask, supervisorsTask, practiceLogsTask, assignmentLogsTask, currentUserTask, threadsTask, notificationsTask);
 
         if (currentUserTask.Result is null)
         {
@@ -69,7 +73,8 @@ public class DepartmentStaffController : Controller
                 CurrentUserFullName = currentUser.FullName,
                 CurrentUserAvatarUrl = currentUser.AvatarUrl,
                 Threads = threadsTask.Result
-            }
+            },
+            Notifications = notificationsTask.Result
         };
 
         return View(model);

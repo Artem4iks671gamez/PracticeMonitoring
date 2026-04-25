@@ -9,11 +9,16 @@ public class SupervisorController : Controller
 {
     private readonly AuthApiService _authApiService;
     private readonly ChatApiService _chatApiService;
+    private readonly NotificationApiService _notificationApiService;
 
-    public SupervisorController(AuthApiService authApiService, ChatApiService chatApiService)
+    public SupervisorController(
+        AuthApiService authApiService,
+        ChatApiService chatApiService,
+        NotificationApiService notificationApiService)
     {
         _authApiService = authApiService;
         _chatApiService = chatApiService;
+        _notificationApiService = notificationApiService;
     }
 
     [HttpGet]
@@ -29,8 +34,9 @@ public class SupervisorController : Controller
 
         var userTask = _authApiService.GetCurrentUserAsync(token);
         var threadsTask = _chatApiService.GetThreadsAsync(token);
+        var notificationsTask = _notificationApiService.GetNotificationsAsync(token);
 
-        await Task.WhenAll(userTask, threadsTask);
+        await Task.WhenAll(userTask, threadsTask, notificationsTask);
 
         var user = userTask.Result;
         if (user is null)
@@ -52,7 +58,8 @@ public class SupervisorController : Controller
                 CurrentUserFullName = user.FullName,
                 CurrentUserAvatarUrl = user.AvatarUrl,
                 Threads = threadsTask.Result
-            }
+            },
+            Notifications = notificationsTask.Result
         });
     }
 }

@@ -1,5 +1,6 @@
 using PracticeMonitoring.Web.Models.Auth;
 using PracticeMonitoring.Web.Models.Messaging;
+using PracticeMonitoring.Web.Models.Notifications;
 
 namespace PracticeMonitoring.Web.Models.DepartmentStaff;
 
@@ -18,4 +19,8 @@ public class DepartmentStaffPageViewModel
     public List<DepartmentStaffAuditLogItemViewModel> AssignmentChangeLogs { get; set; } = new();
 
     public MessagingWorkspaceViewModel Messaging { get; set; } = new();
+
+    public NotificationsPanelViewModel Notifications { get; set; } = new();
+
+    public int UnreadChatsCount => Messaging.Threads.Sum(x => x.UnreadCount);
 }

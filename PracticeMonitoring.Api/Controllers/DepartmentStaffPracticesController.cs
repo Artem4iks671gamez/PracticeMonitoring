@@ -16,11 +16,16 @@ public class DepartmentStaffPracticesController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly AuditLogService _auditLogService;
+    private readonly NotificationService _notificationService;
 
-    public DepartmentStaffPracticesController(AppDbContext context, AuditLogService auditLogService)
+    public DepartmentStaffPracticesController(
+        AppDbContext context,
+        AuditLogService auditLogService,
+        NotificationService notificationService)
     {
         _context = context;
         _auditLogService = auditLogService;
+        _notificationService = notificationService;
     }
 
     [HttpGet]
@@ -327,19 +332,18 @@ public class DepartmentStaffPracticesController : ControllerBase
             .Select(CreateAssignmentSnapshot)
             .ToList();
 
-        _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
-        practice.StudentAssignments = await BuildAssignmentsAsync(request.StudentAssignments, practice.Id);
-
+        ApplyAssignments(practice, request.StudentAssignments);
         await _context.SaveChangesAsync();
+
+        practice = await LoadPracticeDetailsQuery()
+            .FirstAsync(x => x.Id == id);
 
         var currentAssignments = practice.StudentAssignments
             .Select(CreateAssignmentSnapshot)
             .ToList();
 
         await LogAssignmentsDiffAsync(practice, previousAssignments, currentAssignments);
-
-        practice = await LoadPracticeDetailsQuery()
-            .FirstAsync(x => x.Id == id);
+        await CreateAssignmentNotificationsAsync(practice, previousAssignments, currentAssignments);
 
         return Ok(MapDetails(practice));
     }
@@ -553,35 +557,40 @@ public class DepartmentStaffPracticesController : ControllerBase
         return errors.ToDictionary(x => x.Key, x => x.Value.ToArray());
     }
 
-    private async Task<List<ProductionPracticeStudentAssignment>> BuildAssignmentsAsync(
-        List<ProductionPracticeStudentAssignmentRequest> assignments,
-        int? practiceId = null)
+    private void ApplyAssignments(
+        ProductionPractice practice,
+        List<ProductionPracticeStudentAssignmentRequest> assignments)
     {
-        var result = new List<ProductionPracticeStudentAssignment>();
+        var requestedByStudent = assignments
+            .Where(x => x.StudentId > 0)
+            .GroupBy(x => x.StudentId)
+            .ToDictionary(x => x.Key, x => x.First());
 
-        foreach (var assignment in assignments)
+        var existingByStudent = practice.StudentAssignments.ToDictionary(x => x.StudentId);
+
+        var removedAssignments = practice.StudentAssignments
+            .Where(x => !requestedByStudent.ContainsKey(x.StudentId))
+            .ToList();
+
+        if (removedAssignments.Count > 0)
+            _context.ProductionPracticeStudentAssignments.RemoveRange(removedAssignments);
+
+        foreach (var request in requestedByStudent.Values)
         {
-            var student = await _context.Users
-                .Include(x => x.Group)
-                    .ThenInclude(x => x!.Specialty)
-                .FirstAsync(x => x.Id == assignment.StudentId);
-
-            User? supervisor = null;
-
-            if (assignment.SupervisorId.HasValue)
-                supervisor = await _context.Users.FirstAsync(x => x.Id == assignment.SupervisorId.Value);
-
-            result.Add(new ProductionPracticeStudentAssignment
+            if (existingByStudent.TryGetValue(request.StudentId, out var existingAssignment))
             {
-                ProductionPracticeId = practiceId ?? 0,
-                StudentId = student.Id,
-                Student = student,
-                SupervisorId = supervisor?.Id,
-                Supervisor = supervisor
+                existingAssignment.SupervisorId = request.SupervisorId;
+                continue;
+            }
+
+            practice.StudentAssignments.Add(new ProductionPracticeStudentAssignment
+            {
+                ProductionPracticeId = practice.Id,
+                StudentId = request.StudentId,
+                SupervisorId = request.SupervisorId,
+                AssignedAtUtc = DateTime.UtcNow
             });
         }
-
-        return result;
     }
 
     private async Task LogAssignmentsDiffAsync(
@@ -627,6 +636,51 @@ public class DepartmentStaffPracticesController : ControllerBase
             TruncateDescription(
                 $"Обновлены назначения студентов для практики {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
                 $"{string.Join("; ", parts)}."));
+    }
+
+    private async Task CreateAssignmentNotificationsAsync(
+        ProductionPractice practice,
+        List<AssignmentSnapshot> previousAssignments,
+        List<AssignmentSnapshot> currentAssignments)
+    {
+        var previousByStudent = previousAssignments.ToDictionary(x => x.StudentId);
+        var practiceLabel = BuildPracticeDisplayName(practice.PracticeIndex, practice.Name);
+        var datesLabel = $"{practice.StartDate:dd.MM.yyyy} - {practice.EndDate:dd.MM.yyyy}";
+
+        foreach (var assignment in currentAssignments)
+        {
+            if (!previousByStudent.TryGetValue(assignment.StudentId, out var previous))
+            {
+                var supervisorLabel = string.IsNullOrWhiteSpace(assignment.SupervisorFullName)
+                    ? "руководитель практики пока не назначен"
+                    : $"руководитель: {assignment.SupervisorFullName}";
+
+                _notificationService.Add(
+                    assignment.StudentId,
+                    "PracticeAssignment",
+                    "Назначена производственная практика",
+                    $"Вы назначены на производственную практику {practiceLabel}. Сроки: {datesLabel}, {practice.Hours} ч.; {supervisorLabel}. В первые 2 дня практики заполните организацию, руководителя от организации и содержание задания.",
+                    $"/Student?practiceId={assignment.AssignmentId}");
+
+                continue;
+            }
+
+            if (previous.SupervisorId != assignment.SupervisorId)
+            {
+                var supervisorLabel = string.IsNullOrWhiteSpace(assignment.SupervisorFullName)
+                    ? "руководитель практики снят"
+                    : $"новый руководитель: {assignment.SupervisorFullName}";
+
+                _notificationService.Add(
+                    assignment.StudentId,
+                    "PracticeSupervisorChanged",
+                    "Изменён руководитель практики",
+                    $"Для практики {practiceLabel} изменён руководитель: {supervisorLabel}.",
+                    $"/Student?practiceId={assignment.AssignmentId}");
+            }
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     private static ProductionPracticeDetailsResponse MapDetails(ProductionPractice x)
@@ -742,6 +796,7 @@ public class DepartmentStaffPracticesController : ControllerBase
     private static AssignmentSnapshot CreateAssignmentSnapshot(ProductionPracticeStudentAssignment assignment)
     {
         return new AssignmentSnapshot(
+            assignment.Id,
             assignment.StudentId,
             assignment.Student.FullName,
             assignment.SupervisorId,
@@ -843,6 +898,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         string CompetenciesSignature);
 
     private sealed record AssignmentSnapshot(
+        int AssignmentId,
         int StudentId,
         string StudentFullName,
         int? SupervisorId,

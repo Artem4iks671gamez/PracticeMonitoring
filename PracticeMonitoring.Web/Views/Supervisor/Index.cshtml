@@ -59,8 +59,12 @@
         <button type="button" class="role-page-nav-button active" data-page-panel-target="supervisorOverviewPanel">
             Обзор
         </button>
-        <button type="button" class="role-page-nav-button" data-page-panel-target="supervisorChatsPanel">
-            Чаты
+        <button type="button" class="role-page-nav-button nav-button-with-badge" data-page-panel-target="supervisorChatsPanel">
+            <span>Чаты</span>
+            @if (Model.UnreadChatsCount > 0)
+            {
+                <span class="nav-unread-badge">@Model.UnreadChatsCount</span>
+            }
         </button>
         <button type="button" class="role-page-nav-button" data-page-panel-target="supervisorNotificationsPanel">
             Уведомления
@@ -109,7 +113,7 @@
     </div>
 
     <div class="role-page-panel" id="supervisorNotificationsPanel" data-page-panel>
-        @await Html.PartialAsync("_NotificationsPanel")
+        @await Html.PartialAsync("_NotificationsPanel", Model.Notifications)
     </div>
 </div>
 

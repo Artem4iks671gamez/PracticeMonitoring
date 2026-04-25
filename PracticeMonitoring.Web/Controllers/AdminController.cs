@@ -10,17 +10,20 @@ public class AdminController : Controller
     private readonly AdminApiService _adminApiService;
     private readonly AuthApiService _authApiService;
     private readonly ChatApiService _chatApiService;
+    private readonly NotificationApiService _notificationApiService;
     private readonly IWebHostEnvironment _environment;
 
     public AdminController(
         AdminApiService adminApiService,
         AuthApiService authApiService,
         ChatApiService chatApiService,
+        NotificationApiService notificationApiService,
         IWebHostEnvironment environment)
     {
         _adminApiService = adminApiService;
         _authApiService = authApiService;
         _chatApiService = chatApiService;
+        _notificationApiService = notificationApiService;
         _environment = environment;
     }
 
@@ -37,8 +40,9 @@ public class AdminController : Controller
 
         var currentUserTask = _authApiService.GetCurrentUserAsync(token);
         var threadsTask = _chatApiService.GetThreadsAsync(token);
+        var notificationsTask = _notificationApiService.GetNotificationsAsync(token);
 
-        await Task.WhenAll(currentUserTask, threadsTask);
+        await Task.WhenAll(currentUserTask, threadsTask, notificationsTask);
 
         if (currentUserTask.Result is null)
         {
@@ -65,7 +69,8 @@ public class AdminController : Controller
                 CurrentUserFullName = currentUser.FullName,
                 CurrentUserAvatarUrl = currentUser.AvatarUrl,
                 Threads = threadsTask.Result
-            }
+            },
+            Notifications = notificationsTask.Result
         };
 
         return View(model);

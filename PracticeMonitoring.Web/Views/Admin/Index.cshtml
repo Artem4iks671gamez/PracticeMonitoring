@@ -57,8 +57,12 @@
                         Журнал
                     </button>
 
-                    <button type="button" class="admin-nav-button" data-panel="chats-panel">
-                        Чаты
+                    <button type="button" class="admin-nav-button nav-button-with-badge" data-panel="chats-panel">
+                        <span>Чаты</span>
+                        @if (Model.UnreadChatsCount > 0)
+                        {
+                            <span class="nav-unread-badge">@Model.UnreadChatsCount</span>
+                        }
                     </button>
 
                     <button type="button" class="admin-nav-button" data-panel="notifications-panel">
@@ -422,7 +426,7 @@
                     </div>
                 </div>
 
-                @await Html.PartialAsync("_NotificationsPanel")
+                @await Html.PartialAsync("_NotificationsPanel", Model.Notifications)
             </div>
         </section>
     </section>

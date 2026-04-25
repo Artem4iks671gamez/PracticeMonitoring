@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
-using PracticeMonitoring.Web.Models.Auth;
+﻿using Microsoft.AspNetCore.Mvc;
 using PracticeMonitoring.Web.Models.Messaging;
 using PracticeMonitoring.Web.Models.Student;
 using PracticeMonitoring.Web.Services;
@@ -10,16 +9,19 @@ public class StudentController : Controller
 {
     private readonly AuthApiService _authApiService;
     private readonly ChatApiService _chatApiService;
-    private readonly IWebHostEnvironment _environment;
+    private readonly StudentApiService _studentApiService;
+    private readonly NotificationApiService _notificationApiService;
 
     public StudentController(
         AuthApiService authApiService,
         ChatApiService chatApiService,
-        IWebHostEnvironment environment)
+        StudentApiService studentApiService,
+        NotificationApiService notificationApiService)
     {
         _authApiService = authApiService;
         _chatApiService = chatApiService;
-        _environment = environment;
+        _studentApiService = studentApiService;
+        _notificationApiService = notificationApiService;
     }
 
     [HttpGet]
@@ -35,8 +37,10 @@ public class StudentController : Controller
 
         var userTask = _authApiService.GetCurrentUserAsync(token);
         var threadsTask = _chatApiService.GetThreadsAsync(token);
+        var practicesTask = _studentApiService.GetPracticesAsync(token);
+        var notificationsTask = _notificationApiService.GetNotificationsAsync(token);
 
-        await Task.WhenAll(userTask, threadsTask);
+        await Task.WhenAll(userTask, threadsTask, practicesTask, notificationsTask);
 
         var user = userTask.Result;
         if (user is null)
@@ -51,6 +55,8 @@ public class StudentController : Controller
         return View(new StudentPageViewModel
         {
             CurrentUser = user,
+            Practices = practicesTask.Result,
+            Notifications = notificationsTask.Result,
             Messaging = new MessagingWorkspaceViewModel
             {
                 CurrentUserId = user.Id,
@@ -62,58 +68,156 @@ public class StudentController : Controller
         });
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetPractice(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        return Json(practice);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SaveOrganization(
+        int assignmentId,
+        [FromBody] StudentPracticeOrganizationRequestViewModel? model)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        if (model is null)
+            return BadRequest(new { message = "Не удалось прочитать сведения об организации." });
+
+        var result = await _studentApiService.SaveOrganizationAsync(token, assignmentId, model);
+        return ToJsonResult(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SaveDiaryEntry(
+        int assignmentId,
+        [FromBody] StudentPracticeDiaryEntryRequestViewModel? model)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        if (model is null)
+            return BadRequest(new { message = "Не удалось прочитать запись дневника." });
+
+        var result = await _studentApiService.SaveDiaryEntryAsync(token, assignmentId, model);
+        return ToJsonResult(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SaveReportItems(
+        int assignmentId,
+        [FromBody] StudentPracticeReportItemsRequestViewModel? model)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        if (model is null)
+            return BadRequest(new { message = "Не удалось прочитать таблицы отчёта." });
+
+        var result = await _studentApiService.SaveReportItemsAsync(token, assignmentId, model);
+        return ToJsonResult(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SaveSources(
+        int assignmentId,
+        [FromBody] StudentPracticeSourcesRequestViewModel? model)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        if (model is null)
+            return BadRequest(new { message = "Не удалось прочитать источники." });
+
+        var result = await _studentApiService.SaveSourcesAsync(token, assignmentId, model);
+        return ToJsonResult(result);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateProfile(UpdateProfileViewModel model)
+    public async Task<IActionResult> UploadAppendix(
+        int assignmentId,
+        string? title,
+        string? description,
+        IFormFile? file)
     {
-        var role = HttpContext.Session.GetString("Role");
-        if (role != "Student")
-            return RedirectToAction("Login", "Account");
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
 
-        var token = HttpContext.Session.GetString("Token");
-        if (string.IsNullOrWhiteSpace(token))
-            return RedirectToAction("Login", "Account");
+        var result = await _studentApiService.UploadAppendixAsync(token, assignmentId, title, description, file);
+        return ToJsonResult(result);
+    }
 
-        if (!ModelState.IsValid)
-            return RedirectToAction("Index");
+    [HttpPost]
+    public async Task<IActionResult> DeleteAppendix(int appendixId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
 
-        string? avatarUrl = model.CurrentAvatarUrl;
+        var result = await _studentApiService.DeleteAppendixAsync(token, appendixId);
+        if (result.Success)
+            return Ok(new { message = "Приложение удалено." });
 
-        if (model.AvatarFile is not null && model.AvatarFile.Length > 0)
+        return BadRequest(new { message = result.ErrorMessage ?? "Не удалось удалить приложение." });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadAppendix(int appendixId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var file = await _studentApiService.DownloadAppendixAsync(token, appendixId);
+        if (file is null)
+            return NotFound();
+
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadDiaryAttachment(int attachmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var file = await _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId);
+        if (file is null)
+            return NotFound();
+
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    private string? GetToken()
+    {
+        return HttpContext.Session.GetString("Token");
+    }
+
+    private IActionResult ToJsonResult<T>(StudentApiResult<T> result)
+    {
+        if (result.Success && result.Data is not null)
+            return Json(result.Data);
+
+        return BadRequest(new
         {
-            var uploadsRoot = Path.Combine(_environment.WebRootPath, "uploads", "avatars");
-            Directory.CreateDirectory(uploadsRoot);
-
-            var extension = Path.GetExtension(model.AvatarFile.FileName);
-            var fileName = $"{Guid.NewGuid():N}{extension}";
-            var fullPath = Path.Combine(uploadsRoot, fileName);
-
-            await using var stream = new FileStream(fullPath, FileMode.Create);
-            await model.AvatarFile.CopyToAsync(stream);
-
-            avatarUrl = $"/uploads/avatars/{fileName}";
-        }
-
-        var result = await _authApiService.UpdateProfileAsync(token, new Services.UpdateProfileRequest
-        {
-            Surname = model.Surname,
-            FirstName = model.FirstName,
-            Patronymic = model.Patronymic,
-            Email = model.Email,
-            AvatarUrl = avatarUrl,
-            Theme = model.Theme
+            message = result.ErrorMessage ?? "Не удалось выполнить действие.",
+            errors = result.ValidationErrors
         });
-
-        if (!result.Success || result.Data is null)
-        {
-            TempData["ProfileError"] = result.ErrorMessage ?? "�� ������� ��������� ��������� �������.";
-            return RedirectToAction("Index");
-        }
-
-        HttpContext.Session.SetString("FullName", result.Data.FullName);
-        HttpContext.Session.SetString("Theme", result.Data.Theme);
-
-        TempData["ProfileSuccess"] = "������ ������� ������� ���������.";
-        return RedirectToAction("Index");
     }
 }
