@@ -20,6 +20,12 @@ public class ProductionPracticeStudentAssignment
 
     public string? OrganizationName { get; set; }
 
+    public string? OrganizationFullName { get; set; }
+
+    public string? OrganizationShortName { get; set; }
+
+    public string? OrganizationAddress { get; set; }
+
     public string? OrganizationSupervisorFullName { get; set; }
 
     public string? OrganizationSupervisorPosition { get; set; }
@@ -29,6 +35,14 @@ public class ProductionPracticeStudentAssignment
     public string? OrganizationSupervisorEmail { get; set; }
 
     public string? PracticeTaskContent { get; set; }
+
+    public string? StudentDuties { get; set; }
+
+    public string? ProvidedMaterialsDescription { get; set; }
+
+    public string? WorkScheduleDescription { get; set; }
+
+    public string? IntroductionMainGoal { get; set; }
 
     public DateTime? StudentDetailsUpdatedAtUtc { get; set; }
 

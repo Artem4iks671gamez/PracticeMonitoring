@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
 
     public DbSet<ProductionPractice> ProductionPractices => Set<ProductionPractice>();
     public DbSet<ProductionPracticeCompetency> ProductionPracticeCompetencies => Set<ProductionPracticeCompetency>();
+    public DbSet<ProductionPracticeGeneralCompetency> ProductionPracticeGeneralCompetencies => Set<ProductionPracticeGeneralCompetency>();
     public DbSet<ProductionPracticeStudentAssignment> ProductionPracticeStudentAssignments => Set<ProductionPracticeStudentAssignment>();
     public DbSet<StudentPracticeDiaryEntry> StudentPracticeDiaryEntries => Set<StudentPracticeDiaryEntry>();
     public DbSet<StudentPracticeDiaryAttachment> StudentPracticeDiaryAttachments => Set<StudentPracticeDiaryAttachment>();
@@ -148,17 +149,41 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<ProductionPracticeGeneralCompetency>(entity =>
+        {
+            entity.ToTable("production_practice_general_competencies");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.CompetencyCode).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.CompetencyDescription).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.SortOrder).IsRequired();
+
+            entity.HasIndex(x => new { x.ProductionPracticeId, x.SortOrder });
+
+            entity.HasOne(x => x.ProductionPractice)
+                .WithMany(x => x.GeneralCompetencies)
+                .HasForeignKey(x => x.ProductionPracticeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ProductionPracticeStudentAssignment>(entity =>
         {
             entity.ToTable("production_practice_student_assignments");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.AssignedAtUtc).IsRequired();
             entity.Property(x => x.OrganizationName).HasMaxLength(300);
+            entity.Property(x => x.OrganizationFullName).HasMaxLength(500);
+            entity.Property(x => x.OrganizationShortName).HasMaxLength(300);
+            entity.Property(x => x.OrganizationAddress).HasMaxLength(500);
             entity.Property(x => x.OrganizationSupervisorFullName).HasMaxLength(200);
             entity.Property(x => x.OrganizationSupervisorPosition).HasMaxLength(200);
             entity.Property(x => x.OrganizationSupervisorPhone).HasMaxLength(80);
             entity.Property(x => x.OrganizationSupervisorEmail).HasMaxLength(200);
             entity.Property(x => x.PracticeTaskContent).HasMaxLength(4000);
+            entity.Property(x => x.StudentDuties).HasMaxLength(4000);
+            entity.Property(x => x.ProvidedMaterialsDescription).HasMaxLength(4000);
+            entity.Property(x => x.WorkScheduleDescription).HasMaxLength(4000);
+            entity.Property(x => x.IntroductionMainGoal).HasMaxLength(4000);
 
             entity.HasIndex(x => new { x.ProductionPracticeId, x.StudentId }).IsUnique();
 

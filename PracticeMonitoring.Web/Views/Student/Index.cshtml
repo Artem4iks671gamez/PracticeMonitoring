@@ -32,7 +32,8 @@
      data-upload-diary-attachment-url="@Url.Action("UploadDiaryAttachment", "Student")"
      data-delete-appendix-url="@Url.Action("DeleteAppendix", "Student")"
      data-download-appendix-url="@Url.Action("DownloadAppendix", "Student")"
-     data-download-diary-attachment-url="@Url.Action("DownloadDiaryAttachment", "Student")">
+     data-download-diary-attachment-url="@Url.Action("DownloadDiaryAttachment", "Student")"
+     data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")">
     <section class="student-hero-card">
         <div class="student-identity">
             <div class="student-avatar student-avatar-compact" id="studentAvatarPreview">
@@ -238,9 +239,12 @@
                 <button type="button" class="student-modal-tab active" data-student-modal-tab="overview">Сведения</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="organization">Организация</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="diary">Дневник</button>
-                <button type="button" class="student-modal-tab" data-student-modal-tab="report">Таблицы отчёта</button>
+                <button type="button" class="student-modal-tab" data-student-modal-tab="introduction">Введение</button>
+                <button type="button" class="student-modal-tab" data-student-modal-tab="technical">Технические средства</button>
+                <button type="button" class="student-modal-tab" data-student-modal-tab="software">Программные средства</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="sources">Источники</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="appendices">Приложения</button>
+                <button type="button" class="student-modal-tab" data-student-modal-tab="documents">Формирование документов</button>
             </div>
 
             <div class="student-modal-body">
@@ -268,9 +272,19 @@
 
                     <form id="studentOrganizationForm" class="student-form-grid" hidden novalidate>
                         <div class="form-group student-form-wide">
-                            <label class="form-label" for="organizationName">Организация</label>
-                            <input class="form-input" id="organizationName" name="organizationName" maxlength="300" placeholder="Например: ООО «Информационные системы»" />
-                            <div class="student-field-error" data-field-error="OrganizationName"></div>
+                            <label class="form-label" for="organizationFullName">Полное название организации</label>
+                            <input class="form-input" id="organizationFullName" name="organizationFullName" maxlength="500" placeholder="Например: Общество с ограниченной ответственностью «Информационные системы»" />
+                            <div class="student-field-error" data-field-error="OrganizationFullName"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="organizationShortName">Сокращенное название</label>
+                            <input class="form-input" id="organizationShortName" name="organizationShortName" maxlength="300" placeholder="ООО «Информационные системы»" />
+                            <div class="student-field-error" data-field-error="OrganizationShortName"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="organizationAddress">Адрес организации</label>
+                            <input class="form-input" id="organizationAddress" name="organizationAddress" maxlength="500" />
+                            <div class="student-field-error" data-field-error="OrganizationAddress"></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="organizationSupervisorFullName">ФИО руководителя от организации</label>
@@ -315,6 +329,23 @@
                         </aside>
 
                         <form id="studentDiaryForm" class="student-section-card student-diary-editor">
+                            <div class="student-report-global-fields">
+                                <div class="form-group">
+                                    <label class="form-label" for="studentDuties">Выполняемые обязанности</label>
+                                    <textarea class="form-input student-textarea" id="studentDuties" name="studentDuties" rows="3" maxlength="4000" placeholder="В ходе прохождения практики я выполнял/а следующие обязанности:"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="providedMaterialsDescription">Описание предоставленных материалов</label>
+                                    <textarea class="form-input student-textarea" id="providedMaterialsDescription" name="providedMaterialsDescription" rows="3" maxlength="4000" placeholder="Для выполнения заданий были предоставлены"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="workScheduleDescription">Описание графика работы</label>
+                                    <textarea class="form-input student-textarea" id="workScheduleDescription" name="workScheduleDescription" rows="3" maxlength="4000"></textarea>
+                                </div>
+                                <div class="student-form-actions">
+                                    <button type="button" class="student-secondary-button" id="savePracticeContentButton">Сохранить данные отчёта</button>
+                                </div>
+                            </div>
                             <input id="diaryWorkDate" name="workDate" type="hidden" />
                             <div class="student-section-header">
                                 <div>
@@ -346,15 +377,45 @@
                     </div>
                 </section>
 
-                <section class="student-modal-panel" data-student-modal-panel="report">
+                <section class="student-modal-panel" data-student-modal-panel="introduction">
                     <div class="student-section-card">
                         <div class="student-section-header">
-                            <h3>Таблицы для отчёта</h3>
-                            <span>Технические средства, программные средства и периферия</span>
+                            <h3>Введение</h3>
+                            <span>Цель, виды работ, программные средства и технологии для итогового отчёта</span>
                         </div>
-                        <div class="student-report-tables" id="studentReportTables"></div>
+                        <div class="form-group">
+                            <label class="form-label" for="introductionMainGoal">Описание основной цели</label>
+                            <textarea class="form-input student-textarea" id="introductionMainGoal" name="introductionMainGoal" rows="4" maxlength="4000" placeholder="Основной целью практики являлась"></textarea>
+                        </div>
+                        <div class="student-report-tables" id="studentIntroductionTables"></div>
                         <div class="student-form-actions">
-                            <button type="button" class="student-primary-button" id="saveReportItemsButton">Сохранить таблицы</button>
+                            <button type="button" class="student-primary-button" id="saveIntroductionButton">Сохранить введение</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="student-modal-panel" data-student-modal-panel="technical">
+                    <div class="student-section-card">
+                        <div class="student-section-header">
+                            <h3>Технические средства</h3>
+                            <span>Тип оборудования, наименование и характеристики</span>
+                        </div>
+                        <div class="student-report-tables" id="studentTechnicalTools"></div>
+                        <div class="student-form-actions">
+                            <button type="button" class="student-primary-button" id="saveTechnicalToolsButton">Сохранить технические средства</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="student-modal-panel" data-student-modal-panel="software">
+                    <div class="student-section-card">
+                        <div class="student-section-header">
+                            <h3>Программные средства</h3>
+                            <span>Тип средства, название и назначение</span>
+                        </div>
+                        <div class="student-report-tables" id="studentSoftwareTools"></div>
+                        <div class="student-form-actions">
+                            <button type="button" class="student-primary-button" id="saveSoftwareToolsButton">Сохранить программные средства</button>
                         </div>
                     </div>
                 </section>
@@ -406,6 +467,21 @@
                             </div>
                             <div class="student-appendix-list" id="studentAppendicesList"></div>
                         </div>
+                    </div>
+                </section>
+
+                <section class="student-modal-panel" data-student-modal-panel="documents">
+                    <div class="student-section-card">
+                        <div class="student-section-header">
+                            <h3>Формирование документов</h3>
+                            <span>Отчёт формируется автоматически по шаблону DOCX.</span>
+                        </div>
+                        <div class="student-document-actions">
+                            <button type="button" class="student-secondary-button" disabled>Сформировать аттестационный лист</button>
+                            <button type="button" class="student-secondary-button" disabled>Сформировать дневник практики</button>
+                            <button type="button" class="student-primary-button" id="downloadPracticeReportButton">Сформировать отчёт практики</button>
+                        </div>
+                        <div class="student-document-errors" id="studentDocumentErrors" hidden></div>
                     </div>
                 </section>
             </div>

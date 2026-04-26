@@ -28,8 +28,7 @@ public class StudentController : ControllerBase
     private static readonly HashSet<string> AllowedReportCategories = new(StringComparer.Ordinal)
     {
         "TechnicalTool",
-        "SoftwareTool",
-        "PeripheralDevice"
+        "SoftwareTool"
     };
     private static readonly JsonSerializerOptions DayReportJsonOptions = new()
     {
@@ -70,6 +69,8 @@ public class StudentController : ControllerBase
                 .ThenInclude(x => x.Specialty)
             .Include(x => x.ProductionPractice)
                 .ThenInclude(x => x.Competencies)
+            .Include(x => x.ProductionPractice)
+                .ThenInclude(x => x.GeneralCompetencies)
             .Include(x => x.Supervisor)
             .Include(x => x.DiaryEntries)
             .Where(x => x.StudentId == studentId.Value)
@@ -103,12 +104,19 @@ public class StudentController : ControllerBase
         if (errors.Count > 0)
             return BadRequest(new { message = "Заполните обязательные сведения о практике.", errors });
 
-        assignment.OrganizationName = request.OrganizationName!.Trim();
+        assignment.OrganizationName = (request.OrganizationFullName ?? request.OrganizationName)!.Trim();
+        assignment.OrganizationFullName = (request.OrganizationFullName ?? request.OrganizationName)!.Trim();
+        assignment.OrganizationShortName = request.OrganizationShortName!.Trim();
+        assignment.OrganizationAddress = request.OrganizationAddress!.Trim();
         assignment.OrganizationSupervisorFullName = request.OrganizationSupervisorFullName!.Trim();
         assignment.OrganizationSupervisorPosition = request.OrganizationSupervisorPosition!.Trim();
         assignment.OrganizationSupervisorPhone = NormalizeOptional(NormalizePhone(request.OrganizationSupervisorPhone));
         assignment.OrganizationSupervisorEmail = NormalizeOptional(request.OrganizationSupervisorEmail);
         assignment.PracticeTaskContent = request.PracticeTaskContent!.Trim();
+        assignment.StudentDuties = request.StudentDuties?.Trim();
+        assignment.ProvidedMaterialsDescription = request.ProvidedMaterialsDescription?.Trim();
+        assignment.WorkScheduleDescription = request.WorkScheduleDescription?.Trim();
+        assignment.IntroductionMainGoal = request.IntroductionMainGoal?.Trim();
         assignment.StudentDetailsUpdatedAtUtc = DateTime.UtcNow;
 
         if (assignment.SupervisorId.HasValue)
@@ -451,6 +459,8 @@ public class StudentController : ControllerBase
                 .ThenInclude(x => x.Specialty)
             .Include(x => x.ProductionPractice)
                 .ThenInclude(x => x.Competencies)
+            .Include(x => x.ProductionPractice)
+                .ThenInclude(x => x.GeneralCompetencies)
             .Include(x => x.DiaryEntries)
                 .ThenInclude(x => x.Attachments)
             .Include(x => x.ReportItems)
@@ -468,8 +478,15 @@ public class StudentController : ControllerBase
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (string.IsNullOrWhiteSpace(request.OrganizationName))
-            errors[nameof(request.OrganizationName)] = new[] { "Укажите организацию, где проходит практика." };
+        if (string.IsNullOrWhiteSpace(request.OrganizationFullName) &&
+            string.IsNullOrWhiteSpace(request.OrganizationName))
+            errors[nameof(request.OrganizationFullName)] = new[] { "Укажите полное название организации." };
+
+        if (string.IsNullOrWhiteSpace(request.OrganizationShortName))
+            errors[nameof(request.OrganizationShortName)] = new[] { "Укажите сокращенное название организации." };
+
+        if (string.IsNullOrWhiteSpace(request.OrganizationAddress))
+            errors[nameof(request.OrganizationAddress)] = new[] { "Укажите адрес организации." };
 
         if (string.IsNullOrWhiteSpace(request.OrganizationSupervisorFullName))
             errors[nameof(request.OrganizationSupervisorFullName)] = new[] { "Укажите ФИО руководителя от организации." };
@@ -947,7 +964,10 @@ public class StudentController : ControllerBase
             EndDate = practice.EndDate,
             IsCompleted = IsCompleted(practice.EndDate),
             SupervisorFullName = assignment.Supervisor?.FullName,
-            OrganizationName = assignment.OrganizationName,
+            OrganizationName = assignment.OrganizationFullName ?? assignment.OrganizationName,
+            OrganizationFullName = assignment.OrganizationFullName ?? assignment.OrganizationName,
+            OrganizationShortName = assignment.OrganizationShortName,
+            OrganizationAddress = assignment.OrganizationAddress,
             HasRequiredDetails = hasDetails,
             DetailsDueDate = dueDate,
             IsDetailsOverdue = !hasDetails && DateTime.UtcNow.Date > dueDate,
@@ -976,7 +996,10 @@ public class StudentController : ControllerBase
             EndDate = listItem.EndDate,
             IsCompleted = listItem.IsCompleted,
             SupervisorFullName = listItem.SupervisorFullName,
-            OrganizationName = assignment.OrganizationName,
+            OrganizationName = assignment.OrganizationFullName ?? assignment.OrganizationName,
+            OrganizationFullName = assignment.OrganizationFullName ?? assignment.OrganizationName,
+            OrganizationShortName = assignment.OrganizationShortName,
+            OrganizationAddress = assignment.OrganizationAddress,
             HasRequiredDetails = listItem.HasRequiredDetails,
             DetailsDueDate = listItem.DetailsDueDate,
             IsDetailsOverdue = listItem.IsDetailsOverdue,
@@ -988,7 +1011,20 @@ public class StudentController : ControllerBase
             OrganizationSupervisorPhone = assignment.OrganizationSupervisorPhone,
             OrganizationSupervisorEmail = assignment.OrganizationSupervisorEmail,
             PracticeTaskContent = assignment.PracticeTaskContent,
-            Competencies = practice.Competencies
+            StudentDuties = assignment.StudentDuties,
+            ProvidedMaterialsDescription = assignment.ProvidedMaterialsDescription,
+            WorkScheduleDescription = assignment.WorkScheduleDescription,
+            IntroductionMainGoal = assignment.IntroductionMainGoal,
+            GeneralCompetencies = practice.GeneralCompetencies
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .Select(x => new StudentPracticeGeneralCompetencyResponse
+                {
+                    CompetencyCode = x.CompetencyCode,
+                    CompetencyDescription = x.CompetencyDescription,
+                    SortOrder = x.SortOrder
+                })
+                .ToList(),            Competencies = practice.Competencies
                 .OrderBy(x => x.Id)
                 .Select(x => new StudentPracticeCompetencyResponse
                 {
@@ -1062,7 +1098,9 @@ public class StudentController : ControllerBase
 
     private static bool HasRequiredDetails(ProductionPracticeStudentAssignment assignment)
     {
-        return !string.IsNullOrWhiteSpace(assignment.OrganizationName) &&
+        return !string.IsNullOrWhiteSpace(assignment.OrganizationFullName ?? assignment.OrganizationName) &&
+               !string.IsNullOrWhiteSpace(assignment.OrganizationShortName) &&
+               !string.IsNullOrWhiteSpace(assignment.OrganizationAddress) &&
                !string.IsNullOrWhiteSpace(assignment.OrganizationSupervisorFullName) &&
                !string.IsNullOrWhiteSpace(assignment.OrganizationSupervisorPosition) &&
                (!string.IsNullOrWhiteSpace(assignment.OrganizationSupervisorPhone) ||
@@ -1121,6 +1159,10 @@ public class StudentController : ControllerBase
         return int.TryParse(rawValue, out var userId) ? userId : null;
     }
 }
+
+
+
+
 
 
 

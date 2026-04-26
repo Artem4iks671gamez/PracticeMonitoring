@@ -28,6 +28,8 @@ public class DepartmentStaffPracticeDetailsViewModel
 
     public List<DepartmentStaffPracticeCompetencyItemViewModel> Competencies { get; set; } = new();
 
+    public List<DepartmentStaffPracticeGeneralCompetencyItemViewModel> GeneralCompetencies { get; set; } = new();
+
     public List<DepartmentStaffPracticeStudentAssignmentItemViewModel> StudentAssignments { get; set; } = new();
 }
 
@@ -65,4 +67,15 @@ public class DepartmentStaffPracticeStudentAssignmentItemViewModel
     public int? SupervisorId { get; set; }
 
     public string? SupervisorFullName { get; set; }
+}
+
+public class DepartmentStaffPracticeGeneralCompetencyItemViewModel
+{
+    public int Id { get; set; }
+
+    public string CompetencyCode { get; set; } = string.Empty;
+
+    public string CompetencyDescription { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
 }

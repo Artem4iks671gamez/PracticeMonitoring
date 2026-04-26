@@ -35,6 +35,8 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
 
     public List<DepartmentStaffPracticeCompetencyEditViewModel> Competencies { get; set; } = new();
 
+    public List<DepartmentStaffPracticeGeneralCompetencyEditViewModel> GeneralCompetencies { get; set; } = new();
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (!StartDate.HasValue)
@@ -80,6 +82,21 @@ public class DepartmentStaffPracticeUpsertViewModel : IValidatableObject
                     new[] { nameof(Competencies) });
         }
 
+        if (GeneralCompetencies is not null)
+        {
+            for (var i = 0; i < GeneralCompetencies.Count; i++)
+            {
+                var c = GeneralCompetencies[i];
+                var prefix = $"GeneralCompetencies[{i}]";
+
+                if (string.IsNullOrWhiteSpace(c.CompetencyCode))
+                    yield return new ValidationResult("Код общей компетенции обязателен.", new[] { $"{prefix}.CompetencyCode" });
+
+                if (string.IsNullOrWhiteSpace(c.CompetencyDescription))
+                    yield return new ValidationResult("Описание общей компетенции обязательно.", new[] { $"{prefix}.CompetencyDescription" });
+            }
+        }
+
     }
 }
 
@@ -96,6 +113,15 @@ public class DepartmentStaffPracticeCompetencyEditViewModel
 
     [Range(1, int.MaxValue, ErrorMessage = "Часы должны быть больше нуля.")]
     public int Hours { get; set; }
+}
+
+public class DepartmentStaffPracticeGeneralCompetencyEditViewModel
+{
+    [Required(ErrorMessage = "Код общей компетенции обязателен.")]
+    public string CompetencyCode { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Описание общей компетенции обязательно.")]
+    public string CompetencyDescription { get; set; } = string.Empty;
 }
 
 public class DepartmentStaffPracticeStudentAssignmentEditViewModel

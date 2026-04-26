@@ -11,17 +11,20 @@ public class StudentController : Controller
     private readonly ChatApiService _chatApiService;
     private readonly StudentApiService _studentApiService;
     private readonly NotificationApiService _notificationApiService;
+    private readonly PracticeReportDocumentService _practiceReportDocumentService;
 
     public StudentController(
         AuthApiService authApiService,
         ChatApiService chatApiService,
         StudentApiService studentApiService,
-        NotificationApiService notificationApiService)
+        NotificationApiService notificationApiService,
+        PracticeReportDocumentService practiceReportDocumentService)
     {
         _authApiService = authApiService;
         _chatApiService = chatApiService;
         _studentApiService = studentApiService;
         _notificationApiService = notificationApiService;
+        _practiceReportDocumentService = practiceReportDocumentService;
     }
 
     [HttpGet]
@@ -115,6 +118,35 @@ public class StudentController : Controller
     }
 
     [HttpPost]
+    public async Task<IActionResult> UploadDiaryAttachment(
+        int assignmentId,
+        DateTime workDate,
+        string? title,
+        IFormFile? file)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var result = await _studentApiService.UploadDiaryAttachmentAsync(token, assignmentId, workDate, title, file);
+        if (result.Success && result.Data is not null)
+        {
+            result.Data.DownloadUrl = Url.Action(
+                nameof(DownloadDiaryAttachment),
+                "Student",
+                new { attachmentId = result.Data.AttachmentId }) ?? result.Data.DownloadUrl;
+
+            return Json(result.Data);
+        }
+
+        return BadRequest(new
+        {
+            message = result.ErrorMessage ?? "Не удалось загрузить изображение.",
+            errors = result.ValidationErrors
+        });
+    }
+
+    [HttpPost]
     public async Task<IActionResult> SaveReportItems(
         int assignmentId,
         [FromBody] StudentPracticeReportItemsRequestViewModel? model)
@@ -202,6 +234,36 @@ public class StudentController : Controller
             return NotFound();
 
         return File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadPracticeReport(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        var result = await _practiceReportDocumentService.BuildDocxAsync(
+            practice,
+            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId));
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = "Отчет нельзя сформировать: заполнены не все обязательные разделы.",
+                missing = result.Missing
+            });
+        }
+
+        return File(
+            result.Content,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            result.FileName);
     }
 
     private string? GetToken()

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -78,7 +78,7 @@ public class DepartmentStaffPracticesController : ControllerBase
             .Select(x => new PracticeSelectOptionResponse
             {
                 Id = x.Id,
-                Label = $"{x.Code} — {x.Name}"
+                Label = $"{x.Code} вЂ” {x.Name}"
             })
             .ToListAsync();
 
@@ -147,7 +147,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Исправьте ошибки формы.",
+                message = "РСЃРїСЂР°РІСЊС‚Рµ РѕС€РёР±РєРё С„РѕСЂРјС‹.",
                 errors = validationErrors
             });
         }
@@ -175,6 +175,15 @@ public class DepartmentStaffPracticesController : ControllerBase
             Hours = x.Hours
         }).ToList();
 
+        practice.GeneralCompetencies = request.GeneralCompetencies
+            .Select((x, index) => new ProductionPracticeGeneralCompetency
+            {
+                CompetencyCode = x.CompetencyCode.Trim(),
+                CompetencyDescription = x.CompetencyDescription.Trim(),
+                SortOrder = index + 1
+            })
+            .ToList();
+
         _context.ProductionPractices.Add(practice);
         await _context.SaveChangesAsync();
 
@@ -183,10 +192,10 @@ public class DepartmentStaffPracticesController : ControllerBase
             GetActorFullName(),
             "PracticeCreated",
             TruncateDescription(
-                $"Создана производственная практика {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
-                $"Специальность: {specialty.Code} — {specialty.Name}. " +
-                $"Сроки: {practice.StartDate:dd.MM.yyyy} - {practice.EndDate:dd.MM.yyyy}. " +
-                $"Часы: {practice.Hours}. Компетенций: {practice.Competencies.Count}."));
+                $"РЎРѕР·РґР°РЅР° РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅР°СЏ РїСЂР°РєС‚РёРєР° {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                $"РЎРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ: {specialty.Code} вЂ” {specialty.Name}. " +
+                $"РЎСЂРѕРєРё: {practice.StartDate:dd.MM.yyyy} - {practice.EndDate:dd.MM.yyyy}. " +
+                $"Р§Р°СЃС‹: {practice.Hours}. РљРѕРјРїРµС‚РµРЅС†РёР№: {practice.Competencies.Count}."));
 
         practice = await LoadPracticeDetailsQuery()
             .FirstAsync(x => x.Id == practice.Id);
@@ -200,6 +209,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         var practice = await _context.ProductionPractices
             .Include(x => x.Specialty)
             .Include(x => x.Competencies)
+            .Include(x => x.GeneralCompetencies)
             .Include(x => x.StudentAssignments)
                 .ThenInclude(x => x.Student)
                     .ThenInclude(x => x!.Group)
@@ -216,7 +226,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Исправьте ошибки формы.",
+                message = "РСЃРїСЂР°РІСЊС‚Рµ РѕС€РёР±РєРё С„РѕСЂРјС‹.",
                 errors = validationErrors
             });
         }
@@ -232,12 +242,12 @@ public class DepartmentStaffPracticesController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Подтвердите действие.",
+                message = "Р’ СЃР»СѓС‡Р°Рµ РёР·РјРµРЅРµРЅРёСЏ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚Рё Сѓ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅРѕР№ РїСЂР°РєС‚РёРєРё РІСЃРµ РЅР°Р·РЅР°С‡РµРЅРЅС‹Рµ СЃС‚СѓРґРµРЅС‚С‹ Р±СѓРґСѓС‚ СѓРґР°Р»РµРЅС‹. РџРѕРґС‚РІРµСЂРґРёС‚Рµ РґРµР№СЃС‚РІРёРµ.",
                 errors = new Dictionary<string, string[]>
                 {
                     [nameof(request.SpecialtyId)] = new[]
                     {
-                        "В случае изменения специальности у производственной практики все назначенные студенты будут удалены. Подтвердите действие."
+                        "Р’ СЃР»СѓС‡Р°Рµ РёР·РјРµРЅРµРЅРёСЏ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚Рё Сѓ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅРѕР№ РїСЂР°РєС‚РёРєРё РІСЃРµ РЅР°Р·РЅР°С‡РµРЅРЅС‹Рµ СЃС‚СѓРґРµРЅС‚С‹ Р±СѓРґСѓС‚ СѓРґР°Р»РµРЅС‹. РџРѕРґС‚РІРµСЂРґРёС‚Рµ РґРµР№СЃС‚РІРёРµ."
                     }
                 }
             });
@@ -260,6 +270,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         practice.EndDate = EnsureUtc(request.EndDate);
 
         _context.ProductionPracticeCompetencies.RemoveRange(practice.Competencies);
+        _context.ProductionPracticeGeneralCompetencies.RemoveRange(practice.GeneralCompetencies);
 
         practice.Competencies = request.Competencies.Select(x => new ProductionPracticeCompetency
         {
@@ -269,6 +280,16 @@ public class DepartmentStaffPracticesController : ControllerBase
             WorkTypes = x.WorkTypes.Trim(),
             Hours = x.Hours
         }).ToList();
+
+        practice.GeneralCompetencies = request.GeneralCompetencies
+            .Select((x, index) => new ProductionPracticeGeneralCompetency
+            {
+                ProductionPracticeId = practice.Id,
+                CompetencyCode = x.CompetencyCode.Trim(),
+                CompetencyDescription = x.CompetencyDescription.Trim(),
+                SortOrder = index + 1
+            })
+            .ToList();
 
         await _context.SaveChangesAsync();
 
@@ -280,8 +301,8 @@ public class DepartmentStaffPracticesController : ControllerBase
                 GetActorFullName(),
                 "PracticeUpdated",
                 TruncateDescription(
-                    $"Изменена производственная практика {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
-                    $"Изменено: {string.Join("; ", changedFields)}."));
+                    $"РР·РјРµРЅРµРЅР° РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅР°СЏ РїСЂР°РєС‚РёРєР° {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                    $"РР·РјРµРЅРµРЅРѕ: {string.Join("; ", changedFields)}."));
         }
 
         if (specialtyChanged && removedAssignmentsBySpecialtyChange.Count > 0)
@@ -291,8 +312,8 @@ public class DepartmentStaffPracticesController : ControllerBase
                 GetActorFullName(),
                 "AssignmentsClearedBySpecialtyChange",
                 TruncateDescription(
-                    $"При смене специальности у практики {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)} " +
-                    $"автоматически удалены назначения студентов ({removedAssignmentsBySpecialtyChange.Count}): " +
+                    $"РџСЂРё СЃРјРµРЅРµ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚Рё Сѓ РїСЂР°РєС‚РёРєРё {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)} " +
+                    $"Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё СѓРґР°Р»РµРЅС‹ РЅР°Р·РЅР°С‡РµРЅРёСЏ СЃС‚СѓРґРµРЅС‚РѕРІ ({removedAssignmentsBySpecialtyChange.Count}): " +
                     $"{JoinAssignmentNames(removedAssignmentsBySpecialtyChange)}."));
         }
 
@@ -323,7 +344,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Исправьте ошибки назначения студентов.",
+                message = "РСЃРїСЂР°РІСЊС‚Рµ РѕС€РёР±РєРё РЅР°Р·РЅР°С‡РµРЅРёСЏ СЃС‚СѓРґРµРЅС‚РѕРІ.",
                 errors = validationErrors
             });
         }
@@ -354,6 +375,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         var practice = await _context.ProductionPractices
             .Include(x => x.Specialty)
             .Include(x => x.Competencies)
+            .Include(x => x.GeneralCompetencies)
             .Include(x => x.StudentAssignments)
                 .ThenInclude(x => x.Student)
             .Include(x => x.StudentAssignments)
@@ -368,7 +390,7 @@ public class DepartmentStaffPracticesController : ControllerBase
             .ToList();
         var competenciesCount = practice.Competencies.Count;
         var practiceLabel = BuildPracticeDisplayName(practice.PracticeIndex, practice.Name);
-        var specialtyLabel = $"{practice.Specialty.Code} — {practice.Specialty.Name}";
+        var specialtyLabel = $"{practice.Specialty.Code} вЂ” {practice.Specialty.Name}";
 
         _context.ProductionPracticeCompetencies.RemoveRange(practice.Competencies);
         _context.ProductionPracticeStudentAssignments.RemoveRange(practice.StudentAssignments);
@@ -381,9 +403,9 @@ public class DepartmentStaffPracticesController : ControllerBase
             GetActorFullName(),
             "PracticeDeleted",
             TruncateDescription(
-                $"Удалена производственная практика {practiceLabel}. " +
-                $"Специальность: {specialtyLabel}. " +
-                $"Компетенций: {competenciesCount}. Назначенных студентов: {removedAssignments.Count}."));
+                $"РЈРґР°Р»РµРЅР° РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅР°СЏ РїСЂР°РєС‚РёРєР° {practiceLabel}. " +
+                $"РЎРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ: {specialtyLabel}. " +
+                $"РљРѕРјРїРµС‚РµРЅС†РёР№: {competenciesCount}. РќР°Р·РЅР°С‡РµРЅРЅС‹С… СЃС‚СѓРґРµРЅС‚РѕРІ: {removedAssignments.Count}."));
 
         if (removedAssignments.Count > 0)
         {
@@ -392,11 +414,11 @@ public class DepartmentStaffPracticesController : ControllerBase
                 GetActorFullName(),
                 "AssignmentsDeletedWithPractice",
                 TruncateDescription(
-                    $"При удалении практики {practiceLabel} сняты назначения студентов ({removedAssignments.Count}): " +
+                    $"РџСЂРё СѓРґР°Р»РµРЅРёРё РїСЂР°РєС‚РёРєРё {practiceLabel} СЃРЅСЏС‚С‹ РЅР°Р·РЅР°С‡РµРЅРёСЏ СЃС‚СѓРґРµРЅС‚РѕРІ ({removedAssignments.Count}): " +
                     $"{JoinAssignmentNames(removedAssignments)}."));
         }
 
-        return Ok(new { message = "Производственная практика удалена." });
+        return Ok(new { message = "РџСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅР°СЏ РїСЂР°РєС‚РёРєР° СѓРґР°Р»РµРЅР°." });
     }
 
     private IQueryable<ProductionPractice> LoadPracticeDetailsQuery()
@@ -404,6 +426,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         return _context.ProductionPractices
             .Include(x => x.Specialty)
             .Include(x => x.Competencies)
+            .Include(x => x.GeneralCompetencies)
             .Include(x => x.StudentAssignments)
                 .ThenInclude(x => x.Student)
                     .ThenInclude(x => x!.Group)
@@ -426,43 +449,54 @@ public class DepartmentStaffPracticesController : ControllerBase
         }
 
         if (string.IsNullOrWhiteSpace(request.PracticeIndex))
-            AddError(nameof(request.PracticeIndex), "Введите индекс производственной практики.");
+            AddError(nameof(request.PracticeIndex), "Р’РІРµРґРёС‚Рµ РёРЅРґРµРєСЃ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅРѕР№ РїСЂР°РєС‚РёРєРё.");
 
         if (string.IsNullOrWhiteSpace(request.Name))
-            AddError(nameof(request.Name), "Введите название производственной практики.");
+            AddError(nameof(request.Name), "Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅРѕР№ РїСЂР°РєС‚РёРєРё.");
 
         if (request.SpecialtyId <= 0)
         {
-            AddError(nameof(request.SpecialtyId), "Выберите специальность.");
+            AddError(nameof(request.SpecialtyId), "Р’С‹Р±РµСЂРёС‚Рµ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ.");
         }
         else
         {
             var specialtyExists = await _context.Specialties.AnyAsync(x => x.Id == request.SpecialtyId);
             if (!specialtyExists)
-                AddError(nameof(request.SpecialtyId), "Выбранная специальность не найдена.");
+                AddError(nameof(request.SpecialtyId), "Р’С‹Р±СЂР°РЅРЅР°СЏ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ РЅРµ РЅР°Р№РґРµРЅР°.");
         }
 
         if (string.IsNullOrWhiteSpace(request.ProfessionalModuleCode))
-            AddError(nameof(request.ProfessionalModuleCode), "Введите код профессионального модуля.");
+            AddError(nameof(request.ProfessionalModuleCode), "Р’РІРµРґРёС‚Рµ РєРѕРґ РїСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅРѕРіРѕ РјРѕРґСѓР»СЏ.");
 
         if (string.IsNullOrWhiteSpace(request.ProfessionalModuleName))
-            AddError(nameof(request.ProfessionalModuleName), "Введите название профессионального модуля.");
+            AddError(nameof(request.ProfessionalModuleName), "Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РїСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅРѕРіРѕ РјРѕРґСѓР»СЏ.");
 
         if (request.Hours <= 0)
-            AddError(nameof(request.Hours), "Количество часов должно быть больше нуля.");
+            AddError(nameof(request.Hours), "РљРѕР»РёС‡РµСЃС‚РІРѕ С‡Р°СЃРѕРІ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ.");
 
         if (request.StartDate == default)
-            AddError(nameof(request.StartDate), "Укажите дату начала практики.");
+            AddError(nameof(request.StartDate), "РЈРєР°Р¶РёС‚Рµ РґР°С‚Сѓ РЅР°С‡Р°Р»Р° РїСЂР°РєС‚РёРєРё.");
 
         if (request.EndDate == default)
-            AddError(nameof(request.EndDate), "Укажите дату окончания практики.");
+            AddError(nameof(request.EndDate), "РЈРєР°Р¶РёС‚Рµ РґР°С‚Сѓ РѕРєРѕРЅС‡Р°РЅРёСЏ РїСЂР°РєС‚РёРєРё.");
 
         if (request.StartDate != default && request.EndDate != default && request.EndDate < request.StartDate)
-            AddError(nameof(request.EndDate), "Дата окончания не может быть раньше даты начала.");
+            AddError(nameof(request.EndDate), "Р”Р°С‚Р° РѕРєРѕРЅС‡Р°РЅРёСЏ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЂР°РЅСЊС€Рµ РґР°С‚С‹ РЅР°С‡Р°Р»Р°.");
 
+        request.GeneralCompetencies ??= new List<ProductionPracticeGeneralCompetencyRequest>();
+        for (var i = 0; i < request.GeneralCompetencies.Count; i++)
+        {
+            var item = request.GeneralCompetencies[i];
+
+            if (string.IsNullOrWhiteSpace(item.CompetencyCode))
+                AddError($"GeneralCompetencies[{i}].CompetencyCode", "Введите код общей компетенции.");
+
+            if (string.IsNullOrWhiteSpace(item.CompetencyDescription))
+                AddError($"GeneralCompetencies[{i}].CompetencyDescription", "Введите описание общей компетенции.");
+        }
         if (request.Competencies is null || request.Competencies.Count == 0)
         {
-            AddError(nameof(request.Competencies), "Добавьте хотя бы одну профессиональную компетенцию.");
+            AddError(nameof(request.Competencies), "Р”РѕР±Р°РІСЊС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРЅСѓ РїСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅСѓСЋ РєРѕРјРїРµС‚РµРЅС†РёСЋ.");
         }
         else
         {
@@ -473,22 +507,22 @@ public class DepartmentStaffPracticesController : ControllerBase
                 var item = request.Competencies[i];
 
                 if (string.IsNullOrWhiteSpace(item.CompetencyCode))
-                    AddError($"Competencies[{i}].CompetencyCode", "Введите код компетенции.");
+                    AddError($"Competencies[{i}].CompetencyCode", "Р’РІРµРґРёС‚Рµ РєРѕРґ РєРѕРјРїРµС‚РµРЅС†РёРё.");
 
                 if (string.IsNullOrWhiteSpace(item.CompetencyDescription))
-                    AddError($"Competencies[{i}].CompetencyDescription", "Введите описание компетенции.");
+                    AddError($"Competencies[{i}].CompetencyDescription", "Р’РІРµРґРёС‚Рµ РѕРїРёСЃР°РЅРёРµ РєРѕРјРїРµС‚РµРЅС†РёРё.");
 
                 if (string.IsNullOrWhiteSpace(item.WorkTypes))
-                    AddError($"Competencies[{i}].WorkTypes", "Введите виды работ.");
+                    AddError($"Competencies[{i}].WorkTypes", "Р’РІРµРґРёС‚Рµ РІРёРґС‹ СЂР°Р±РѕС‚.");
 
                 if (item.Hours <= 0)
-                    AddError($"Competencies[{i}].Hours", "Количество часов по компетенции должно быть больше нуля.");
+                    AddError($"Competencies[{i}].Hours", "РљРѕР»РёС‡РµСЃС‚РІРѕ С‡Р°СЃРѕРІ РїРѕ РєРѕРјРїРµС‚РµРЅС†РёРё РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ.");
                 else
                     competencyHoursSum += item.Hours;
             }
 
             if (request.Hours > 0 && competencyHoursSum != request.Hours)
-                AddError(nameof(request.Competencies), $"Сумма часов по компетенциям ({competencyHoursSum}) должна быть равна общему количеству часов ({request.Hours}).");
+                AddError(nameof(request.Competencies), $"РЎСѓРјРјР° С‡Р°СЃРѕРІ РїРѕ РєРѕРјРїРµС‚РµРЅС†РёСЏРј ({competencyHoursSum}) РґРѕР»Р¶РЅР° Р±С‹С‚СЊ СЂР°РІРЅР° РѕР±С‰РµРјСѓ РєРѕР»РёС‡РµСЃС‚РІСѓ С‡Р°СЃРѕРІ ({request.Hours}).");
         }
 
         return errors.ToDictionary(x => x.Key, x => x.Value.ToArray());
@@ -522,12 +556,12 @@ public class DepartmentStaffPracticesController : ControllerBase
 
             if (assignment.StudentId <= 0)
             {
-                AddError($"StudentAssignments[{i}].StudentId", "Выберите студента.");
+                AddError($"StudentAssignments[{i}].StudentId", "Р’С‹Р±РµСЂРёС‚Рµ СЃС‚СѓРґРµРЅС‚Р°.");
                 continue;
             }
 
             if (duplicateStudentIds.Contains(assignment.StudentId))
-                AddError($"StudentAssignments[{i}].StudentId", "Этот студент выбран несколько раз.");
+                AddError($"StudentAssignments[{i}].StudentId", "Р­С‚РѕС‚ СЃС‚СѓРґРµРЅС‚ РІС‹Р±СЂР°РЅ РЅРµСЃРєРѕР»СЊРєРѕ СЂР°Р·.");
 
             var student = await _context.Users
                 .Include(x => x.Role)
@@ -536,11 +570,11 @@ public class DepartmentStaffPracticesController : ControllerBase
 
             if (student is null || student.Role.Name != "Student")
             {
-                AddError($"StudentAssignments[{i}].StudentId", "Выбранный пользователь не является студентом.");
+                AddError($"StudentAssignments[{i}].StudentId", "Р’С‹Р±СЂР°РЅРЅС‹Р№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ СЏРІР»СЏРµС‚СЃСЏ СЃС‚СѓРґРµРЅС‚РѕРј.");
             }
             else if (student.Group is null || student.Group.SpecialtyId != specialtyId)
             {
-                AddError($"StudentAssignments[{i}].StudentId", $"Студент {student.FullName} не относится к выбранной специальности.");
+                AddError($"StudentAssignments[{i}].StudentId", $"РЎС‚СѓРґРµРЅС‚ {student.FullName} РЅРµ РѕС‚РЅРѕСЃРёС‚СЃСЏ Рє РІС‹Р±СЂР°РЅРЅРѕР№ СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚Рё.");
             }
 
             if (assignment.SupervisorId.HasValue)
@@ -550,7 +584,7 @@ public class DepartmentStaffPracticesController : ControllerBase
                     .FirstOrDefaultAsync(x => x.Id == assignment.SupervisorId.Value);
 
                 if (supervisor is null || supervisor.Role.Name != "Supervisor")
-                    AddError($"StudentAssignments[{i}].SupervisorId", "Выбранный руководитель не имеет роль Supervisor.");
+                    AddError($"StudentAssignments[{i}].SupervisorId", "Р’С‹Р±СЂР°РЅРЅС‹Р№ СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ РЅРµ РёРјРµРµС‚ СЂРѕР»СЊ Supervisor.");
             }
         }
 
@@ -621,20 +655,20 @@ public class DepartmentStaffPracticesController : ControllerBase
         var parts = new List<string>();
 
         if (added.Count > 0)
-            parts.Add($"добавлены {added.Count}: {JoinAssignmentNames(added)}");
+            parts.Add($"РґРѕР±Р°РІР»РµРЅС‹ {added.Count}: {JoinAssignmentNames(added)}");
 
         if (removed.Count > 0)
-            parts.Add($"удалены {removed.Count}: {JoinAssignmentNames(removed)}");
+            parts.Add($"СѓРґР°Р»РµРЅС‹ {removed.Count}: {JoinAssignmentNames(removed)}");
 
         if (supervisorChanged.Count > 0)
-            parts.Add($"изменён руководитель у {supervisorChanged.Count}: {JoinSupervisorChanges(supervisorChanged)}");
+            parts.Add($"РёР·РјРµРЅС‘РЅ СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ Сѓ {supervisorChanged.Count}: {JoinSupervisorChanges(supervisorChanged)}");
 
         await _auditLogService.LogProductionPracticeAssignmentChangeAsync(
             GetActorUserId(),
             GetActorFullName(),
             "AssignmentsUpdated",
             TruncateDescription(
-                $"Обновлены назначения студентов для практики {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
+                $"РћР±РЅРѕРІР»РµРЅС‹ РЅР°Р·РЅР°С‡РµРЅРёСЏ СЃС‚СѓРґРµРЅС‚РѕРІ РґР»СЏ РїСЂР°РєС‚РёРєРё {BuildPracticeDisplayName(practice.PracticeIndex, practice.Name)}. " +
                 $"{string.Join("; ", parts)}."));
     }
 
@@ -652,14 +686,14 @@ public class DepartmentStaffPracticesController : ControllerBase
             if (!previousByStudent.TryGetValue(assignment.StudentId, out var previous))
             {
                 var supervisorLabel = string.IsNullOrWhiteSpace(assignment.SupervisorFullName)
-                    ? "руководитель практики пока не назначен"
-                    : $"руководитель: {assignment.SupervisorFullName}";
+                    ? "СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ РїСЂР°РєС‚РёРєРё РїРѕРєР° РЅРµ РЅР°Р·РЅР°С‡РµРЅ"
+                    : $"СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ: {assignment.SupervisorFullName}";
 
                 _notificationService.Add(
                     assignment.StudentId,
                     "PracticeAssignment",
-                    "Назначена производственная практика",
-                    $"Вы назначены на производственную практику {practiceLabel}. Сроки: {datesLabel}, {practice.Hours} ч.; {supervisorLabel}. В первые 2 дня практики заполните организацию, руководителя от организации и содержание задания.",
+                    "РќР°Р·РЅР°С‡РµРЅР° РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅР°СЏ РїСЂР°РєС‚РёРєР°",
+                    $"Р’С‹ РЅР°Р·РЅР°С‡РµРЅС‹ РЅР° РїСЂРѕРёР·РІРѕРґСЃС‚РІРµРЅРЅСѓСЋ РїСЂР°РєС‚РёРєСѓ {practiceLabel}. РЎСЂРѕРєРё: {datesLabel}, {practice.Hours} С‡.; {supervisorLabel}. Р’ РїРµСЂРІС‹Рµ 2 РґРЅСЏ РїСЂР°РєС‚РёРєРё Р·Р°РїРѕР»РЅРёС‚Рµ РѕСЂРіР°РЅРёР·Р°С†РёСЋ, СЂСѓРєРѕРІРѕРґРёС‚РµР»СЏ РѕС‚ РѕСЂРіР°РЅРёР·Р°С†РёРё Рё СЃРѕРґРµСЂР¶Р°РЅРёРµ Р·Р°РґР°РЅРёСЏ.",
                     $"/Student?practiceId={assignment.AssignmentId}");
 
                 continue;
@@ -668,14 +702,14 @@ public class DepartmentStaffPracticesController : ControllerBase
             if (previous.SupervisorId != assignment.SupervisorId)
             {
                 var supervisorLabel = string.IsNullOrWhiteSpace(assignment.SupervisorFullName)
-                    ? "руководитель практики снят"
-                    : $"новый руководитель: {assignment.SupervisorFullName}";
+                    ? "СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ РїСЂР°РєС‚РёРєРё СЃРЅСЏС‚"
+                    : $"РЅРѕРІС‹Р№ СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ: {assignment.SupervisorFullName}";
 
                 _notificationService.Add(
                     assignment.StudentId,
                     "PracticeSupervisorChanged",
-                    "Изменён руководитель практики",
-                    $"Для практики {practiceLabel} изменён руководитель: {supervisorLabel}.",
+                    "РР·РјРµРЅС‘РЅ СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ РїСЂР°РєС‚РёРєРё",
+                    $"Р”Р»СЏ РїСЂР°РєС‚РёРєРё {practiceLabel} РёР·РјРµРЅС‘РЅ СЂСѓРєРѕРІРѕРґРёС‚РµР»СЊ: {supervisorLabel}.",
                     $"/Student?practiceId={assignment.AssignmentId}");
             }
         }
@@ -710,7 +744,17 @@ public class DepartmentStaffPracticesController : ControllerBase
                     Hours = c.Hours
                 })
                 .ToList(),
-            StudentAssignments = x.StudentAssignments
+            GeneralCompetencies = x.GeneralCompetencies
+                .OrderBy(c => c.SortOrder)
+                .ThenBy(c => c.Id)
+                .Select(c => new ProductionPracticeGeneralCompetencyItemResponse
+                {
+                    Id = c.Id,
+                    CompetencyCode = c.CompetencyCode,
+                    CompetencyDescription = c.CompetencyDescription,
+                    SortOrder = c.SortOrder
+                })
+                .ToList(),            StudentAssignments = x.StudentAssignments
                 .OrderBy(a => a.Student.Group != null ? a.Student.Group.Course : 99)
                 .ThenBy(a => a.Student.Group != null ? a.Student.Group.Name : "")
                 .ThenBy(a => a.Student.FullName)
@@ -744,35 +788,35 @@ public class DepartmentStaffPracticesController : ControllerBase
         var professionalModuleName = request.ProfessionalModuleName.Trim();
         var startDate = EnsureUtc(request.StartDate);
         var endDate = EnsureUtc(request.EndDate);
-        var specialtyLabel = $"{specialty.Code} — {specialty.Name}";
+        var specialtyLabel = $"{specialty.Code} вЂ” {specialty.Name}";
         var competenciesSignature = BuildCompetenciesSignature(request.Competencies);
 
         if (!string.Equals(previous.PracticeIndex, practiceIndex, StringComparison.Ordinal))
-            changedFields.Add($"индекс ПП: {previous.PracticeIndex} -> {practiceIndex}");
+            changedFields.Add($"РёРЅРґРµРєСЃ РџРџ: {previous.PracticeIndex} -> {practiceIndex}");
 
         if (!string.Equals(previous.Name, name, StringComparison.Ordinal))
-            changedFields.Add($"название: {previous.Name} -> {name}");
+            changedFields.Add($"РЅР°Р·РІР°РЅРёРµ: {previous.Name} -> {name}");
 
         if (previous.SpecialtyId != specialty.Id)
-            changedFields.Add($"специальность: {previous.SpecialtyLabel} -> {specialtyLabel}");
+            changedFields.Add($"СЃРїРµС†РёР°Р»СЊРЅРѕСЃС‚СЊ: {previous.SpecialtyLabel} -> {specialtyLabel}");
 
         if (!string.Equals(previous.ProfessionalModuleCode, professionalModuleCode, StringComparison.Ordinal))
-            changedFields.Add($"код ПМ: {previous.ProfessionalModuleCode} -> {professionalModuleCode}");
+            changedFields.Add($"РєРѕРґ РџРњ: {previous.ProfessionalModuleCode} -> {professionalModuleCode}");
 
         if (!string.Equals(previous.ProfessionalModuleName, professionalModuleName, StringComparison.Ordinal))
-            changedFields.Add($"название ПМ: {previous.ProfessionalModuleName} -> {professionalModuleName}");
+            changedFields.Add($"РЅР°Р·РІР°РЅРёРµ РџРњ: {previous.ProfessionalModuleName} -> {professionalModuleName}");
 
         if (previous.Hours != request.Hours)
-            changedFields.Add($"часы: {previous.Hours} -> {request.Hours}");
+            changedFields.Add($"С‡Р°СЃС‹: {previous.Hours} -> {request.Hours}");
 
         if (previous.StartDate.Date != startDate.Date)
-            changedFields.Add($"дата начала: {previous.StartDate:dd.MM.yyyy} -> {startDate:dd.MM.yyyy}");
+            changedFields.Add($"РґР°С‚Р° РЅР°С‡Р°Р»Р°: {previous.StartDate:dd.MM.yyyy} -> {startDate:dd.MM.yyyy}");
 
         if (previous.EndDate.Date != endDate.Date)
-            changedFields.Add($"дата окончания: {previous.EndDate:dd.MM.yyyy} -> {endDate:dd.MM.yyyy}");
+            changedFields.Add($"РґР°С‚Р° РѕРєРѕРЅС‡Р°РЅРёСЏ: {previous.EndDate:dd.MM.yyyy} -> {endDate:dd.MM.yyyy}");
 
         if (!string.Equals(previous.CompetenciesSignature, competenciesSignature, StringComparison.Ordinal))
-            changedFields.Add($"компетенции: {previous.CompetenciesCount} -> {request.Competencies.Count}");
+            changedFields.Add($"РєРѕРјРїРµС‚РµРЅС†РёРё: {previous.CompetenciesCount} -> {request.Competencies.Count}");
 
         return changedFields;
     }
@@ -783,7 +827,7 @@ public class DepartmentStaffPracticesController : ControllerBase
             practice.PracticeIndex,
             practice.Name,
             practice.SpecialtyId,
-            $"{practice.Specialty.Code} — {practice.Specialty.Name}",
+            $"{practice.Specialty.Code} вЂ” {practice.Specialty.Name}",
             practice.ProfessionalModuleCode,
             practice.ProfessionalModuleName,
             practice.Hours,
@@ -825,7 +869,7 @@ public class DepartmentStaffPracticesController : ControllerBase
 
     private string GetActorFullName()
     {
-        return User.FindFirstValue(ClaimTypes.Name) ?? "Работник отдела";
+        return User.FindFirstValue(ClaimTypes.Name) ?? "Р Р°Р±РѕС‚РЅРёРє РѕС‚РґРµР»Р°";
     }
 
     private static string BuildPracticeDisplayName(string practiceIndex, string name)
@@ -841,7 +885,7 @@ public class DepartmentStaffPracticesController : ControllerBase
     private static string JoinSupervisorChanges(IEnumerable<SupervisorChangeSnapshot> changes)
     {
         return JoinLimited(changes.Select(x =>
-            $"{x.StudentFullName} ({(string.IsNullOrWhiteSpace(x.PreviousSupervisorFullName) ? "без руководителя" : x.PreviousSupervisorFullName)} -> {(string.IsNullOrWhiteSpace(x.CurrentSupervisorFullName) ? "без руководителя" : x.CurrentSupervisorFullName)})"));
+            $"{x.StudentFullName} ({(string.IsNullOrWhiteSpace(x.PreviousSupervisorFullName) ? "Р±РµР· СЂСѓРєРѕРІРѕРґРёС‚РµР»СЏ" : x.PreviousSupervisorFullName)} -> {(string.IsNullOrWhiteSpace(x.CurrentSupervisorFullName) ? "Р±РµР· СЂСѓРєРѕРІРѕРґРёС‚РµР»СЏ" : x.CurrentSupervisorFullName)})"));
     }
 
     private static string JoinLimited(IEnumerable<string> items, int take = 6)
@@ -851,12 +895,12 @@ public class DepartmentStaffPracticesController : ControllerBase
             .ToList();
 
         if (materialized.Count == 0)
-            return "нет данных";
+            return "РЅРµС‚ РґР°РЅРЅС‹С…";
 
         if (materialized.Count <= take)
             return string.Join(", ", materialized);
 
-        return $"{string.Join(", ", materialized.Take(take))} и ещё {materialized.Count - take}";
+        return $"{string.Join(", ", materialized.Take(take))} Рё РµС‰С‘ {materialized.Count - take}";
     }
 
     private static string TruncateDescription(string value)
@@ -909,3 +953,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         string? PreviousSupervisorFullName,
         string? CurrentSupervisorFullName);
 }
+
+
+
+

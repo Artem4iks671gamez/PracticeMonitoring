@@ -555,6 +555,18 @@
                 <div id="competenciesContainer" class="department-repeaters-container"></div>
             </div>
 
+            <div class="department-form-section">
+                <div class="department-form-section-header">
+                    <div class="department-form-section-title">Общие компетенции</div>
+                    <button type="button" class="department-ghost-button" id="addGeneralCompetencyButton">
+                        Добавить общую компетенцию
+                    </button>
+                </div>
+
+                <div class="field-error field-error-block" data-error-for="GeneralCompetencies"></div>
+                <div id="generalCompetenciesContainer" class="department-repeaters-container"></div>
+            </div>
+
             <div class="department-modal-actions">
                 <button type="button" class="department-ghost-button" id="cancelPracticeEditModalButton">
                     Отмена
@@ -877,6 +889,30 @@
         <div class="department-repeater-actions">
             <button type="button" class="department-danger-button remove-competency-button">
                 Удалить компетенцию
+            </button>
+        </div>
+    </div>
+</template>
+
+<template id="generalCompetencyItemTemplate">
+    <div class="department-repeater-item general-competency-item">
+        <div class="department-repeater-grid">
+            <div class="form-group">
+                <label class="form-label">Код общей компетенции</label>
+                <input class="form-input general-competency-code-input" type="text" placeholder="ОК 01" />
+                <div class="field-error general-competency-code-error"></div>
+            </div>
+
+            <div class="form-group department-form-full">
+                <label class="form-label">Описание общей компетенции</label>
+                <textarea class="form-input department-textarea general-competency-description-input"></textarea>
+                <div class="field-error general-competency-description-error"></div>
+            </div>
+        </div>
+
+        <div class="department-repeater-actions">
+            <button type="button" class="department-danger-button remove-general-competency-button">
+                Удалить общую компетенцию
             </button>
         </div>
     </div>

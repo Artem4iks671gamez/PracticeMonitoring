@@ -46,6 +46,7 @@ builder.Services.AddHttpClient<NotificationApiService>(client =>
 });
 
 builder.Services.AddScoped<AttestationSheetService>();
+builder.Services.AddScoped<PracticeReportDocumentService>();
 
 var app = builder.Build();
 

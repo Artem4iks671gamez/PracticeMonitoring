@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using PracticeMonitoring.Web.Models.Student;
@@ -60,6 +60,30 @@ public class StudentApiService
             "Не удалось сохранить запись дневника.");
     }
 
+    public async Task<StudentApiResult<StudentPracticeDiaryAttachmentUploadViewModel>> UploadDiaryAttachmentAsync(
+        string token,
+        int assignmentId,
+        DateTime workDate,
+        string? title,
+        IFormFile? file)
+    {
+        using var request = CreateAuthorizedRequest(HttpMethod.Post, $"api/student/practices/{assignmentId}/diary-attachments", token);
+        using var formData = new MultipartFormDataContent();
+
+        formData.Add(new StringContent(workDate.ToString("O")), "workDate");
+        formData.Add(new StringContent(title ?? string.Empty), "title");
+
+        if (file is not null && file.Length > 0)
+        {
+            var streamContent = new StreamContent(file.OpenReadStream());
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            formData.Add(streamContent, "file", file.FileName);
+        }
+
+        request.Content = formData;
+        return await SendAsync<StudentPracticeDiaryAttachmentUploadViewModel>(request, "Не удалось загрузить изображение.");
+    }
     public Task<StudentApiResult<StudentPracticeDetailsViewModel>> SaveReportItemsAsync(
         string token,
         int assignmentId,
@@ -239,3 +263,4 @@ public class StudentApiService
         return string.IsNullOrWhiteSpace(rawFileName) ? null : rawFileName.Trim('"');
     }
 }
+

@@ -28,6 +28,8 @@ public class ProductionPracticeDetailsResponse
 
     public List<ProductionPracticeCompetencyItemResponse> Competencies { get; set; } = new();
 
+    public List<ProductionPracticeGeneralCompetencyItemResponse> GeneralCompetencies { get; set; } = new();
+
     public List<ProductionPracticeStudentAssignmentItemResponse> StudentAssignments { get; set; } = new();
 }
 
@@ -65,4 +67,15 @@ public class ProductionPracticeStudentAssignmentItemResponse
     public int? SupervisorId { get; set; }
 
     public string? SupervisorFullName { get; set; }
+}
+
+public class ProductionPracticeGeneralCompetencyItemResponse
+{
+    public int Id { get; set; }
+
+    public string CompetencyCode { get; set; } = string.Empty;
+
+    public string CompetencyDescription { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
 }

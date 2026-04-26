@@ -55,6 +55,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const competenciesContainer = document.getElementById('competenciesContainer');
     const addCompetencyButton = document.getElementById('addCompetencyButton');
     const competencyTemplate = document.getElementById('competencyItemTemplate');
+    const generalCompetenciesContainer = document.getElementById('generalCompetenciesContainer');
+    const addGeneralCompetencyButton = document.getElementById('addGeneralCompetencyButton');
+    const generalCompetencyTemplate = document.getElementById('generalCompetencyItemTemplate');
 
     const assignmentTabs = Array.from(document.querySelectorAll('.assignment-tab-button'));
     const practiceAssignmentsModalTitle = document.getElementById('practiceAssignmentsModalTitle');
@@ -1179,6 +1182,24 @@ document.addEventListener('DOMContentLoaded', function () {
         competenciesContainer.appendChild(fragment);
     }
 
+    function createGeneralCompetencyItem(value = {}) {
+        if (!generalCompetencyTemplate || !generalCompetenciesContainer) return;
+
+        const fragment = generalCompetencyTemplate.content.cloneNode(true);
+        const element = fragment.querySelector('.general-competency-item');
+        if (!element) return;
+
+        element.querySelector('.general-competency-code-input').value = value.competencyCode || '';
+        element.querySelector('.general-competency-description-input').value = value.competencyDescription || '';
+
+        element.querySelector('.remove-general-competency-button').addEventListener('click', () => {
+            element.remove();
+            clearFieldErrors();
+        });
+
+        generalCompetenciesContainer.appendChild(fragment);
+    }
+
     function resetPracticeForm() {
         if (practiceIdInput) practiceIdInput.value = '';
         if (practiceIndexInput) practiceIndexInput.value = '';
@@ -1190,6 +1211,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (practiceStartDateInput) practiceStartDateInput.value = '';
         if (practiceEndDateInput) practiceEndDateInput.value = '';
         if (competenciesContainer) competenciesContainer.innerHTML = '';
+        if (generalCompetenciesContainer) generalCompetenciesContainer.innerHTML = '';
 
         currentAssignmentPractice = null;
         assignmentSelections = new Map();
@@ -1436,6 +1458,7 @@ document.addEventListener('DOMContentLoaded', function () {
         practiceSpecialtySelect?.dispatchEvent(new Event('change', { bubbles: true }));
 
         (details.competencies || []).forEach(item => createCompetencyItem(item));
+        (details.generalCompetencies || []).forEach(item => createGeneralCompetencyItem(item));
 
         if (practiceEditModalTitle) {
             practiceEditModalTitle.textContent = 'Редактирование производственной практики';
@@ -1463,6 +1486,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 competencyDescription: item.querySelector('.competency-description-input').value.trim(),
                 workTypes: item.querySelector('.competency-worktypes-input').value.trim(),
                 hours: Number(item.querySelector('.competency-hours-input').value || 0)
+            })),
+            generalCompetencies: Array.from(generalCompetenciesContainer?.querySelectorAll('.general-competency-item') || []).map(item => ({
+                competencyCode: item.querySelector('.general-competency-code-input').value.trim(),
+                competencyDescription: item.querySelector('.general-competency-description-input').value.trim()
             }))
         };
     }
@@ -1590,6 +1617,10 @@ document.addEventListener('DOMContentLoaded', function () {
         createCompetencyItem();
     });
 
+    addGeneralCompetencyButton?.addEventListener('click', () => {
+        createGeneralCompetencyItem();
+    });
+
     openCreatePracticeButton?.addEventListener('click', () => {
         resetPracticeForm();
 
@@ -1602,6 +1633,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         createCompetencyItem();
+        createGeneralCompetencyItem();
         openModal(editModalBackdrop);
     });
 

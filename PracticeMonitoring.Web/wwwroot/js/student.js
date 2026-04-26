@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
     const workspace = document.querySelector('[data-student-workspace]');
     if (workspace) {
         initStudentWorkspace(workspace);
@@ -16,7 +16,8 @@ function initStudentWorkspace(workspace) {
         uploadDiaryAttachment: workspace.dataset.uploadDiaryAttachmentUrl || '',
         deleteAppendix: workspace.dataset.deleteAppendixUrl || '',
         downloadAppendix: workspace.dataset.downloadAppendixUrl || '',
-        downloadDiaryAttachment: workspace.dataset.downloadDiaryAttachmentUrl || ''
+        downloadDiaryAttachment: workspace.dataset.downloadDiaryAttachmentUrl || '',
+        downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || ''
     };
 
     const $ = selector => workspace.querySelector(selector);
@@ -38,9 +39,10 @@ function initStudentWorkspace(workspace) {
     };
 
     const reportCategories = [
-        { key: 'TechnicalTool', title: 'Технические средства', namePlaceholder: 'Ноутбук, сервер, маршрутизатор', descriptionPlaceholder: 'Характеристики или назначение' },
-        { key: 'SoftwareTool', title: 'Программные средства', namePlaceholder: 'Visual Studio, PostgreSQL, Figma', descriptionPlaceholder: 'Версия, назначение, где применялось' },
-        { key: 'PeripheralDevice', title: 'Периферийные устройства', namePlaceholder: 'Принтер, сканер, веб-камера', descriptionPlaceholder: 'Модель или задача использования' }
+        { key: 'IntroductionWorkType', title: 'Виды работ', target: 'studentIntroductionTables', namePlaceholder: 'Настройка рабочего места, анализ требований', descriptionPlaceholder: 'Краткое пояснение при необходимости' },
+        { key: 'IntroductionSoftwareTechnology', title: 'Программные средства и технологии', target: 'studentIntroductionTables', namePlaceholder: 'Visual Studio, PostgreSQL, ASP.NET Core', descriptionPlaceholder: 'Где применялось в ходе практики' },
+        { key: 'TechnicalTool', title: 'Технические средства', target: 'studentTechnicalTools', namePlaceholder: 'Ноутбук, сервер, маршрутизатор', descriptionPlaceholder: 'Характеристики или описание' },
+        { key: 'SoftwareTool', title: 'Программные средства', target: 'studentSoftwareTools', namePlaceholder: 'Visual Studio, PostgreSQL, Figma', descriptionPlaceholder: 'Назначение средства' }
     ];
 
     bindWorkspaceEvents();
@@ -101,7 +103,11 @@ function initStudentWorkspace(workspace) {
 
         $('#studentOrganizationForm')?.addEventListener('submit', saveOrganization);
         $('#studentDiaryForm')?.addEventListener('submit', saveDiaryEntry);
-        $('#saveReportItemsButton')?.addEventListener('click', saveReportItems);
+        $('#saveIntroductionButton')?.addEventListener('click', () => saveReportItems(['IntroductionWorkType', 'IntroductionSoftwareTechnology']));
+        $('#saveTechnicalToolsButton')?.addEventListener('click', () => saveReportItems(['TechnicalTool']));
+        $('#saveSoftwareToolsButton')?.addEventListener('click', () => saveReportItems(['SoftwareTool']));
+        $('#savePracticeContentButton')?.addEventListener('click', () => savePracticeReportMetadata(false));
+        $('#downloadPracticeReportButton')?.addEventListener('click', downloadPracticeReport);
         $('#addSourceButton')?.addEventListener('click', () => addSourceRow());
         $('#saveSourcesButton')?.addEventListener('click', saveSources);
         $('#studentAppendixForm')?.addEventListener('submit', uploadAppendix);
@@ -277,6 +283,12 @@ function initStudentWorkspace(workspace) {
         }
 
         if (target.closest('#studentReportEditorModal')) {
+            return;
+        }
+
+        const tabLink = target.closest('[data-student-modal-tab-link]');
+        if (tabLink) {
+            activateModalTab(tabLink.dataset.studentModalTabLink);
             return;
         }
 
@@ -519,6 +531,7 @@ function initStudentWorkspace(workspace) {
         renderOrganization(details);
         renderDiary(details);
         renderReportTables(details.reportItems || []);
+        renderPracticeReportMetadata(details);
         renderSources(details.sources || []);
         renderAppendices(details.appendices || []);
     }
@@ -553,7 +566,9 @@ function initStudentWorkspace(workspace) {
     function renderOrganization(details) {
         fillOrganizationForm(details);
         $('#studentOrganizationReadonly').innerHTML = [
-            ['Организация', details.organizationName],
+            ['Полное название организации', details.organizationFullName || details.organizationName],
+            ['Сокращенное название', details.organizationShortName],
+            ['Адрес организации', details.organizationAddress],
             ['Руководитель от организации', details.organizationSupervisorFullName],
             ['Должность', details.organizationSupervisorPosition],
             ['Телефон', details.organizationSupervisorPhone],
@@ -581,7 +596,9 @@ function initStudentWorkspace(workspace) {
             return;
         }
 
-        form.organizationName.value = details.organizationName || '';
+        form.organizationFullName.value = details.organizationFullName || details.organizationName || '';
+        form.organizationShortName.value = details.organizationShortName || '';
+        form.organizationAddress.value = details.organizationAddress || '';
         form.organizationSupervisorFullName.value = details.organizationSupervisorFullName || '';
         form.organizationSupervisorPosition.value = details.organizationSupervisorPosition || '';
         form.organizationSupervisorPhone.value = details.organizationSupervisorPhone || '+7 ';
@@ -589,10 +606,60 @@ function initStudentWorkspace(workspace) {
         form.practiceTaskContent.value = details.practiceTaskContent || '';
     }
 
+    function renderPracticeReportMetadata(details) {
+        if (!details) {
+            return;
+        }
+
+        if ($('#studentDuties')) $('#studentDuties').value = details.studentDuties || '';
+        if ($('#providedMaterialsDescription')) $('#providedMaterialsDescription').value = details.providedMaterialsDescription || '';
+        if ($('#workScheduleDescription')) $('#workScheduleDescription').value = details.workScheduleDescription || '';
+        if ($('#introductionMainGoal')) $('#introductionMainGoal').value = details.introductionMainGoal || '';
+    }
+
+    function buildPracticeMetadataPayload() {
+        const details = state.currentDetails || {};
+        const form = $('#studentOrganizationForm');
+
+        return {
+            organizationName: form?.organizationFullName?.value || details.organizationFullName || details.organizationName || '',
+            organizationFullName: form?.organizationFullName?.value || details.organizationFullName || details.organizationName || '',
+            organizationShortName: form?.organizationShortName?.value || details.organizationShortName || '',
+            organizationAddress: form?.organizationAddress?.value || details.organizationAddress || '',
+            organizationSupervisorFullName: form?.organizationSupervisorFullName?.value || details.organizationSupervisorFullName || '',
+            organizationSupervisorPosition: form?.organizationSupervisorPosition?.value || details.organizationSupervisorPosition || '',
+            organizationSupervisorPhone: form?.organizationSupervisorPhone?.value || details.organizationSupervisorPhone || '',
+            organizationSupervisorEmail: form?.organizationSupervisorEmail?.value || details.organizationSupervisorEmail || '',
+            practiceTaskContent: form?.practiceTaskContent?.value || details.practiceTaskContent || '',
+            studentDuties: $('#studentDuties')?.value || details.studentDuties || '',
+            providedMaterialsDescription: $('#providedMaterialsDescription')?.value || details.providedMaterialsDescription || '',
+            workScheduleDescription: $('#workScheduleDescription')?.value || details.workScheduleDescription || '',
+            introductionMainGoal: $('#introductionMainGoal')?.value || details.introductionMainGoal || ''
+        };
+    }
+
+    async function savePracticeReportMetadata(silent) {
+        const payload = buildPracticeMetadataPayload();
+        const result = await postJson(withAssignment(urls.saveOrganization, state.currentDetails.assignmentId), payload);
+        if (!result.ok) {
+            renderFieldErrors(result.errors || {});
+            if (!silent) {
+                showStatus(result.message || 'Не удалось сохранить данные отчёта.', true);
+            }
+            return false;
+        }
+
+        applyUpdatedDetails(result.data);
+        if (!silent) {
+            showStatus('Данные отчёта сохранены.', false);
+        }
+        return true;
+    }
+
     async function saveOrganization(event) {
         event.preventDefault();
         clearStudentFieldErrors();
-        const payload = readFormValues(event.currentTarget);
+        const payload = buildPracticeMetadataPayload();
         const clientErrors = validateOrganizationClient(payload);
         if (Object.keys(clientErrors).length) {
             renderFieldErrors(clientErrors);
@@ -1583,12 +1650,25 @@ function initStudentWorkspace(workspace) {
         element.textContent = text;
     }
 
-    async function saveReportItems() {
-        const items = $$('[data-report-row]').map(row => ({
+    async function saveReportItems(categoriesToSave) {
+        await savePracticeReportMetadata(false);
+
+        const selected = new Set(categoriesToSave || reportCategories.map(x => x.key));
+        const preserved = (state.currentDetails?.reportItems || [])
+            .filter(item => !selected.has(item.category))
+            .map(item => ({
+                category: item.category || '',
+                name: item.name || '',
+                description: item.description || ''
+            }));
+
+        const edited = $$('[data-report-row]').map(row => ({
             category: row.dataset.category || '',
             name: row.querySelector('[data-report-name]')?.value || '',
             description: row.querySelector('[data-report-description]')?.value || ''
-        })).filter(item => item.name.trim());
+        })).filter(item => selected.has(item.category) && item.name.trim());
+
+        const items = [...preserved, ...edited];
 
         const result = await postJson(withAssignment(urls.saveReportItems, state.currentDetails.assignmentId), { items });
         if (!result.ok) {
@@ -1600,7 +1680,21 @@ function initStudentWorkspace(workspace) {
     }
 
     function renderReportTables(items) {
-        $('#studentReportTables').innerHTML = reportCategories.map(category => {
+        const groups = reportCategories.reduce((acc, category) => {
+            if (!acc[category.target]) {
+                acc[category.target] = [];
+            }
+            acc[category.target].push(category);
+            return acc;
+        }, {});
+
+        Object.entries(groups).forEach(([targetId, categories]) => {
+            const target = $(`#${targetId}`);
+            if (!target) {
+                return;
+            }
+
+            target.innerHTML = categories.map(category => {
             const rows = items.filter(item => item.category === category.key);
             return `
                 <div class="student-report-table-block" data-report-category="${category.key}">
@@ -1612,7 +1706,8 @@ function initStudentWorkspace(workspace) {
                         ${rows.length ? rows.map(item => buildReportRow(category.key, item)).join('') : buildReportRow(category.key)}
                     </div>
                 </div>`;
-        }).join('');
+            }).join('');
+        });
     }
 
     function addReportRow(category) {
@@ -1733,6 +1828,50 @@ function initStudentWorkspace(workspace) {
         const file = $('#appendixFile')?.files?.[0];
         $('#appendixFileName').textContent = file ? `${file.name} · ${formatBytes(file.size)}` : 'Файл не выбран';
         clearFieldError('AppendixFile');
+    }
+
+    async function downloadPracticeReport() {
+        if (!state.currentDetails) {
+            return;
+        }
+
+        const url = `${urls.downloadPracticeReport}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            renderDocumentErrors(error);
+            showStatus(error?.message || 'Не удалось сформировать отчёт практики.', true);
+            return;
+        }
+
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = getFileNameFromDisposition(response.headers.get('content-disposition')) || `practice-report-${state.currentDetails.practiceIndex || state.currentDetails.assignmentId}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        $('#studentDocumentErrors').hidden = true;
+        showStatus('Отчёт практики сформирован.', false);
+    }
+
+    function renderDocumentErrors(error) {
+        const target = $('#studentDocumentErrors');
+        if (!target) {
+            return;
+        }
+
+        const missing = Array.isArray(error?.missing) ? error.missing : [];
+        target.hidden = false;
+        target.innerHTML = missing.length
+            ? `<strong>${escapeHtml(error?.message || 'Заполните обязательные разделы.')}</strong><ul>${missing.map(item => `<li><button type="button" data-student-modal-tab-link="${escapeHtmlAttribute(item.tab)}">${escapeHtml(item.message)}</button></li>`).join('')}</ul>`
+            : `<strong>${escapeHtml(error?.message || 'Не удалось сформировать отчёт.')}</strong>`;
+    }
+
+    function getFileNameFromDisposition(disposition) {
+        const match = /filename\\*=UTF-8''([^;]+)|filename=\"?([^\";]+)\"?/i.exec(disposition || '');
+        return match ? decodeURIComponent(match[1] || match[2] || '') : '';
     }
 
     function applyUpdatedDetails(details) {
@@ -2059,7 +2198,9 @@ function validateOrganizationClient(payload) {
     const errors = {};
     const phone = (payload.organizationSupervisorPhone || '').trim();
     const email = (payload.organizationSupervisorEmail || '').trim();
-    if (!payload.organizationName?.trim()) errors.OrganizationName = ['Укажите организацию.'];
+    if (!payload.organizationFullName?.trim()) errors.OrganizationFullName = ['Укажите полное название организации.'];
+    if (!payload.organizationShortName?.trim()) errors.OrganizationShortName = ['Укажите сокращенное название организации.'];
+    if (!payload.organizationAddress?.trim()) errors.OrganizationAddress = ['Укажите адрес организации.'];
     if (!payload.organizationSupervisorFullName?.trim()) errors.OrganizationSupervisorFullName = ['Укажите ФИО руководителя.'];
     if (!payload.organizationSupervisorPosition?.trim()) errors.OrganizationSupervisorPosition = ['Укажите должность руководителя.'];
     if (!phone && !email) errors.OrganizationSupervisorPhone = ['Укажите телефон или почту руководителя.'];
@@ -2257,3 +2398,5 @@ function normalizeReportDocumentForDocx(reportDocument) {
         return { kind: 'text', content: block.content || stripHtml(block.html || ''), mode: block.mode || 'paragraph' };
     });
 }
+
+

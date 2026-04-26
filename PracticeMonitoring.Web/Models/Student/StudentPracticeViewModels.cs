@@ -30,6 +30,12 @@ public class StudentPracticeListItemViewModel
 
     public string? OrganizationName { get; set; }
 
+    public string? OrganizationFullName { get; set; }
+
+    public string? OrganizationShortName { get; set; }
+
+    public string? OrganizationAddress { get; set; }
+
     public bool HasRequiredDetails { get; set; }
 
     public DateTime DetailsDueDate { get; set; }
@@ -55,6 +61,16 @@ public class StudentPracticeDetailsViewModel : StudentPracticeListItemViewModel
 
     public string? PracticeTaskContent { get; set; }
 
+    public string? StudentDuties { get; set; }
+
+    public string? ProvidedMaterialsDescription { get; set; }
+
+    public string? WorkScheduleDescription { get; set; }
+
+    public string? IntroductionMainGoal { get; set; }
+
+    public List<StudentPracticeGeneralCompetencyViewModel> GeneralCompetencies { get; set; } = new();
+
     public List<StudentPracticeCompetencyViewModel> Competencies { get; set; } = new();
 
     public List<StudentPracticeDiaryEntryViewModel> DiaryEntries { get; set; } = new();
@@ -75,6 +91,15 @@ public class StudentPracticeCompetencyViewModel
     public string WorkTypes { get; set; } = string.Empty;
 
     public int Hours { get; set; }
+}
+
+public class StudentPracticeGeneralCompetencyViewModel
+{
+    public string CompetencyCode { get; set; } = string.Empty;
+
+    public string CompetencyDescription { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
 }
 
 public class StudentPracticeDiaryEntryViewModel
@@ -167,6 +192,12 @@ public class StudentPracticeOrganizationRequestViewModel
 {
     public string? OrganizationName { get; set; }
 
+    public string? OrganizationFullName { get; set; }
+
+    public string? OrganizationShortName { get; set; }
+
+    public string? OrganizationAddress { get; set; }
+
     public string? OrganizationSupervisorFullName { get; set; }
 
     public string? OrganizationSupervisorPosition { get; set; }
@@ -176,6 +207,14 @@ public class StudentPracticeOrganizationRequestViewModel
     public string? OrganizationSupervisorEmail { get; set; }
 
     public string? PracticeTaskContent { get; set; }
+
+    public string? StudentDuties { get; set; }
+
+    public string? ProvidedMaterialsDescription { get; set; }
+
+    public string? WorkScheduleDescription { get; set; }
+
+    public string? IntroductionMainGoal { get; set; }
 }
 
 public class StudentPracticeDiaryEntryRequestViewModel

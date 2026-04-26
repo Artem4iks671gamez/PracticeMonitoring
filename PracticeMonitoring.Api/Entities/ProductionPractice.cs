@@ -24,5 +24,7 @@ public class ProductionPractice
 
     public List<ProductionPracticeCompetency> Competencies { get; set; } = new();
 
+    public List<ProductionPracticeGeneralCompetency> GeneralCompetencies { get; set; } = new();
+
     public List<ProductionPracticeStudentAssignment> StudentAssignments { get; set; } = new();
 }

@@ -32,5 +32,7 @@ public class ProductionPracticeUpsertRequest
 
     public List<ProductionPracticeCompetencyRequest> Competencies { get; set; } = new();
 
+    public List<ProductionPracticeGeneralCompetencyRequest> GeneralCompetencies { get; set; } = new();
+
     public List<ProductionPracticeStudentAssignmentRequest> StudentAssignments { get; set; } = new();
 }
