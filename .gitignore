@@ -361,3 +361,16 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local application secrets and machine-specific settings
+**/appsettings.Local.json
+**/appsettings.*.local.json
+!**/appsettings.example.json
+
+# User secrets are stored outside the repository by dotnet user-secrets,
+# but keep common accidental secret exports out as well.
+secrets.json
+*.secrets.json
+.env
+.env.*
+/PracticeMonitoring.Web/Templates
