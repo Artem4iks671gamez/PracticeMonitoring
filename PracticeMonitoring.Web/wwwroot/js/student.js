@@ -13,6 +13,7 @@ function initStudentWorkspace(workspace) {
         saveReportItems: workspace.dataset.saveReportItemsUrl || '',
         saveSources: workspace.dataset.saveSourcesUrl || '',
         uploadAppendix: workspace.dataset.uploadAppendixUrl || '',
+        uploadDiaryAttachment: workspace.dataset.uploadDiaryAttachmentUrl || '',
         deleteAppendix: workspace.dataset.deleteAppendixUrl || '',
         downloadAppendix: workspace.dataset.downloadAppendixUrl || '',
         downloadDiaryAttachment: workspace.dataset.downloadDiaryAttachmentUrl || ''
@@ -1314,17 +1315,39 @@ function initStudentWorkspace(workspace) {
         if (block.previewUrl?.startsWith('blob:')) {
             URL.revokeObjectURL(block.previewUrl);
         }
-        block.pendingFile = file;
-        block.uploadClientId = makeId('upload');
-        block.previewUrl = URL.createObjectURL(file);
-        block.fileName = file.name;
-        block.mimeType = file.type || 'application/octet-stream';
-        block.size = file.size;
-        block.attachmentId = null;
         if (!block.title && !block.caption) {
             block.title = file.name.replace(/\.[^.]+$/, '');
             block.caption = block.title;
         }
+
+        setReportSaveState('saving', 'Загрузка изображения...');
+        const formData = new FormData();
+        formData.append('workDate', $('#diaryWorkDate').value || state.selectedDate);
+        formData.append('title', block.title || block.caption || file.name.replace(/\.[^.]+$/, ''));
+        formData.append('file', file, file.name);
+
+        const response = await fetch(withAssignment(urls.uploadDiaryAttachment, state.currentDetails.assignmentId), {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            setReportSaveState('error', error?.message || 'Не удалось загрузить изображение');
+            renderFieldErrors(error?.errors || {});
+            event.target.value = '';
+            return;
+        }
+
+        const attachment = await response.json();
+        block.pendingFile = null;
+        block.uploadClientId = null;
+        block.previewUrl = '';
+        block.attachmentId = attachment.attachmentId;
+        block.imageUrl = attachment.downloadUrl || `${urls.downloadDiaryAttachment}?attachmentId=${encodeURIComponent(attachment.attachmentId)}`;
+        block.fileName = file.name;
+        block.mimeType = attachment.contentType || file.type || 'application/octet-stream';
+        block.size = attachment.sizeBytes || file.size;
         markReportDirty();
         renderReportEditor();
         renderReportSummary();
@@ -1366,13 +1389,12 @@ function initStudentWorkspace(workspace) {
         }
 
         const prepared = prepareReportDocumentForSave(state.reportDocument);
-        const figures = await readFigurePayloadsFromReport(state.reportDocument);
         const payload = {
             workDate: $('#diaryWorkDate').value,
             shortDescription: $('#diaryShortDescription').value,
             detailedReport: JSON.stringify(prepared.document),
             keptAttachmentIds: prepared.keptAttachmentIds,
-            figures
+            figures: []
         };
 
         state.reportSaving = true;
@@ -1425,7 +1447,7 @@ function initStudentWorkspace(workspace) {
                 }
             }
             if (block.type === 'image') {
-                if (!block.attachmentId && !block.pendingFile) {
+                if (!block.attachmentId) {
                     problems.push({ blockId: block.id, kind: 'image-file', message: 'рисунок без изображения' });
                 }
                 if (!String(block.title || block.caption || '').trim()) {
@@ -1499,7 +1521,6 @@ function initStudentWorkspace(workspace) {
                     alt: block.alt || '',
                     attachmentId: block.attachmentId || null,
                     imageUrl: block.imageUrl || '',
-                    uploadClientId: block.pendingFile ? block.uploadClientId : undefined,
                     fileName: block.fileName || '',
                     mimeType: block.mimeType || '',
                     size: block.size || 0
@@ -1551,23 +1572,6 @@ function initStudentWorkspace(workspace) {
         };
 
         return { document: cleanDocument, keptAttachmentIds };
-    }
-
-    async function readFigurePayloadsFromReport(reportDocument) {
-        const figures = [];
-        const figureBlocks = reportDocument.content.filter(block => block.type === 'image' && block.pendingFile);
-        for (let i = 0; i < figureBlocks.length; i += 1) {
-            const block = figureBlocks[i];
-            figures.push({
-                clientId: block.uploadClientId,
-                caption: block.title || block.caption || block.pendingFile.name,
-                fileName: block.pendingFile.name,
-                contentType: block.pendingFile.type || 'application/octet-stream',
-                base64Content: await fileToBase64(block.pendingFile),
-                sortOrder: getFigureSortOrder(block.id)
-            });
-        }
-        return figures;
     }
 
     function setReportSaveState(kind, text) {
@@ -2140,15 +2144,6 @@ function getDefaultDiaryDate(details) {
         return today;
     }
     return toDateInputValue(workDays.find(day => !entries.has(toDateInputValue(day))) || workDays[0] || new Date(details.startDate));
-}
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
 }
 
 function formatRuPhone(value) {

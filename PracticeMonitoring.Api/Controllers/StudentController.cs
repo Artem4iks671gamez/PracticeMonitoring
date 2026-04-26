@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,23 @@ public class StudentController : ControllerBase
 {
     private const long MaxAppendixSizeBytes = 15 * 1024 * 1024;
     private const long MaxDiaryFigureSizeBytes = 8 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedDiaryImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp"
+    };
     private static readonly HashSet<string> AllowedReportCategories = new(StringComparer.Ordinal)
     {
         "TechnicalTool",
         "SoftwareTool",
         "PeripheralDevice"
+    };
+    private static readonly JsonSerializerOptions DayReportJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        AllowOutOfOrderMetadataProperties = true
     };
 
     private readonly AppDbContext _context;
@@ -170,6 +183,10 @@ public class StudentController : ControllerBase
             await _context.SaveChangesAsync();
 
             entry.DetailedReport = BindDiaryAttachmentIds(entry.DetailedReport, pendingAttachments);
+            var reportErrors = ValidateDetailedReport(entry.DetailedReport, allowPendingImageUploads: false, pendingUploadClientIds: null);
+            if (reportErrors.Count > 0)
+                return BadRequest(new { message = "Проверьте подробный отчёт за день.", errors = reportErrors });
+
             ApplyDiaryAttachmentMetadata(entry, entry.DetailedReport);
 
             await _context.SaveChangesAsync();
@@ -182,6 +199,75 @@ public class StudentController : ControllerBase
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
         return Ok(MapDetails(assignment!));
     }
+
+    [HttpPost("practices/{assignmentId:int}/diary-attachments")]
+    public async Task<ActionResult<StudentPracticeDiaryAttachmentUploadResponse>> UploadDiaryAttachment(
+        int assignmentId,
+        [FromForm] DateTime workDate,
+        [FromForm] string? title,
+        [FromForm] IFormFile? file)
+    {
+        var assignment = await LoadStudentAssignmentAsync(assignmentId);
+        if (assignment is null)
+            return NotFound();
+
+        var normalizedWorkDate = ToUtcDate(workDate);
+        if (workDate == default ||
+            normalizedWorkDate.Date < assignment.ProductionPractice.StartDate.Date ||
+            normalizedWorkDate.Date > assignment.ProductionPractice.EndDate.Date ||
+            normalizedWorkDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            return BadRequest(new { message = "Дата изображения должна быть рабочим днём в период практики." });
+        }
+
+        var errors = ValidateDiaryImageFile(file);
+        if (errors.Count > 0)
+            return BadRequest(new { message = "Не удалось загрузить изображение.", errors = new Dictionary<string, string[]> { ["file"] = errors.ToArray() } });
+
+        var entry = assignment.DiaryEntries.FirstOrDefault(x => x.WorkDate.Date == normalizedWorkDate.Date);
+        var now = DateTime.UtcNow;
+        if (entry is null)
+        {
+            entry = new StudentPracticeDiaryEntry
+            {
+                ProductionPracticeStudentAssignmentId = assignment.Id,
+                WorkDate = normalizedWorkDate,
+                ShortDescription = string.Empty,
+                DetailedReport = "{\"version\":3,\"type\":\"practice-day-report\",\"blocks\":[]}",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+            assignment.DiaryEntries.Add(entry);
+        }
+
+        await using var stream = file!.OpenReadStream();
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+
+        var attachment = new StudentPracticeDiaryAttachment
+        {
+            Caption = string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(file.FileName) : title.Trim(),
+            FileName = Path.GetFileName(file.FileName),
+            ContentType = NormalizeImageContentType(file.ContentType, file.FileName),
+            SizeBytes = file.Length,
+            Content = memory.ToArray(),
+            SortOrder = entry.Attachments.Count + 1
+        };
+
+        entry.Attachments.Add(attachment);
+        entry.UpdatedAtUtc = now;
+        await _context.SaveChangesAsync();
+
+        return Ok(new StudentPracticeDiaryAttachmentUploadResponse
+        {
+            AttachmentId = attachment.Id,
+            FileName = attachment.FileName,
+            ContentType = attachment.ContentType,
+            SizeBytes = attachment.SizeBytes,
+            DownloadUrl = Url.Action(nameof(DownloadDiaryAttachment), "Student", new { attachmentId = attachment.Id }) ?? string.Empty
+        });
+    }
+
     [HttpPut("practices/{assignmentId:int}/report-items")]
     public async Task<ActionResult<StudentPracticeDetailsResponse>> SaveReportItems(
         int assignmentId,
@@ -441,6 +527,15 @@ public class StudentController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.DetailedReport))
             errors[nameof(request.DetailedReport)] = new[] { "Заполните подробный отчёт за день." };
+        else
+        {
+            var pendingUploadClientIds = request.Figures
+                .Where(x => !string.IsNullOrWhiteSpace(x.Base64Content) && !string.IsNullOrWhiteSpace(x.ClientId))
+                .Select(x => x.ClientId!.Trim())
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var error in ValidateDetailedReport(request.DetailedReport, allowPendingImageUploads: true, pendingUploadClientIds))
+                errors[error.Key] = error.Value;
+        }
 
         for (var i = 0; i < request.Figures.Count; i++)
         {
@@ -460,6 +555,176 @@ public class StudentController : ControllerBase
 
         return errors;
     }
+
+    private static Dictionary<string, string[]> ValidateDetailedReport(
+        string detailedReport,
+        bool allowPendingImageUploads,
+        HashSet<string>? pendingUploadClientIds)
+    {
+        var messages = new List<string>();
+        DayReportDto? report;
+
+        try
+        {
+            report = JsonSerializer.Deserialize<DayReportDto>(detailedReport, DayReportJsonOptions);
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string[]>
+            {
+                [nameof(StudentPracticeDiaryEntryRequest.DetailedReport)] = new[]
+                {
+                    "Подробный отчёт должен соответствовать схеме DayReportDto. Неизвестные типы блоков запрещены."
+                }
+            };
+        }
+
+        if (report is null)
+            messages.Add("Подробный отчёт не удалось прочитать.");
+        else
+            ValidateDetailedReportModel(report, allowPendingImageUploads, pendingUploadClientIds, messages);
+
+        return messages.Count == 0
+            ? new Dictionary<string, string[]>()
+            : new Dictionary<string, string[]>
+            {
+                [nameof(StudentPracticeDiaryEntryRequest.DetailedReport)] = messages.Distinct().ToArray()
+            };
+    }
+
+    private static void ValidateDetailedReportModel(
+        DayReportDto report,
+        bool allowPendingImageUploads,
+        HashSet<string>? pendingUploadClientIds,
+        List<string> messages)
+    {
+        if (!string.Equals(report.Type, "practice-day-report", StringComparison.Ordinal))
+            messages.Add("У подробного отчёта указан неизвестный тип документа.");
+
+        if (report.Blocks.Count == 0)
+        {
+            messages.Add("Подробный отчёт не должен быть пустым.");
+            return;
+        }
+
+        var hasMeaningfulBlock = false;
+        for (var blockIndex = 0; blockIndex < report.Blocks.Count; blockIndex++)
+        {
+            var block = report.Blocks[blockIndex];
+            switch (block)
+            {
+                case TextReportBlockDto textBlock:
+                    if (string.IsNullOrWhiteSpace(textBlock.Content))
+                        messages.Add($"Текстовый блок #{blockIndex + 1} пустой.");
+                    else
+                        hasMeaningfulBlock = true;
+                    break;
+
+                case TableReportBlockDto tableBlock:
+                    ValidateTableReportBlock(tableBlock, blockIndex, messages);
+                    hasMeaningfulBlock = true;
+                    break;
+
+                case ImageReportBlockDto imageBlock:
+                    ValidateImageReportBlock(imageBlock, blockIndex, allowPendingImageUploads, pendingUploadClientIds, messages);
+                    hasMeaningfulBlock = true;
+                    break;
+
+                default:
+                    messages.Add($"Блок #{blockIndex + 1} имеет неизвестный тип.");
+                    break;
+            }
+        }
+
+        if (!hasMeaningfulBlock)
+            messages.Add("Подробный отчёт должен содержать хотя бы один заполненный блок.");
+    }
+
+    private static void ValidateTableReportBlock(TableReportBlockDto tableBlock, int blockIndex, List<string> messages)
+    {
+        if (string.IsNullOrWhiteSpace(tableBlock.Title))
+            messages.Add($"У таблицы #{blockIndex + 1} должно быть название.");
+
+        if (tableBlock.Rows.Count == 0)
+            messages.Add($"Таблица #{blockIndex + 1} должна содержать хотя бы одну строку.");
+
+        for (var rowIndex = 0; rowIndex < tableBlock.Rows.Count; rowIndex++)
+        {
+            var row = tableBlock.Rows[rowIndex];
+            if (row.Cells.Count == 0)
+                messages.Add($"Строка #{rowIndex + 1} таблицы #{blockIndex + 1} должна содержать ячейки.");
+
+            for (var cellIndex = 0; cellIndex < row.Cells.Count; cellIndex++)
+            {
+                var cell = row.Cells[cellIndex];
+                if (cell.Colspan < 1)
+                    messages.Add($"Colspan ячейки #{cellIndex + 1} строки #{rowIndex + 1} таблицы #{blockIndex + 1} должен быть не меньше 1.");
+                if (cell.Rowspan < 1)
+                    messages.Add($"Rowspan ячейки #{cellIndex + 1} строки #{rowIndex + 1} таблицы #{blockIndex + 1} должен быть не меньше 1.");
+            }
+        }
+    }
+
+    private static void ValidateImageReportBlock(
+        ImageReportBlockDto imageBlock,
+        int blockIndex,
+        bool allowPendingImageUploads,
+        HashSet<string>? pendingUploadClientIds,
+        List<string> messages)
+    {
+        if (string.IsNullOrWhiteSpace(imageBlock.Title))
+            messages.Add($"У рисунка #{blockIndex + 1} должно быть название.");
+
+        var hasAttachment = imageBlock.AttachmentId.HasValue && imageBlock.AttachmentId.Value > 0;
+        var hasPendingUpload = allowPendingImageUploads &&
+                               !string.IsNullOrWhiteSpace(imageBlock.UploadClientId) &&
+                               pendingUploadClientIds?.Contains(imageBlock.UploadClientId.Trim()) == true;
+
+        if (!hasAttachment && !hasPendingUpload)
+            messages.Add($"У рисунка #{blockIndex + 1} должен быть attachmentId.");
+    }
+
+    private static List<string> ValidateDiaryImageFile(IFormFile? file)
+    {
+        var errors = new List<string>();
+        if (file is null || file.Length == 0)
+        {
+            errors.Add("Выберите изображение.");
+            return errors;
+        }
+
+        if (file.Length > MaxDiaryFigureSizeBytes)
+            errors.Add("Размер изображения не должен превышать 8 МБ.");
+
+        var contentType = NormalizeImageContentType(file.ContentType, file.FileName);
+        if (!AllowedDiaryImageContentTypes.Contains(contentType))
+            errors.Add("Можно загрузить только PNG, JPG, JPEG или WEBP.");
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension is not (".png" or ".jpg" or ".jpeg" or ".webp"))
+            errors.Add("Расширение файла должно быть PNG, JPG, JPEG или WEBP.");
+
+        return errors;
+    }
+
+    private static string NormalizeImageContentType(string? contentType, string? fileName)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            var normalized = contentType.Trim().ToLowerInvariant();
+            return normalized == "image/jpg" ? "image/jpeg" : normalized;
+        }
+
+        var extension = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
+        return extension switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+    }
+
     private static List<PendingDiaryAttachment> BuildDiaryAttachments(List<StudentPracticeDiaryFigureRequest> figures)
     {
         var attachments = new List<PendingDiaryAttachment>();
@@ -856,6 +1121,7 @@ public class StudentController : ControllerBase
         return int.TryParse(rawValue, out var userId) ? userId : null;
     }
 }
+
 
 
 

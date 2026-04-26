@@ -39,9 +39,9 @@ public class AuthController : ControllerBase
         if (exists)
             return BadRequest(new { message = "Пользователь с таким email уже существует." });
 
-        var role = await _context.Roles.FirstOrDefaultAsync(x => x.Name == request.Role);
+        var role = await _context.Roles.FirstOrDefaultAsync(x => x.Name == "Student");
         if (role is null)
-            return BadRequest(new { message = "Указанная роль не существует." });
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Базовая роль Student не настроена." });
 
         Group? group = null;
         if (request.GroupId.HasValue)
@@ -102,6 +102,9 @@ public class AuthController : ControllerBase
         var validPassword = _passwordService.VerifyPassword(user, request.Password);
         if (!validPassword)
             return Unauthorized(new { message = "Неверный email или пароль." });
+
+        if (!user.IsActive)
+            return Unauthorized(new { message = "Аккаунт отключён. Обратитесь к администратору." });
 
         var token = _jwtService.GenerateToken(user);
 

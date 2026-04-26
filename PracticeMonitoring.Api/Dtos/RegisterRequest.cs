@@ -23,8 +23,9 @@ public class RegisterRequest
     )]
     public string Password { get; set; } = null!;
 
-    [Required(ErrorMessage = "Роль обязательна.")]
-    public string Role { get; set; } = null!;
+    // Public registration does not trust this value. It is kept optional only
+    // for backward compatibility with older clients that still send "Student".
+    public string? Role { get; set; }
 
     public int? GroupId { get; set; }
 }

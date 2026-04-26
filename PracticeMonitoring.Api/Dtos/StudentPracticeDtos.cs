@@ -193,6 +193,19 @@ public class StudentPracticeDiaryFigureRequest
     public int SortOrder { get; set; }
 }
 
+public class StudentPracticeDiaryAttachmentUploadResponse
+{
+    public int AttachmentId { get; set; }
+
+    public string FileName { get; set; } = string.Empty;
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public long SizeBytes { get; set; }
+
+    public string DownloadUrl { get; set; } = string.Empty;
+}
+
 public class StudentPracticeReportItemsRequest
 {
     public List<StudentPracticeReportItemRequest> Items { get; set; } = new();
