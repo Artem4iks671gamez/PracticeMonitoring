@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const practiceDetailsOverviewStats = document.getElementById('practiceDetailsOverviewStats');
     const practiceDetailsInfo = document.getElementById('practiceDetailsInfo');
     const practiceDetailsAssignments = document.getElementById('practiceDetailsAssignments');
+    const practiceDetailsGeneralCompetencies = document.getElementById('practiceDetailsGeneralCompetencies');
     const practiceDetailsCompetencies = document.getElementById('practiceDetailsCompetencies');
     const openAssignmentsFromDetailsButton = document.getElementById('openAssignmentsFromDetailsButton');
     const editPracticeFromDetailsButton = document.getElementById('editPracticeFromDetailsButton');
@@ -1230,6 +1231,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderPracticeDetails(details) {
+        const competencies = details.competencies || [];
+        const generalCompetencies = details.generalCompetencies || [];
+        const studentAssignments = details.studentAssignments || [];
+
         if (practiceDetailsTitle) {
             practiceDetailsTitle.textContent = `${details.practiceIndex} - ${details.name}`;
         }
@@ -1254,11 +1259,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="department-details-overview-stat">
                     <span class="department-details-overview-stat-label">Студенты</span>
-                    <span class="department-details-overview-stat-value">${details.studentAssignments.length}</span>
+                    <span class="department-details-overview-stat-value">${studentAssignments.length}</span>
                 </div>
                 <div class="department-details-overview-stat">
                     <span class="department-details-overview-stat-label">Компетенции</span>
-                    <span class="department-details-overview-stat-value">${details.competencies.length}</span>
+                    <span class="department-details-overview-stat-value">${competencies.length + generalCompetencies.length}</span>
                 </div>
                 <div class="department-details-overview-stat">
                     <span class="department-details-overview-stat-label">Период</span>
@@ -1313,8 +1318,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (practiceDetailsAssignments) {
-            practiceDetailsAssignments.innerHTML = details.studentAssignments.length
-                ? details.studentAssignments.map(item => `
+            practiceDetailsAssignments.innerHTML = studentAssignments.length
+                ? studentAssignments.map(item => `
                     <div class="department-details-card">
                         <div class="department-details-card-header">
                             <div class="department-details-card-title">${escapeHtml(item.studentFullName)}</div>
@@ -1330,9 +1335,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 : '<div class="department-details-card"><div class="department-details-card-text">Студенты пока не назначены.</div></div>';
         }
 
+        if (practiceDetailsGeneralCompetencies) {
+            practiceDetailsGeneralCompetencies.innerHTML = generalCompetencies.length
+                ? generalCompetencies
+                    .slice()
+                    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                    .map(item => `
+                        <div class="department-details-card">
+                            <div class="department-details-card-header">
+                                <div class="department-details-card-title">${escapeHtml(item.competencyCode)} - ${escapeHtml(item.competencyDescription)}</div>
+                                <div class="department-details-chip">ОК</div>
+                            </div>
+                        </div>
+                    `).join('')
+                : '<div class="department-details-card"><div class="department-details-card-text">Общие компетенции пока не добавлены.</div></div>';
+        }
+
         if (practiceDetailsCompetencies) {
-            practiceDetailsCompetencies.innerHTML = details.competencies.length
-                ? details.competencies.map(item => `
+            practiceDetailsCompetencies.innerHTML = competencies.length
+                ? competencies.map(item => `
                     <div class="department-details-card">
                         <div class="department-details-card-header">
                             <div class="department-details-card-title">${escapeHtml(item.competencyCode)} - ${escapeHtml(item.competencyDescription)}</div>

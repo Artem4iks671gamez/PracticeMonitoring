@@ -4,7 +4,7 @@
     ViewData["Title"] = "Работник отдела";
 }
 
-<link rel="stylesheet" href="~/css/DepartmentStaff.css" />
+<link rel="stylesheet" href="~/css/DepartmentStaff.css" asp-append-version="true" />
 
 <div class="department-shell">
     <section class="department-hero-card">
@@ -615,6 +615,11 @@
             </div>
 
             <div class="department-details-section">
+                <div class="department-details-title">Общие компетенции</div>
+                <div id="practiceDetailsGeneralCompetencies" class="department-details-list"></div>
+            </div>
+
+            <div class="department-details-section">
                 <div class="department-details-title">Профессиональные компетенции и виды работ</div>
                 <div id="practiceDetailsCompetencies" class="department-details-list"></div>
             </div>
@@ -924,8 +929,8 @@
     <script>
         window.departmentStaffInitialPractices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Practices));
     </script>
-    <script src="~/js/student-profile.js"></script>
-    <script src="~/js/departmentStaff.js"></script>
+    <script src="~/js/student-profile.js" asp-append-version="true"></script>
+    <script src="~/js/departmentStaff.js" asp-append-version="true"></script>
 }
 
 

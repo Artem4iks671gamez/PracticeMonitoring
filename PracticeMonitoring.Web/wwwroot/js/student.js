@@ -17,6 +17,7 @@ function initStudentWorkspace(workspace) {
         deleteAppendix: workspace.dataset.deleteAppendixUrl || '',
         downloadAppendix: workspace.dataset.downloadAppendixUrl || '',
         downloadDiaryAttachment: workspace.dataset.downloadDiaryAttachmentUrl || '',
+        practiceReportPreview: workspace.dataset.practiceReportPreviewUrl || '',
         downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || ''
     };
 
@@ -35,14 +36,29 @@ function initStudentWorkspace(workspace) {
         reportDirty: false,
         reportSaving: false,
         reportAutosaveTimer: null,
-        reportEditorOpen: false
+        reportEditorOpen: false,
+        sourcesEditMode: false,
+        introductionEditCompletedByAssignment: new Set(),
+        technicalEditCompletedByAssignment: new Set()
     };
+
+    const technicalComputerLabel = 'Компьютер';
+    const technicalCharacteristics = [
+        'Размер экрана',
+        'Разрешение экрана',
+        'Процессор',
+        'Количество ядер процессора',
+        'Оперативная память',
+        'Тип видеокарты',
+        'Видеокарта',
+        'Конфигурация накопителей',
+        'Общий объем всех накопителей',
+        'Операционная система'
+    ];
 
     const reportCategories = [
         { key: 'IntroductionWorkType', title: 'Виды работ', target: 'studentIntroductionTables', namePlaceholder: 'Настройка рабочего места, анализ требований', descriptionPlaceholder: 'Краткое пояснение при необходимости' },
-        { key: 'IntroductionSoftwareTechnology', title: 'Программные средства и технологии', target: 'studentIntroductionTables', namePlaceholder: 'Visual Studio, PostgreSQL, ASP.NET Core', descriptionPlaceholder: 'Где применялось в ходе практики' },
-        { key: 'TechnicalTool', title: 'Технические средства', target: 'studentTechnicalTools', namePlaceholder: 'Ноутбук, сервер, маршрутизатор', descriptionPlaceholder: 'Характеристики или описание' },
-        { key: 'SoftwareTool', title: 'Программные средства', target: 'studentSoftwareTools', namePlaceholder: 'Visual Studio, PostgreSQL, Figma', descriptionPlaceholder: 'Назначение средства' }
+        { key: 'IntroductionSoftwareTechnology', title: 'Программные средства и технологии', target: 'studentIntroductionTables', namePlaceholder: 'Visual Studio, PostgreSQL, ASP.NET Core', descriptionPlaceholder: 'Где применялось в ходе практики' }
     ];
 
     bindWorkspaceEvents();
@@ -103,12 +119,32 @@ function initStudentWorkspace(workspace) {
 
         $('#studentOrganizationForm')?.addEventListener('submit', saveOrganization);
         $('#studentDiaryForm')?.addEventListener('submit', saveDiaryEntry);
-        $('#saveIntroductionButton')?.addEventListener('click', () => saveReportItems(['IntroductionWorkType', 'IntroductionSoftwareTechnology']));
-        $('#saveTechnicalToolsButton')?.addEventListener('click', () => saveReportItems(['TechnicalTool']));
-        $('#saveSoftwareToolsButton')?.addEventListener('click', () => saveReportItems(['SoftwareTool']));
-        $('#savePracticeContentButton')?.addEventListener('click', () => savePracticeReportMetadata(false));
+        $('#editIntroductionButton')?.addEventListener('click', () => setIntroductionEditMode(true));
+        $('#cancelIntroductionEditButton')?.addEventListener('click', () => {
+            renderPracticeReportMetadata(state.currentDetails);
+            renderReportTables(state.currentDetails?.reportItems || []);
+            setIntroductionEditMode(false);
+            hideStatus();
+        });
+        $('#saveIntroductionButton')?.addEventListener('click', saveIntroduction);
+        $('#editTechnicalToolsButton')?.addEventListener('click', () => setTechnicalToolsEditMode(true));
+        $('#cancelTechnicalToolsButton')?.addEventListener('click', () => {
+            renderTechnicalTools(state.currentDetails);
+            setTechnicalToolsEditMode(false);
+            hideStatus();
+        });
+        $('#saveTechnicalToolsButton')?.addEventListener('click', saveTechnicalTools);
         $('#downloadPracticeReportButton')?.addEventListener('click', downloadPracticeReport);
+        $('#editSourcesButton')?.addEventListener('click', () => {
+            state.sourcesEditMode = true;
+            renderSources(state.currentDetails?.sources || []);
+        });
         $('#addSourceButton')?.addEventListener('click', () => addSourceRow());
+        $('#cancelSourcesButton')?.addEventListener('click', () => {
+            renderSources(state.currentDetails?.sources || []);
+            setSourcesEditMode(false);
+            hideStatus();
+        });
         $('#saveSourcesButton')?.addEventListener('click', saveSources);
         $('#studentAppendixForm')?.addEventListener('submit', uploadAppendix);
         $('#appendixFile')?.addEventListener('change', updateAppendixFileName);
@@ -531,9 +567,12 @@ function initStudentWorkspace(workspace) {
         renderOrganization(details);
         renderDiary(details);
         renderReportTables(details.reportItems || []);
+        renderTechnicalTools(details);
         renderPracticeReportMetadata(details);
+        state.sourcesEditMode = !Array.isArray(details.sources) || details.sources.length === 0;
         renderSources(details.sources || []);
         renderAppendices(details.appendices || []);
+        renderPracticeReportPreview(details.assignmentId);
     }
 
     function renderOverview(details) {
@@ -553,14 +592,29 @@ function initStudentWorkspace(workspace) {
                 <strong>${escapeHtml(value || 'Не указано')}</strong>
             </div>`).join('');
 
-        $('#studentPracticeCompetencies').innerHTML = (details.competencies || []).length
-            ? details.competencies.map(item => `
+        const generalCompetencies = details.generalCompetencies || [];
+        const competencies = details.competencies || [];
+
+        $('#studentPracticeGeneralCompetencies').innerHTML = generalCompetencies.length
+            ? generalCompetencies
+                .slice()
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                .map(item => `
+                    <article class="student-compact-card">
+                        <strong>${escapeHtml(item.competencyCode)} · ${escapeHtml(item.competencyDescription)}</strong>
+                        <small>Общая компетенция</small>
+                    </article>`)
+                .join('')
+            : '<div class="student-empty-state">Общие компетенции не указаны.</div>';
+
+        $('#studentPracticeCompetencies').innerHTML = competencies.length
+            ? competencies.map(item => `
                 <article class="student-compact-card">
                     <strong>${escapeHtml(item.competencyCode)} · ${escapeHtml(item.competencyDescription)}</strong>
                     <p>${escapeHtml(item.workTypes)}</p>
                     <small>${item.hours || 0} ч.</small>
                 </article>`).join('')
-            : '<div class="student-empty-state">Компетенции не указаны.</div>';
+            : '<div class="student-empty-state">Профессиональные компетенции не указаны.</div>';
     }
 
     function renderOrganization(details) {
@@ -583,11 +637,24 @@ function initStudentWorkspace(workspace) {
     }
 
     function setOrganizationEditMode(isEdit) {
-        $('#studentOrganizationForm').hidden = !isEdit;
-        $('#studentOrganizationView').hidden = isEdit;
+        const form = $('#studentOrganizationForm');
+        const view = $('#studentOrganizationView');
+
+        toggleStudentHidden(form, !isEdit);
+        toggleStudentHidden(view, isEdit);
+
         if (isEdit) {
             clearStudentFieldErrors();
         }
+    }
+
+    function toggleStudentHidden(element, shouldHide) {
+        if (!element) {
+            return;
+        }
+
+        element.hidden = shouldHide;
+        element.classList.toggle('student-hidden', shouldHide);
     }
 
     function fillOrganizationForm(details) {
@@ -615,6 +682,199 @@ function initStudentWorkspace(workspace) {
         if ($('#providedMaterialsDescription')) $('#providedMaterialsDescription').value = details.providedMaterialsDescription || '';
         if ($('#workScheduleDescription')) $('#workScheduleDescription').value = details.workScheduleDescription || '';
         if ($('#introductionMainGoal')) $('#introductionMainGoal').value = details.introductionMainGoal || '';
+        renderIntroductionReadonly(details);
+        setIntroductionEditMode(!hasIntroductionContent(details) && !state.introductionEditCompletedByAssignment.has(details.assignmentId));
+    }
+
+    function renderIntroductionReadonly(details) {
+        const target = $('#studentIntroductionReadonly');
+        if (!target || !details) {
+            return;
+        }
+
+        const workTypes = formatReportItemsForReadonly(details.reportItems, ['IntroductionWorkType']);
+        const technologies = formatReportItemsForReadonly(details.reportItems, ['IntroductionSoftwareTechnology']);
+        const rows = [
+            ['Описание основной цели', details.introductionMainGoal],
+            ['Выполняемые обязанности', details.studentDuties],
+            ['Описание предоставленных материалов', details.providedMaterialsDescription],
+            ['Описание графика работы', details.workScheduleDescription],
+            ['Виды работ', workTypes],
+            ['Программные средства и технологии', technologies]
+        ];
+
+        target.innerHTML = rows.map(([label, value]) => `
+            <div class="student-readonly-item wide">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(value || 'Не указано')}</strong>
+            </div>`).join('');
+    }
+
+    function formatReportItemsForReadonly(items, categories) {
+        const selected = new Set(categories);
+        return (items || [])
+            .filter(item => selected.has(item.category) && (String(item.name || '').trim() || String(item.description || '').trim()))
+            .map((item, index) => {
+                const name = String(item.name || '').trim();
+                const description = String(item.description || '').trim();
+                return `${index + 1}. ${name}${description ? ` — ${description}` : ''}`;
+            })
+            .join('\n');
+    }
+
+    function hasIntroductionContent(details) {
+        if (!details) {
+            return false;
+        }
+
+        return [
+            details.introductionMainGoal,
+            details.studentDuties,
+            details.providedMaterialsDescription,
+            details.workScheduleDescription,
+            formatReportItemsForReadonly(details.reportItems, ['IntroductionWorkType', 'IntroductionSoftwareTechnology'])
+        ].some(value => String(value || '').trim());
+    }
+
+    function setIntroductionEditMode(isEdit) {
+        if (!isEdit) {
+            const assignmentId = state.currentDetails?.assignmentId;
+            if (assignmentId) {
+                state.introductionEditCompletedByAssignment.add(assignmentId);
+            }
+        }
+
+        toggleStudentHidden($('#studentIntroductionForm'), !isEdit);
+        toggleStudentHidden($('#studentIntroductionView'), isEdit);
+    }
+
+    function renderTechnicalTools(details) {
+        if (!details) {
+            return;
+        }
+
+        const values = getTechnicalToolValues(details.reportItems || []);
+        const computerInput = $('#technicalComputerName');
+        if (computerInput) {
+            computerInput.value = values.computerName;
+        }
+
+        const formTarget = $('#studentTechnicalCharacteristics');
+        if (formTarget) {
+            formTarget.innerHTML = technicalCharacteristics.map((label, index) => `
+                <div class="student-technical-row">
+                    <span>${index + 1}</span>
+                    <label for="technicalCharacteristic${index}">${escapeHtml(label)}</label>
+                    <input class="form-input" id="technicalCharacteristic${index}" data-technical-characteristic="${escapeHtmlAttribute(label)}" value="${escapeHtmlAttribute(values.characteristics.get(label) || '')}" maxlength="500" />
+                </div>`).join('');
+        }
+
+        renderTechnicalToolsReadonly(values);
+        setTechnicalToolsEditMode(!hasTechnicalToolsContent(values) && !state.technicalEditCompletedByAssignment.has(details.assignmentId));
+    }
+
+    function renderTechnicalToolsReadonly(values) {
+        const target = $('#studentTechnicalToolsReadonly');
+        if (!target) {
+            return;
+        }
+
+        target.innerHTML = `
+            <div class="student-technical-preview">
+                <div class="student-technical-preview-title">Таблица 1 – Технические средства</div>
+                <div class="student-technical-preview-grid">
+                    <div class="head">№</div>
+                    <div class="head">Тип оборудования</div>
+                    <div class="head">Наименование и характеристики</div>
+                    <div></div>
+                    <div>2</div>
+                    <div>3</div>
+                    <div class="equipment">${escapeHtml(values.computerName || 'Не указано')}</div>
+                    ${technicalCharacteristics.map((label, index) => `
+                        <div>${index + 1}</div>
+                        <div>${escapeHtml(label)}</div>
+                        <div>${escapeHtml(values.characteristics.get(label) || 'Не указано')}</div>
+                    `).join('')}
+                </div>
+            </div>`;
+    }
+
+    function getTechnicalToolValues(items) {
+        const values = {
+            computerName: '',
+            characteristics: new Map()
+        };
+
+        (items || [])
+            .filter(item => item.category === 'TechnicalTool')
+            .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+            .forEach(item => {
+                const name = String(item.name || '').trim();
+                const description = String(item.description || '').trim();
+                if (name === technicalComputerLabel) {
+                    values.computerName = description;
+                } else if (technicalCharacteristics.includes(name)) {
+                    values.characteristics.set(name, description);
+                } else if (name && !values.computerName) {
+                    values.computerName = name;
+                }
+            });
+
+        return values;
+    }
+
+    function hasTechnicalToolsContent(values) {
+        return Boolean(String(values.computerName || '').trim() || technicalCharacteristics.some(label => String(values.characteristics.get(label) || '').trim()));
+    }
+
+    function setTechnicalToolsEditMode(isEdit) {
+        if (!isEdit) {
+            const assignmentId = state.currentDetails?.assignmentId;
+            if (assignmentId) {
+                state.technicalEditCompletedByAssignment.add(assignmentId);
+            }
+        }
+
+        toggleStudentHidden($('#studentTechnicalToolsForm'), !isEdit);
+        toggleStudentHidden($('#studentTechnicalToolsView'), isEdit);
+    }
+
+    async function saveTechnicalTools() {
+        const computerName = $('#technicalComputerName')?.value || '';
+        const technicalItems = [{
+            category: 'TechnicalTool',
+            name: technicalComputerLabel,
+            description: computerName
+        }];
+
+        $$('[data-technical-characteristic]').forEach(input => {
+            technicalItems.push({
+                category: 'TechnicalTool',
+                name: input.dataset.technicalCharacteristic || '',
+                description: input.value || ''
+            });
+        });
+
+        const preserved = (state.currentDetails?.reportItems || [])
+            .filter(item => item.category !== 'TechnicalTool')
+            .map(item => ({
+                category: item.category || '',
+                name: item.name || '',
+                description: item.description || ''
+            }));
+
+        const result = await postJson(withAssignment(urls.saveReportItems, state.currentDetails.assignmentId), {
+            items: [...preserved, ...technicalItems].filter(item => item.name.trim())
+        });
+
+        if (!result.ok) {
+            showStatus(result.message || 'Не удалось сохранить технические средства.', true);
+            return;
+        }
+
+        applyUpdatedDetails(result.data);
+        setTechnicalToolsEditMode(false);
+        showStatus('Технические средства сохранены.', false);
     }
 
     function buildPracticeMetadataPayload() {
@@ -1650,9 +1910,18 @@ function initStudentWorkspace(workspace) {
         element.textContent = text;
     }
 
-    async function saveReportItems(categoriesToSave) {
-        await savePracticeReportMetadata(false);
+    async function saveIntroduction() {
+        const saved = await saveReportItems(['IntroductionWorkType', 'IntroductionSoftwareTechnology'], {
+            saveMetadata: true,
+            successMessage: 'Введение сохранено.'
+        });
 
+        if (saved) {
+            setIntroductionEditMode(false);
+        }
+    }
+
+    async function saveReportItems(categoriesToSave, options = {}) {
         const selected = new Set(categoriesToSave || reportCategories.map(x => x.key));
         const preserved = (state.currentDetails?.reportItems || [])
             .filter(item => !selected.has(item.category))
@@ -1673,10 +1942,20 @@ function initStudentWorkspace(workspace) {
         const result = await postJson(withAssignment(urls.saveReportItems, state.currentDetails.assignmentId), { items });
         if (!result.ok) {
             showStatus(result.message || 'Не удалось сохранить таблицы отчёта.', true);
-            return;
+            return false;
         }
         applyUpdatedDetails(result.data);
-        showStatus('Таблицы отчёта сохранены.', false);
+
+        if (options.saveMetadata) {
+            const metadataSaved = await savePracticeReportMetadata(true);
+            if (!metadataSaved) {
+                showStatus('Табличные данные сохранены. Текстовые поля введения не сохранены: проверьте обязательные сведения об организации.', true);
+                return true;
+            }
+        }
+
+        showStatus(options.successMessage || 'Таблицы отчёта сохранены.', false);
+        return true;
     }
 
     function renderReportTables(items) {
@@ -1739,14 +2018,31 @@ function initStudentWorkspace(workspace) {
             return;
         }
         applyUpdatedDetails(result.data);
+        setSourcesEditMode(false);
         showStatus('Источники сохранены.', false);
     }
 
     function renderSources(sources) {
-        $('#studentSourcesList').innerHTML = sources.length ? sources.map(source => buildSourceRow(source)).join('') : buildSourceRow();
+        const target = $('#studentSourcesList');
+        if (!target) {
+            return;
+        }
+
+        if (state.sourcesEditMode) {
+            target.innerHTML = sources.length ? sources.map(source => buildSourceRow(source)).join('') : buildSourceRow();
+        } else {
+            target.innerHTML = sources.length
+                ? sources.map((source, index) => buildSourceReadonly(source, index)).join('')
+                : '<div class="student-empty-state">Источники пока не указаны.</div>';
+        }
+
+        setSourcesEditMode(state.sourcesEditMode);
     }
 
     function addSourceRow(source) {
+        if (!state.sourcesEditMode) {
+            setSourcesEditMode(true);
+        }
         $('#studentSourcesList').insertAdjacentHTML('beforeend', buildSourceRow(source));
     }
 
@@ -1762,9 +2058,33 @@ function initStudentWorkspace(workspace) {
             </div>`;
     }
 
+    function buildSourceReadonly(source, index) {
+        const title = String(source?.title || '').trim();
+        const url = String(source?.url || '').trim();
+        const description = String(source?.description || '').trim();
+        return `
+            <article class="student-compact-card student-source-readonly">
+                <strong>${index + 1}. ${escapeHtml(title || 'Источник без названия')}</strong>
+                ${url ? `<a href="${escapeHtmlAttribute(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>` : ''}
+                ${description ? `<p>${escapeHtml(description)}</p>` : ''}
+            </article>`;
+    }
+
+    function setSourcesEditMode(isEdit) {
+        state.sourcesEditMode = Boolean(isEdit);
+        toggleStudentHidden($('#addSourceButton'), !state.sourcesEditMode);
+        toggleStudentHidden($('#studentSourcesActions'), !state.sourcesEditMode);
+        toggleStudentHidden($('#editSourcesButton'), state.sourcesEditMode);
+    }
+
     async function uploadAppendix(event) {
         event.preventDefault();
         clearStudentFieldErrors();
+        if (!state.currentDetails) {
+            showStatus('Сначала откройте практику.', true);
+            return;
+        }
+
         const file = $('#appendixFile')?.files?.[0];
         const allowed = ['doc', 'docx', 'pdf', 'zip', 'rar', '7z', 'txt', 'cs', 'sql', 'png', 'jpg', 'jpeg'];
         const ext = file?.name.split('.').pop()?.toLowerCase() || '';
@@ -1779,11 +2099,29 @@ function initStudentWorkspace(workspace) {
             return;
         }
 
+        const optimisticAppendix = {
+            id: `temp-${Date.now()}`,
+            title: $('#appendixTitle')?.value?.trim() || file.name,
+            description: $('#appendixDescription')?.value?.trim() || '',
+            fileName: file.name,
+            contentType: file.type || 'application/octet-stream',
+            sizeBytes: file.size,
+            createdAtUtc: new Date().toISOString(),
+            isPending: true
+        };
+        upsertAppendixInState(optimisticAppendix);
+        renderAppendices(state.currentDetails.appendices || []);
+
+        const token = event.currentTarget.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        const headers = token ? { RequestVerificationToken: token } : {};
         const response = await fetch(withAssignment(urls.uploadAppendix, state.currentDetails.assignmentId), {
             method: 'POST',
+            headers,
             body: new FormData(event.currentTarget)
         });
         if (!response.ok) {
+            removeAppendixFromState(optimisticAppendix.id);
+            renderAppendices(state.currentDetails?.appendices || []);
             const error = await safeReadJson(response);
             showStatus(error?.message || 'Не удалось загрузить приложение.', true);
             return;
@@ -1791,7 +2129,29 @@ function initStudentWorkspace(workspace) {
 
         event.currentTarget.reset();
         updateAppendixFileName();
-        applyUpdatedDetails(await response.json());
+        const payload = await response.json();
+        const updatedDetails = payload?.details || null;
+        const appendix = payload?.appendix || null;
+
+        if (updatedDetails?.assignmentId) {
+            state.currentDetails = updatedDetails;
+            state.detailsByAssignment.set(updatedDetails.assignmentId, updatedDetails);
+            state.practices = state.practices.map(item => item.assignmentId === updatedDetails.assignmentId ? toListItem(updatedDetails) : item);
+            renderPractices();
+            removeAppendixFromState(optimisticAppendix.id);
+        } else if (appendix?.id) {
+            removeAppendixFromState(optimisticAppendix.id);
+            upsertAppendixInState(appendix);
+        }
+
+        if (appendix?.id && state.currentDetails) {
+            upsertAppendixInState(appendix);
+        } else if (state.currentDetails && !hasAppendix(optimisticAppendix.id)) {
+            upsertAppendixInState(optimisticAppendix);
+        }
+
+        renderAppendices(state.currentDetails?.appendices || []);
+        renderPracticeReportPreview(state.currentDetails?.assignmentId);
         showStatus('Приложение загружено.', false);
     }
 
@@ -1815,13 +2175,42 @@ function initStudentWorkspace(workspace) {
                 <article class="student-compact-card">
                     <strong>${escapeHtml(item.title)}</strong>
                     <p>${escapeHtml(item.description || item.fileName)}</p>
-                    <small>${escapeHtml(item.fileName)} · ${formatBytes(item.sizeBytes)} · ${formatDateTime(item.createdAtUtc)}</small>
+                    <small>${escapeHtml(item.fileName)} · ${formatBytes(item.sizeBytes)} · ${item.isPending ? 'загружено локально' : formatDateTime(item.createdAtUtc)}</small>
                     <div class="student-appendix-actions">
-                        <a class="student-mini-button" href="${urls.downloadAppendix}?appendixId=${encodeURIComponent(item.id)}">Скачать</a>
-                        <button type="button" class="student-mini-button" data-delete-appendix="${item.id}">Удалить</button>
+                        ${item.isPending
+                            ? '<button type="button" class="student-mini-button" disabled>Скачать</button><button type="button" class="student-mini-button" disabled>Удалить</button>'
+                            : `<a class="student-mini-button" href="${urls.downloadAppendix}?appendixId=${encodeURIComponent(item.id)}">Скачать</a>
+                               <button type="button" class="student-mini-button" data-delete-appendix="${item.id}">Удалить</button>`}
                     </div>
                 </article>`).join('')
             : '<div class="student-empty-state">Приложения пока не загружены.</div>';
+    }
+
+    function upsertAppendixInState(appendix) {
+        if (!state.currentDetails || !appendix) {
+            return;
+        }
+
+        const appendices = Array.isArray(state.currentDetails.appendices) ? state.currentDetails.appendices : [];
+        state.currentDetails.appendices = [
+            ...appendices.filter(item => String(item.id) !== String(appendix.id)),
+            appendix
+        ];
+        state.detailsByAssignment.set(state.currentDetails.assignmentId, state.currentDetails);
+    }
+
+    function removeAppendixFromState(appendixId) {
+        if (!state.currentDetails) {
+            return;
+        }
+
+        state.currentDetails.appendices = (state.currentDetails.appendices || [])
+            .filter(item => String(item.id) !== String(appendixId));
+        state.detailsByAssignment.set(state.currentDetails.assignmentId, state.currentDetails);
+    }
+
+    function hasAppendix(appendixId) {
+        return Boolean(state.currentDetails?.appendices?.some(item => String(item.id) === String(appendixId)));
     }
 
     function updateAppendixFileName() {
@@ -1854,6 +2243,40 @@ function initStudentWorkspace(workspace) {
         URL.revokeObjectURL(link.href);
         $('#studentDocumentErrors').hidden = true;
         showStatus('Отчёт практики сформирован.', false);
+    }
+
+    async function renderPracticeReportPreview(assignmentId) {
+        const target = $('#studentPracticeReportPreviewShell');
+        if (!target || !urls.practiceReportPreview || !assignmentId) {
+            return;
+        }
+
+        target.innerHTML = '<div class="student-empty-state">Формируется предпросмотр...</div>';
+        const response = await fetch(`${urls.practiceReportPreview}?assignmentId=${encodeURIComponent(assignmentId)}`);
+        if (!response.ok) {
+            target.innerHTML = '<div class="student-empty-state">Не удалось сформировать предпросмотр отчёта.</div>';
+            return;
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data.missing) && data.missing.length) {
+            target.innerHTML = `
+                <div class="student-document-readiness error">
+                    <strong>Отчёт DOCX пока нельзя сформировать</strong>
+                    <p>Заполните обязательные разделы из списка выше. Предпросмотр HTML отключён, потому что итоговый файл формируется напрямую по шаблону Word.</p>
+                </div>`;
+            renderDocumentErrors({
+                message: 'Для формирования отчёта нужно заполнить обязательные разделы.',
+                missing: data.missing
+            });
+        } else {
+            target.innerHTML = `
+                <div class="student-document-readiness">
+                    <strong>Данные готовы для формирования DOCX</strong>
+                    <p>Нажмите «Сформировать отчёт практики», чтобы получить настоящий документ по шаблону Word.</p>
+                </div>`;
+            $('#studentDocumentErrors').hidden = true;
+        }
     }
 
     function renderDocumentErrors(error) {

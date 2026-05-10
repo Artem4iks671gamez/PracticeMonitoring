@@ -14,6 +14,14 @@ public class StudentPracticeListItemViewModel
 
     public string SpecialtyName { get; set; } = string.Empty;
 
+    public string QualificationName { get; set; } = string.Empty;
+
+    public string StudentFullName { get; set; } = string.Empty;
+
+    public string StudentGroup { get; set; } = string.Empty;
+
+    public int? StudentCourse { get; set; }
+
     public string ProfessionalModuleCode { get; set; } = string.Empty;
 
     public string ProfessionalModuleName { get; set; } = string.Empty;
@@ -186,6 +194,13 @@ public class StudentPracticeAppendixViewModel
     public long SizeBytes { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+}
+
+public class StudentPracticeAppendixUploadResponseViewModel
+{
+    public StudentPracticeDetailsViewModel Details { get; set; } = new();
+
+    public StudentPracticeAppendixViewModel Appendix { get; set; } = new();
 }
 
 public class StudentPracticeOrganizationRequestViewModel

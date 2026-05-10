@@ -14,6 +14,14 @@ public class StudentPracticeListItemResponse
 
     public string SpecialtyName { get; set; } = string.Empty;
 
+    public string QualificationName { get; set; } = string.Empty;
+
+    public string StudentFullName { get; set; } = string.Empty;
+
+    public string StudentGroup { get; set; } = string.Empty;
+
+    public int? StudentCourse { get; set; }
+
     public string ProfessionalModuleCode { get; set; } = string.Empty;
 
     public string ProfessionalModuleName { get; set; } = string.Empty;
@@ -173,6 +181,13 @@ public class StudentPracticeAppendixResponse
     public long SizeBytes { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+}
+
+public class StudentPracticeAppendixUploadResponse
+{
+    public StudentPracticeDetailsResponse Details { get; set; } = new();
+
+    public StudentPracticeAppendixResponse Appendix { get; set; } = new();
 }
 
 public class StudentPracticeOrganizationRequest

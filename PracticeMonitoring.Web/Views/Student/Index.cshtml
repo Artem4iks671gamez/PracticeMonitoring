@@ -33,6 +33,7 @@
      data-delete-appendix-url="@Url.Action("DeleteAppendix", "Student")"
      data-download-appendix-url="@Url.Action("DownloadAppendix", "Student")"
      data-download-diary-attachment-url="@Url.Action("DownloadDiaryAttachment", "Student")"
+     data-practice-report-preview-url="@Url.Action("GetPracticeReportPreview", "Student")"
      data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")">
     <section class="student-hero-card">
         <div class="student-identity">
@@ -241,7 +242,6 @@
                 <button type="button" class="student-modal-tab" data-student-modal-tab="diary">Дневник</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="introduction">Введение</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="technical">Технические средства</button>
-                <button type="button" class="student-modal-tab" data-student-modal-tab="software">Программные средства</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="sources">Источники</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="appendices">Приложения</button>
                 <button type="button" class="student-modal-tab" data-student-modal-tab="documents">Формирование документов</button>
@@ -250,6 +250,12 @@
             <div class="student-modal-body">
                 <section class="student-modal-panel active" data-student-modal-panel="overview">
                     <div class="student-overview-grid" id="studentPracticeOverview"></div>
+                    <div class="student-section-card">
+                        <div class="student-section-header">
+                            <h3>Общие компетенции</h3>
+                        </div>
+                        <div class="student-competency-list" id="studentPracticeGeneralCompetencies"></div>
+                    </div>
                     <div class="student-section-card">
                         <div class="student-section-header">
                             <h3>Профессиональные компетенции и виды работ</h3>
@@ -329,23 +335,6 @@
                         </aside>
 
                         <form id="studentDiaryForm" class="student-section-card student-diary-editor">
-                            <div class="student-report-global-fields">
-                                <div class="form-group">
-                                    <label class="form-label" for="studentDuties">Выполняемые обязанности</label>
-                                    <textarea class="form-input student-textarea" id="studentDuties" name="studentDuties" rows="3" maxlength="4000" placeholder="В ходе прохождения практики я выполнял/а следующие обязанности:"></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="providedMaterialsDescription">Описание предоставленных материалов</label>
-                                    <textarea class="form-input student-textarea" id="providedMaterialsDescription" name="providedMaterialsDescription" rows="3" maxlength="4000" placeholder="Для выполнения заданий были предоставлены"></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="workScheduleDescription">Описание графика работы</label>
-                                    <textarea class="form-input student-textarea" id="workScheduleDescription" name="workScheduleDescription" rows="3" maxlength="4000"></textarea>
-                                </div>
-                                <div class="student-form-actions">
-                                    <button type="button" class="student-secondary-button" id="savePracticeContentButton">Сохранить данные отчёта</button>
-                                </div>
-                            </div>
                             <input id="diaryWorkDate" name="workDate" type="hidden" />
                             <div class="student-section-header">
                                 <div>
@@ -378,56 +367,91 @@
                 </section>
 
                 <section class="student-modal-panel" data-student-modal-panel="introduction">
-                    <div class="student-section-card">
+                    <div class="student-section-card student-introduction-view" id="studentIntroductionView">
                         <div class="student-section-header">
-                            <h3>Введение</h3>
-                            <span>Цель, виды работ, программные средства и технологии для итогового отчёта</span>
+                            <div>
+                                <h3>Введение</h3>
+                                <span>После сохранения данные отображаются как карточка. Для изменений нажмите “Редактировать”.</span>
+                            </div>
+                            <button type="button" class="student-primary-button" id="editIntroductionButton">Редактировать</button>
+                        </div>
+                        <div class="student-readonly-grid" id="studentIntroductionReadonly"></div>
+                    </div>
+
+                    <form class="student-section-card student-introduction-form" id="studentIntroductionForm" hidden novalidate>
+                        <div class="student-section-header">
+                            <div>
+                                <h3>Редактирование введения</h3>
+                                <span>Цель, обязанности, условия работы, виды работ и технологии для итогового отчёта.</span>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="introductionMainGoal">Описание основной цели</label>
                             <textarea class="form-input student-textarea" id="introductionMainGoal" name="introductionMainGoal" rows="4" maxlength="4000" placeholder="Основной целью практики являлась"></textarea>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label" for="studentDuties">Выполняемые обязанности</label>
+                            <textarea class="form-input student-textarea" id="studentDuties" name="studentDuties" rows="3" maxlength="4000" placeholder="В ходе прохождения практики я выполнял/а следующие обязанности:"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="providedMaterialsDescription">Описание предоставленных материалов</label>
+                            <textarea class="form-input student-textarea" id="providedMaterialsDescription" name="providedMaterialsDescription" rows="3" maxlength="4000" placeholder="Для выполнения заданий были предоставлены"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="workScheduleDescription">Описание графика работы</label>
+                            <textarea class="form-input student-textarea" id="workScheduleDescription" name="workScheduleDescription" rows="3" maxlength="4000"></textarea>
+                        </div>
                         <div class="student-report-tables" id="studentIntroductionTables"></div>
                         <div class="student-form-actions">
+                            <button type="button" class="student-secondary-button" id="cancelIntroductionEditButton">Отмена</button>
                             <button type="button" class="student-primary-button" id="saveIntroductionButton">Сохранить введение</button>
                         </div>
-                    </div>
+                    </form>
                 </section>
 
                 <section class="student-modal-panel" data-student-modal-panel="technical">
-                    <div class="student-section-card">
+                    <div class="student-section-card student-technical-view" id="studentTechnicalToolsView">
                         <div class="student-section-header">
-                            <h3>Технические средства</h3>
-                            <span>Тип оборудования, наименование и характеристики</span>
+                            <div>
+                                <h3>Технические средства</h3>
+                                <span>После сохранения данные отображаются как таблица. Для изменений нажмите “Редактировать”.</span>
+                            </div>
+                            <button type="button" class="student-primary-button" id="editTechnicalToolsButton">Редактировать</button>
                         </div>
-                        <div class="student-report-tables" id="studentTechnicalTools"></div>
+                        <div id="studentTechnicalToolsReadonly"></div>
+                    </div>
+
+                    <form class="student-section-card student-technical-form" id="studentTechnicalToolsForm" hidden novalidate>
+                        <div class="student-section-header">
+                            <div>
+                                <h3>Редактирование технических средств</h3>
+                                <span>Компьютер и его характеристики для итогового отчёта.</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="technicalComputerName">Компьютер</label>
+                            <input class="form-input" id="technicalComputerName" maxlength="500" placeholder="HP 25x" />
+                        </div>
+                        <div class="student-technical-characteristics" id="studentTechnicalCharacteristics"></div>
                         <div class="student-form-actions">
+                            <button type="button" class="student-secondary-button" id="cancelTechnicalToolsButton">Отмена</button>
                             <button type="button" class="student-primary-button" id="saveTechnicalToolsButton">Сохранить технические средства</button>
                         </div>
-                    </div>
-                </section>
-
-                <section class="student-modal-panel" data-student-modal-panel="software">
-                    <div class="student-section-card">
-                        <div class="student-section-header">
-                            <h3>Программные средства</h3>
-                            <span>Тип средства, название и назначение</span>
-                        </div>
-                        <div class="student-report-tables" id="studentSoftwareTools"></div>
-                        <div class="student-form-actions">
-                            <button type="button" class="student-primary-button" id="saveSoftwareToolsButton">Сохранить программные средства</button>
-                        </div>
-                    </div>
+                    </form>
                 </section>
 
                 <section class="student-modal-panel" data-student-modal-panel="sources">
                     <div class="student-section-card">
                         <div class="student-section-header">
                             <h3>Список использованных источников</h3>
-                            <button type="button" class="student-secondary-button" id="addSourceButton">Добавить источник</button>
+                            <div class="student-section-actions">
+                                <button type="button" class="student-secondary-button" id="editSourcesButton">Редактировать</button>
+                                <button type="button" class="student-secondary-button" id="addSourceButton" hidden>Добавить источник</button>
+                            </div>
                         </div>
                         <div class="student-source-list" id="studentSourcesList"></div>
-                        <div class="student-form-actions">
+                        <div class="student-form-actions" id="studentSourcesActions" hidden>
+                            <button type="button" class="student-secondary-button" id="cancelSourcesButton">Отмена</button>
                             <button type="button" class="student-primary-button" id="saveSourcesButton">Сохранить источники</button>
                         </div>
                     </div>
@@ -482,6 +506,9 @@
                             <button type="button" class="student-primary-button" id="downloadPracticeReportButton">Сформировать отчёт практики</button>
                         </div>
                         <div class="student-document-errors" id="studentDocumentErrors" hidden></div>
+                        <div class="student-practice-report-preview-shell" id="studentPracticeReportPreviewShell">
+                            <div class="student-empty-state">Предпросмотр отчёта появится после открытия практики.</div>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -557,6 +584,6 @@
     <script>
         window.initialStudentPractices = @Html.Raw(JsonSerializer.Serialize(Model.Practices, jsonOptions));
     </script>
-    <script src="~/js/student-profile.js"></script>
-    <script src="~/js/student.js"></script>
+    <script src="~/js/student-profile.js" asp-append-version="true"></script>
+    <script src="~/js/student.js" asp-append-version="true"></script>
 }

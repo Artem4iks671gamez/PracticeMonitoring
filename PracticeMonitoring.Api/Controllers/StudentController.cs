@@ -27,6 +27,8 @@ public class StudentController : ControllerBase
     };
     private static readonly HashSet<string> AllowedReportCategories = new(StringComparer.Ordinal)
     {
+        "IntroductionWorkType",
+        "IntroductionSoftwareTechnology",
         "TechnicalTool",
         "SoftwareTool"
     };
@@ -65,6 +67,8 @@ public class StudentController : ControllerBase
 
         var assignments = await _context.ProductionPracticeStudentAssignments
             .AsNoTracking()
+            .Include(x => x.Student)
+                .ThenInclude(x => x.Group)
             .Include(x => x.ProductionPractice)
                 .ThenInclude(x => x.Specialty)
             .Include(x => x.ProductionPractice)
@@ -131,6 +135,7 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        _context.ChangeTracker.Clear();
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
         return Ok(MapDetails(assignment!));
     }
@@ -305,6 +310,7 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        _context.ChangeTracker.Clear();
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
         return Ok(MapDetails(assignment!));
     }
@@ -344,7 +350,7 @@ public class StudentController : ControllerBase
 
     [HttpPost("practices/{assignmentId:int}/appendices")]
     [RequestSizeLimit(25 * 1024 * 1024)]
-    public async Task<ActionResult<StudentPracticeDetailsResponse>> UploadAppendix(
+    public async Task<ActionResult<StudentPracticeAppendixUploadResponse>> UploadAppendix(
         int assignmentId,
         [FromForm] string? title,
         [FromForm] string? description,
@@ -367,7 +373,7 @@ public class StudentController : ControllerBase
         using var memoryStream = new MemoryStream();
         await stream.CopyToAsync(memoryStream);
 
-        assignment.Appendices.Add(new StudentPracticeAppendix
+        var appendix = new StudentPracticeAppendix
         {
             ProductionPracticeStudentAssignmentId = assignment.Id,
             Title = title.Trim(),
@@ -377,12 +383,28 @@ public class StudentController : ControllerBase
             SizeBytes = file.Length,
             Content = memoryStream.ToArray(),
             CreatedAtUtc = DateTime.UtcNow
-        });
+        };
+
+        assignment.Appendices.Add(appendix);
 
         await _context.SaveChangesAsync();
 
+        _context.ChangeTracker.Clear();
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        return Ok(MapDetails(assignment!));
+        return Ok(new StudentPracticeAppendixUploadResponse
+        {
+            Details = MapDetails(assignment!),
+            Appendix = new StudentPracticeAppendixResponse
+            {
+                Id = appendix.Id,
+                Title = appendix.Title,
+                Description = appendix.Description,
+                FileName = appendix.FileName,
+                ContentType = appendix.ContentType,
+                SizeBytes = appendix.SizeBytes,
+                CreatedAtUtc = appendix.CreatedAtUtc
+            }
+        });
     }
 
     [HttpDelete("appendices/{appendixId:int}")]
@@ -454,6 +476,7 @@ public class StudentController : ControllerBase
 
         var query = _context.ProductionPracticeStudentAssignments
             .Include(x => x.Student)
+                .ThenInclude(x => x.Group)
             .Include(x => x.Supervisor)
             .Include(x => x.ProductionPractice)
                 .ThenInclude(x => x.Specialty)
@@ -956,7 +979,11 @@ public class StudentController : ControllerBase
             PracticeIndex = practice.PracticeIndex,
             Name = practice.Name,
             SpecialtyCode = practice.Specialty.Code,
-            SpecialtyName = practice.Specialty.Name,
+            SpecialtyName = GetSpecialtyDisplayName(practice.Specialty.Code, practice.Specialty.Name),
+            QualificationName = practice.Specialty.Name,
+            StudentFullName = assignment.Student?.FullName ?? string.Empty,
+            StudentGroup = assignment.Student?.Group?.Name ?? string.Empty,
+            StudentCourse = assignment.Student?.Group?.Course,
             ProfessionalModuleCode = practice.ProfessionalModuleCode,
             ProfessionalModuleName = practice.ProfessionalModuleName,
             Hours = practice.Hours,
@@ -989,6 +1016,10 @@ public class StudentController : ControllerBase
             Name = listItem.Name,
             SpecialtyCode = listItem.SpecialtyCode,
             SpecialtyName = listItem.SpecialtyName,
+            QualificationName = listItem.QualificationName,
+            StudentFullName = listItem.StudentFullName,
+            StudentGroup = listItem.StudentGroup,
+            StudentCourse = listItem.StudentCourse,
             ProfessionalModuleCode = listItem.ProfessionalModuleCode,
             ProfessionalModuleName = listItem.ProfessionalModuleName,
             Hours = listItem.Hours,
@@ -1123,6 +1154,15 @@ public class StudentController : ControllerBase
     private static bool IsCompleted(DateTime endDate)
     {
         return endDate.Date < DateTime.UtcNow.Date;
+    }
+
+    private static string GetSpecialtyDisplayName(string code, string fallback)
+    {
+        return code.Trim() switch
+        {
+            "09.02.07" => "Информационные системы и программирование",
+            _ => fallback
+        };
     }
 
     private static DateTime ToUtcDate(DateTime value)

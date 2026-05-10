@@ -191,7 +191,27 @@ public class StudentController : Controller
             return Unauthorized();
 
         var result = await _studentApiService.UploadAppendixAsync(token, assignmentId, title, description, file);
-        return ToJsonResult(result);
+        if (result.Success)
+        {
+            var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+            if (practice is null)
+                return Json(result.Data);
+
+            return Json(new
+            {
+                details = practice,
+                appendix = practice.Appendices
+                    .OrderByDescending(x => x.CreatedAtUtc)
+                    .ThenByDescending(x => x.Id)
+                    .FirstOrDefault()
+            });
+        }
+
+        return BadRequest(new
+        {
+            message = result.ErrorMessage ?? "Не удалось загрузить приложение.",
+            errors = result.ValidationErrors
+        });
     }
 
     [HttpPost]
@@ -237,6 +257,23 @@ public class StudentController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> GetPracticeReportPreview(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        return Json(new
+        {
+            missing = _practiceReportDocumentService.Validate(practice)
+        });
+    }
+
+    [HttpGet]
     public async Task<IActionResult> DownloadPracticeReport(int assignmentId)
     {
         var token = GetToken();
@@ -249,7 +286,8 @@ public class StudentController : Controller
 
         var result = await _practiceReportDocumentService.BuildDocxAsync(
             practice,
-            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId));
+            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId),
+            appendixId => _studentApiService.DownloadAppendixAsync(token, appendixId));
 
         if (!result.Success)
         {

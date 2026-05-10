@@ -110,7 +110,7 @@ public class StudentApiService
             "Не удалось сохранить источники.");
     }
 
-    public async Task<StudentApiResult<StudentPracticeDetailsViewModel>> UploadAppendixAsync(
+    public async Task<StudentApiResult<StudentPracticeAppendixUploadResponseViewModel>> UploadAppendixAsync(
         string token,
         int assignmentId,
         string? title,
@@ -132,7 +132,7 @@ public class StudentApiService
         }
 
         request.Content = formData;
-        return await SendAsync<StudentPracticeDetailsViewModel>(request, "Не удалось загрузить приложение.");
+        return await SendAsync<StudentPracticeAppendixUploadResponseViewModel>(request, "Не удалось загрузить приложение.");
     }
 
     public async Task<StudentApiResult<object>> DeleteAppendixAsync(string token, int appendixId)
