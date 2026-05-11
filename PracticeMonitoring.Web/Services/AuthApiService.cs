@@ -28,6 +28,15 @@ public class AuthApiService
         return await ReadAuthResponseAsync<AuthResponse>(response, "Ошибка регистрации.");
     }
 
+    public async Task<AuthApiResult<object>> SendRegistrationCodeAsync(RegisterViewModel model)
+    {
+        var json = JsonSerializer.Serialize(model);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync("api/Auth/send-registration-code", content);
+        return await ReadAuthResponseAsync<object>(response, "Не удалось отправить код регистрации.");
+    }
+
     public async Task<AuthApiResult<AuthResponse>> LoginAsync(LoginViewModel model)
     {
         var json = JsonSerializer.Serialize(model);
@@ -35,6 +44,47 @@ public class AuthApiService
 
         var response = await _httpClient.PostAsync("api/Auth/login", content);
         return await ReadAuthResponseAsync<AuthResponse>(response, "Ошибка входа.");
+    }
+
+    public async Task<AuthApiResult<object>> ForgotPasswordAsync(ForgotPasswordViewModel model)
+    {
+        var json = JsonSerializer.Serialize(model);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync("api/Auth/forgot-password", content);
+        return await ReadAuthResponseAsync<object>(response, "Не удалось отправить код восстановления.");
+    }
+
+    public async Task<AuthApiResult<object>> ResetPasswordAsync(ResetPasswordViewModel model)
+    {
+        var payload = new
+        {
+            model.Email,
+            model.Code,
+            model.NewPassword
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync("api/Auth/reset-password", content);
+        return await ReadAuthResponseAsync<object>(response, "Не удалось сменить пароль.");
+    }
+
+    public async Task<AuthApiResult<object>> ChangePasswordAsync(string token, ChangePasswordViewModel model)
+    {
+        var payload = new
+        {
+            model.CurrentPassword,
+            model.NewPassword
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/Auth/change-password");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.SendAsync(request);
+        return await ReadAuthResponseAsync<object>(response, "Не удалось сменить пароль.");
     }
 
     public async Task<CurrentUserViewModel?> GetCurrentUserAsync(string token)

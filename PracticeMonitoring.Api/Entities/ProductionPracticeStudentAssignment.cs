@@ -53,4 +53,6 @@ public class ProductionPracticeStudentAssignment
     public List<StudentPracticeSource> Sources { get; set; } = new();
 
     public List<StudentPracticeAppendix> Appendices { get; set; } = new();
+
+    public List<StudentPracticeSectionComment> SectionComments { get; set; } = new();
 }

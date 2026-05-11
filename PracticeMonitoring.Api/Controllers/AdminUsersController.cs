@@ -17,15 +17,21 @@ public class AdminUsersController : ControllerBase
     private readonly AppDbContext _context;
     private readonly PasswordService _passwordService;
     private readonly AuditLogService _auditLogService;
+    private readonly AccountEmailService _accountEmailService;
+    private readonly TemporaryPasswordService _temporaryPasswordService;
 
     public AdminUsersController(
         AppDbContext context,
         PasswordService passwordService,
-        AuditLogService auditLogService)
+        AuditLogService auditLogService,
+        AccountEmailService accountEmailService,
+        TemporaryPasswordService temporaryPasswordService)
     {
         _context = context;
         _passwordService = passwordService;
         _auditLogService = auditLogService;
+        _accountEmailService = accountEmailService;
+        _temporaryPasswordService = temporaryPasswordService;
     }
 
     [HttpGet]
@@ -114,6 +120,7 @@ public class AdminUsersController : ControllerBase
         user.Role = role;
         user.GroupId = group?.Id;
         user.Group = group;
+        var wasActive = user.IsActive;
         user.IsActive = request.IsActive;
 
         if (request.RemoveAvatar)
@@ -134,6 +141,11 @@ public class AdminUsersController : ControllerBase
             : $"{user.Surname} {user.FirstName} {user.Patronymic}";
 
         await _context.SaveChangesAsync();
+
+        if (wasActive && !user.IsActive)
+        {
+            await _accountEmailService.SendAccountDisabledAsync(user);
+        }
 
         if (changes.Count > 0)
         {
@@ -178,12 +190,11 @@ public class AdminUsersController : ControllerBase
         if (emailInUse)
             return BadRequest(new { message = "Этот email уже используется другим пользователем." });
 
-        if (string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest(new { message = "Для нового пользователя необходимо указать пароль." });
-
         var role = await _context.Roles.FirstOrDefaultAsync(x => x.Name == roleName);
         if (role is null)
             return BadRequest(new { message = $"Роль {roleName} не найдена." });
+
+        var generatedPassword = _temporaryPasswordService.Generate();
 
         var user = new User
         {
@@ -197,14 +208,15 @@ public class AdminUsersController : ControllerBase
             Group = null,
             AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim(),
             Theme = "light",
-            IsActive = request.IsActive
+            IsActive = request.IsActive,
+            MustChangePassword = true
         };
 
         user.FullName = string.IsNullOrWhiteSpace(user.Patronymic)
             ? $"{user.Surname} {user.FirstName}"
             : $"{user.Surname} {user.FirstName} {user.Patronymic}";
 
-        user.PasswordHash = _passwordService.HashPassword(user, request.Password);
+        user.PasswordHash = _passwordService.HashPassword(user, generatedPassword);
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
@@ -216,6 +228,8 @@ public class AdminUsersController : ControllerBase
             description: $"Администратор создал пользователя {user.FullName} с ролью {role.Name}.",
             targetUserId: user.Id,
             targetUserFullName: user.FullName);
+
+        await _accountEmailService.SendAccountCreatedAsync(user, generatedPassword);
 
         return Ok(MapUser(user));
     }

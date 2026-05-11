@@ -1,4 +1,5 @@
-﻿@model PracticeMonitoring.Web.Models.Supervisor.SupervisorPageViewModel
+@using System.Text.Json
+@model PracticeMonitoring.Web.Models.Supervisor.SupervisorPageViewModel
 
 @{
     ViewData["Title"] = "Руководитель практики";
@@ -6,42 +7,42 @@
     var user = Model.CurrentUser;
     var avatarInitials =
         $"{(string.IsNullOrWhiteSpace(user.Surname) ? "" : user.Surname[0])}{(string.IsNullOrWhiteSpace(user.FirstName) ? "" : user.FirstName[0])}";
+    var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 }
 
-<div class="student-shell">
-    <section class="student-topbar">
-        <div class="student-identity">
-            <div class="student-identity-text">
-                <div class="student-role-line">Руководитель практики</div>
-                <h1 class="student-fullname">@user.FullName</h1>
-                <div class="student-specialty-line">Общение со студентами, отделом и администрацией</div>
-                <div class="student-email-line">@user.Email</div>
-            </div>
+<link rel="stylesheet" href="~/css/Supervisor.css" asp-append-version="true" />
 
-            <div class="student-avatar-block">
-                <div class="student-avatar">
-                    @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
-                    {
-                        <img src="@user.AvatarUrl" alt="Аватар руководителя" />
-                    }
-                    else
-                    {
-                        <span>@avatarInitials</span>
-                    }
-                </div>
-            </div>
+<div class="supervisor-shell"
+     data-supervisor-workspace
+     data-assignment-details-url="@Url.Action("GetAssignmentDetails", "Supervisor")"
+     data-review-diary-entry-url="@Url.Action("ReviewDiaryEntry", "Supervisor")"
+     data-save-section-comment-url="@Url.Action("SaveSectionComment", "Supervisor")"
+     data-open-appendix-url="@Url.Action("OpenAppendix", "Supervisor")"
+     data-download-appendix-url="@Url.Action("DownloadAppendix", "Supervisor")"
+     data-open-diary-attachment-url="@Url.Action("OpenDiaryAttachment", "Supervisor")"
+     data-download-diary-attachment-url="@Url.Action("DownloadDiaryAttachment", "Supervisor")">
+    <section class="supervisor-hero-card">
+        <div>
+            <div class="supervisor-badge">Руководитель практики от техникума</div>
+            <h1 class="supervisor-title">Мониторинг производственной практики</h1>
+            <p class="supervisor-subtitle">@user.FullName</p>
         </div>
 
-        <div class="student-actions">
-            <button type="button" class="student-secondary-button" id="openProfileSettingsButton">
-                Настройки профиля
-            </button>
-
-            <form asp-controller="Account" asp-action="Logout" method="post">
-                <button type="submit" class="student-danger-button">
-                    Выйти
-                </button>
-            </form>
+        <div class="supervisor-hero-profile">
+            <div class="supervisor-avatar">
+                @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                {
+                    <img src="@user.AvatarUrl" alt="Аватар руководителя" />
+                }
+                else
+                {
+                    <span>@avatarInitials</span>
+                }
+            </div>
+            <div>
+                <strong>@user.Email</strong>
+                <button type="button" class="supervisor-secondary-button" id="openProfileSettingsButton">Профиль</button>
+            </div>
         </div>
     </section>
 
@@ -55,71 +56,170 @@
         <div class="student-alert student-alert-error">@errorMessage</div>
     }
 
-    <div class="role-page-tabs">
-        <button type="button" class="role-page-nav-button active" data-page-panel-target="supervisorOverviewPanel">
-            Обзор
-        </button>
-        <button type="button" class="role-page-nav-button nav-button-with-badge" data-page-panel-target="supervisorChatsPanel">
-            <span>Чаты</span>
-            @if (Model.UnreadChatsCount > 0)
-            {
-                <span class="nav-unread-badge">@Model.UnreadChatsCount</span>
-            }
-        </button>
-        <button type="button" class="role-page-nav-button" data-page-panel-target="supervisorNotificationsPanel">
-            Уведомления
-        </button>
-    </div>
-
-    <div class="role-page-panel active" id="supervisorOverviewPanel" data-page-panel>
-        <section class="student-dashboard">
-            <div class="dashboard-card dashboard-card-wide">
-                <div class="dashboard-card-header">
-                    <h2>Рабочее место руководителя</h2>
-                    <span>Supervisor</span>
+    <div class="supervisor-workspace">
+        <aside class="supervisor-sidebar-card">
+            <div class="supervisor-sidebar-block">
+                <div class="supervisor-sidebar-title">Навигация</div>
+                <div class="supervisor-sidebar-nav">
+                    <button type="button" class="supervisor-nav-button active" data-supervisor-panel-target="overviewPanel">Обзор</button>
+                    <button type="button" class="supervisor-nav-button" data-supervisor-panel-target="studentsPanel">Студенты</button>
+                    <button type="button" class="supervisor-nav-button" data-supervisor-panel-target="practicesPanel">Практики</button>
+                    <button type="button" class="supervisor-nav-button" data-supervisor-panel-target="risksPanel">Риски</button>
+                    <button type="button" class="supervisor-nav-button" data-supervisor-panel-target="documentsPanel">Документы</button>
+                    <button type="button" class="supervisor-nav-button nav-button-with-badge" data-supervisor-panel-target="chatsPanel">
+                        <span>Чаты</span>
+                        @if (Model.UnreadChatsCount > 0)
+                        {
+                            <span class="nav-unread-badge">@Model.UnreadChatsCount</span>
+                        }
+                    </button>
+                    <button type="button" class="supervisor-nav-button" data-supervisor-panel-target="notificationsPanel">Уведомления</button>
                 </div>
-                <p>
-                    Основной канал взаимодействия с назначенными студентами, работниками отдела и администраторами вынесен во вкладку `Чаты`.
-                </p>
             </div>
 
-            <div class="dashboard-grid">
-                <div class="dashboard-card">
-                    <div class="dashboard-card-header">
-                        <h3>Профиль</h3>
+            <div class="supervisor-sidebar-divider"></div>
+
+            <div class="supervisor-sidebar-block">
+                <div class="supervisor-sidebar-title">Быстрые фильтры</div>
+                <div class="supervisor-sidebar-actions">
+                    <button type="button" class="supervisor-filter-chip active" data-risk-filter="all">Все студенты</button>
+                    <button type="button" class="supervisor-filter-chip" data-risk-filter="critical">Критично</button>
+                    <button type="button" class="supervisor-filter-chip" data-risk-filter="attention">Требуют внимания</button>
+                    <button type="button" class="supervisor-filter-chip" data-risk-filter="ready">Отчёт готов</button>
+                </div>
+            </div>
+
+            <div class="supervisor-sidebar-divider"></div>
+
+            <div class="supervisor-sidebar-block">
+                <div class="supervisor-sidebar-title">Действия</div>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    <button type="submit" class="supervisor-secondary-button supervisor-full-button">Выйти</button>
+                </form>
+            </div>
+        </aside>
+
+        <section class="supervisor-main-card">
+            <div class="supervisor-panel active" id="overviewPanel" data-supervisor-panel>
+                <div class="supervisor-panel-header">
+                    <div>
+                        <h2>Сводка по назначенным студентам</h2>
+                        <p>Общий прогресс, риски, дневники и готовность отчётов.</p>
                     </div>
-                    <ul class="dashboard-list">
-                        <li><strong>ФИО:</strong> @user.FullName</li>
-                        <li><strong>Email:</strong> @user.Email</li>
-                        <li><strong>Роль:</strong> Руководитель практики</li>
-                        <li><strong>Тема:</strong> @(user.Theme == "dark" ? "Тёмная" : "Светлая")</li>
-                    </ul>
                 </div>
 
-                <div class="dashboard-card">
-                    <div class="dashboard-card-header">
-                        <h3>Коммуникации</h3>
-                    </div>
-                    <p class="dashboard-empty">
-                        Вы можете инициировать диалоги со всеми ролями системы, а также принимать сообщения и файлы от студентов.
-                    </p>
+                <div class="supervisor-kpi-grid" id="supervisorKpiGrid"></div>
+
+                <div class="supervisor-analytics-grid">
+                    <section class="supervisor-card">
+                        <div class="supervisor-card-header">
+                            <h3>Распределение прогресса</h3>
+                        </div>
+                        <div class="supervisor-chart-bars" id="progressBucketsChart"></div>
+                    </section>
+
+                    <section class="supervisor-card">
+                        <div class="supervisor-card-header">
+                            <h3>Прогресс по группам</h3>
+                        </div>
+                        <div class="supervisor-chart-bars" id="groupProgressChart"></div>
+                    </section>
+
+                    <section class="supervisor-card">
+                        <div class="supervisor-card-header">
+                            <h3>Статусы риска</h3>
+                        </div>
+                        <div class="supervisor-risk-donut" id="riskDistributionChart"></div>
+                    </section>
                 </div>
+            </div>
+
+            <div class="supervisor-panel" id="studentsPanel" data-supervisor-panel>
+                <div class="supervisor-panel-header">
+                    <div>
+                        <h2>Студенты</h2>
+                        <p>Поиск, фильтрация и быстрый переход в подробную карточку.</p>
+                    </div>
+                </div>
+
+                <div class="supervisor-toolbar">
+                    <input class="form-input" id="supervisorStudentSearch" placeholder="Поиск по ФИО, группе, практике или организации..." />
+                    <select class="form-input" id="supervisorPracticeFilter"></select>
+                    <select class="form-input" id="supervisorGroupFilter"></select>
+                    <select class="form-input" id="supervisorStatusFilter">
+                        <option value="all">Все статусы</option>
+                        <option value="critical">Критично</option>
+                        <option value="attention">Требуют внимания</option>
+                        <option value="ok">В норме</option>
+                        <option value="done">Завершено</option>
+                        <option value="ready">Отчёт готов</option>
+                    </select>
+                </div>
+
+                <div class="supervisor-students-list" id="supervisorStudentsList"></div>
+            </div>
+
+            <div class="supervisor-panel" id="practicesPanel" data-supervisor-panel>
+                <div class="supervisor-panel-header">
+                    <div>
+                        <h2>Практики в нагрузке</h2>
+                        <p>Средний прогресс, количество студентов и проблемные зоны по каждой практике.</p>
+                    </div>
+                </div>
+                <div class="supervisor-practices-grid" id="supervisorPracticesGrid"></div>
+            </div>
+
+            <div class="supervisor-panel" id="risksPanel" data-supervisor-panel>
+                <div class="supervisor-panel-header">
+                    <div>
+                        <h2>Риски</h2>
+                        <p>Студенты, которым нужно внимание руководителя в первую очередь.</p>
+                    </div>
+                </div>
+                <div class="supervisor-risk-list" id="supervisorRiskList"></div>
+            </div>
+
+            <div class="supervisor-panel" id="documentsPanel" data-supervisor-panel>
+                <div class="supervisor-panel-header">
+                    <div>
+                        <h2>Документы и готовность отчётов</h2>
+                        <p>Контроль обязательных разделов итогового отчёта по каждому студенту.</p>
+                    </div>
+                </div>
+                <div class="supervisor-documents-grid" id="supervisorDocumentsGrid"></div>
+            </div>
+
+            <div class="supervisor-panel" id="chatsPanel" data-supervisor-panel>
+                @await Html.PartialAsync("_MessagingWorkspace", Model.Messaging)
+            </div>
+
+            <div class="supervisor-panel" id="notificationsPanel" data-supervisor-panel>
+                @await Html.PartialAsync("_NotificationsPanel", Model.Notifications)
             </div>
         </section>
     </div>
 
-    <div class="role-page-panel" id="supervisorChatsPanel" data-page-panel>
-        @await Html.PartialAsync("_MessagingWorkspace", Model.Messaging)
-    </div>
-
-    <div class="role-page-panel" id="supervisorNotificationsPanel" data-page-panel>
-        @await Html.PartialAsync("_NotificationsPanel", Model.Notifications)
+    <div class="supervisor-modal-backdrop" id="supervisorStudentDetailsModal" hidden>
+        <div class="supervisor-modal" role="dialog" aria-modal="true" aria-labelledby="supervisorStudentDetailsTitle">
+            <header class="supervisor-modal-header">
+                <div>
+                    <span>Карточка студента</span>
+                    <h2 id="supervisorStudentDetailsTitle">Студент</h2>
+                    <p id="supervisorStudentDetailsSubtitle"></p>
+                </div>
+                <button type="button" class="supervisor-modal-close" id="closeSupervisorStudentDetailsButton">×</button>
+            </header>
+            <div class="supervisor-modal-body" id="supervisorStudentDetailsBody"></div>
+        </div>
     </div>
 </div>
 
 @await Html.PartialAsync("_ProfileSettingsModal", user)
 
 @section Scripts {
-    <script src="~/js/student-profile.js"></script>
+    <script>
+        window.initialSupervisorDashboard = @Html.Raw(JsonSerializer.Serialize(Model.Dashboard, jsonOptions));
+    </script>
+    <script src="~/js/student-profile.js" asp-append-version="true"></script>
+    <script src="~/js/supervisor.js" asp-append-version="true"></script>
 }
-

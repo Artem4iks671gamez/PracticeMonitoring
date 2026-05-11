@@ -25,11 +25,17 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<DatabaseBackupService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<AccountEmailService>();
+builder.Services.AddScoped<EmailVerificationService>();
+builder.Services.AddScoped<TemporaryPasswordService>();
 
 builder.Services.AddCors(options =>
 {

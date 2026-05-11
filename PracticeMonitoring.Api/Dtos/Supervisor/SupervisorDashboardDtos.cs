@@ -1,40 +1,23 @@
-using PracticeMonitoring.Web.Models.Auth;
-using PracticeMonitoring.Web.Models.Messaging;
-using PracticeMonitoring.Web.Models.Notifications;
+namespace PracticeMonitoring.Api.Dtos.Supervisor;
 
-namespace PracticeMonitoring.Web.Models.Supervisor;
-
-public class SupervisorPageViewModel
+public class SupervisorDashboardResponse
 {
-    public CurrentUserViewModel CurrentUser { get; set; } = new();
+    public SupervisorSummaryResponse Summary { get; set; } = new();
 
-    public SupervisorDashboardViewModel Dashboard { get; set; } = new();
+    public List<SupervisorPracticeProgressResponse> Practices { get; set; } = new();
 
-    public MessagingWorkspaceViewModel Messaging { get; set; } = new();
+    public List<SupervisorStudentProgressResponse> Students { get; set; } = new();
 
-    public NotificationsPanelViewModel Notifications { get; set; } = new();
+    public List<SupervisorRiskItemResponse> Risks { get; set; } = new();
 
-    public int UnreadChatsCount => Messaging.Threads.Sum(x => x.UnreadCount);
+    public List<SupervisorChartPointResponse> ProgressBuckets { get; set; } = new();
+
+    public List<SupervisorChartPointResponse> GroupProgress { get; set; } = new();
+
+    public List<SupervisorChartPointResponse> RiskDistribution { get; set; } = new();
 }
 
-public class SupervisorDashboardViewModel
-{
-    public SupervisorSummaryViewModel Summary { get; set; } = new();
-
-    public List<SupervisorPracticeProgressViewModel> Practices { get; set; } = new();
-
-    public List<SupervisorStudentProgressViewModel> Students { get; set; } = new();
-
-    public List<SupervisorRiskItemViewModel> Risks { get; set; } = new();
-
-    public List<SupervisorChartPointViewModel> ProgressBuckets { get; set; } = new();
-
-    public List<SupervisorChartPointViewModel> GroupProgress { get; set; } = new();
-
-    public List<SupervisorChartPointViewModel> RiskDistribution { get; set; } = new();
-}
-
-public class SupervisorSummaryViewModel
+public class SupervisorSummaryResponse
 {
     public int TotalStudents { get; set; }
 
@@ -57,7 +40,7 @@ public class SupervisorSummaryViewModel
     public int DiaryLaggingCount { get; set; }
 }
 
-public class SupervisorStudentProgressViewModel
+public class SupervisorStudentProgressResponse
 {
     public int AssignmentId { get; set; }
 
@@ -124,7 +107,7 @@ public class SupervisorStudentProgressViewModel
     public DateTime? LastActivityAtUtc { get; set; }
 }
 
-public class SupervisorPracticeProgressViewModel
+public class SupervisorPracticeProgressResponse
 {
     public int PracticeId { get; set; }
 
@@ -151,7 +134,7 @@ public class SupervisorPracticeProgressViewModel
     public int ReportReadyCount { get; set; }
 }
 
-public class SupervisorRiskItemViewModel
+public class SupervisorRiskItemResponse
 {
     public int AssignmentId { get; set; }
 
@@ -172,7 +155,7 @@ public class SupervisorRiskItemViewModel
     public int ProgressPercent { get; set; }
 }
 
-public class SupervisorChartPointViewModel
+public class SupervisorChartPointResponse
 {
     public string Label { get; set; } = string.Empty;
 
@@ -181,7 +164,7 @@ public class SupervisorChartPointViewModel
     public int Percent { get; set; }
 }
 
-public class SupervisorAssignmentDetailsViewModel : SupervisorStudentProgressViewModel
+public class SupervisorAssignmentDetailsResponse : SupervisorStudentProgressResponse
 {
     public string? OrganizationFullName { get; set; }
 
@@ -207,18 +190,18 @@ public class SupervisorAssignmentDetailsViewModel : SupervisorStudentProgressVie
 
     public string? IntroductionMainGoal { get; set; }
 
-    public List<SupervisorDiaryEntryViewModel> DiaryEntries { get; set; } = new();
+    public List<SupervisorDiaryEntryResponse> DiaryEntries { get; set; } = new();
 
-    public List<SupervisorReportSectionViewModel> ReportSections { get; set; } = new();
+    public List<SupervisorReportSectionResponse> ReportSections { get; set; } = new();
 
-    public List<SupervisorSourceViewModel> Sources { get; set; } = new();
+    public List<SupervisorSourceResponse> Sources { get; set; } = new();
 
-    public List<SupervisorAppendixViewModel> Appendices { get; set; } = new();
+    public List<SupervisorAppendixResponse> Appendices { get; set; } = new();
 
-    public List<SupervisorSectionCommentViewModel> SectionComments { get; set; } = new();
+    public List<SupervisorSectionCommentResponse> SectionComments { get; set; } = new();
 }
 
-public class SupervisorDiaryEntryViewModel
+public class SupervisorDiaryEntryResponse
 {
     public int Id { get; set; }
 
@@ -244,10 +227,10 @@ public class SupervisorDiaryEntryViewModel
 
     public DateTime UpdatedAtUtc { get; set; }
 
-    public List<SupervisorDiaryAttachmentViewModel> Attachments { get; set; } = new();
+    public List<SupervisorDiaryAttachmentResponse> Attachments { get; set; } = new();
 }
 
-public class SupervisorDiaryAttachmentViewModel
+public class SupervisorDiaryAttachmentResponse
 {
     public int Id { get; set; }
 
@@ -262,7 +245,7 @@ public class SupervisorDiaryAttachmentViewModel
     public int SortOrder { get; set; }
 }
 
-public class SupervisorReportSectionViewModel
+public class SupervisorReportSectionResponse
 {
     public string SectionKey { get; set; } = string.Empty;
 
@@ -273,7 +256,7 @@ public class SupervisorReportSectionViewModel
     public string Description { get; set; } = string.Empty;
 }
 
-public class SupervisorSourceViewModel
+public class SupervisorSourceResponse
 {
     public string Title { get; set; } = string.Empty;
 
@@ -282,7 +265,7 @@ public class SupervisorSourceViewModel
     public string? Description { get; set; }
 }
 
-public class SupervisorAppendixViewModel
+public class SupervisorAppendixResponse
 {
     public int Id { get; set; }
 
@@ -299,7 +282,7 @@ public class SupervisorAppendixViewModel
     public DateTime CreatedAtUtc { get; set; }
 }
 
-public class SupervisorSectionCommentViewModel
+public class SupervisorSectionCommentResponse
 {
     public string SectionKey { get; set; } = string.Empty;
 
@@ -312,23 +295,14 @@ public class SupervisorSectionCommentViewModel
     public string SupervisorFullName { get; set; } = string.Empty;
 }
 
-public class SupervisorDiaryReviewRequestViewModel
+public class SupervisorDiaryReviewRequest
 {
     public int? Grade { get; set; }
 
     public string? Comment { get; set; }
 }
 
-public class SupervisorSectionCommentRequestViewModel
+public class SupervisorSectionCommentRequest
 {
     public string? Comment { get; set; }
-}
-
-public class SupervisorFileResult
-{
-    public byte[] Content { get; set; } = Array.Empty<byte>();
-
-    public string ContentType { get; set; } = "application/octet-stream";
-
-    public string FileName { get; set; } = "file.bin";
 }

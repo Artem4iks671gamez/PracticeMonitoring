@@ -1237,6 +1237,70 @@
     flex-wrap: wrap;
 }
 
+.student-document-errors {
+    margin: 12px 0 0;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
+.student-document-errors-header {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.student-document-errors-header span {
+    color: #b45309;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.student-document-errors-header strong {
+    color: var(--text-color);
+    font-size: 15px;
+    line-height: 1.35;
+}
+
+.student-document-errors-list {
+    display: grid;
+    gap: 8px;
+}
+
+.student-document-error-item {
+    width: 100%;
+    display: grid;
+    gap: 3px;
+    padding: 11px 12px;
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    border-radius: 12px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    text-align: left;
+    cursor: pointer;
+}
+
+.student-document-error-item:hover {
+    border-color: rgba(245, 158, 11, 0.45);
+    transform: translateY(-1px);
+}
+
+.student-document-error-item span {
+    color: var(--muted-text);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.student-document-error-item strong {
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
 .student-practice-report-preview-shell {
     margin-top: 16px;
     max-height: 620px;
@@ -1407,6 +1471,15 @@
 
 .student-calendar-day.filled b {
     color: #15803d;
+}
+
+.student-calendar-day.reviewed {
+    background: linear-gradient(180deg, #eef5ff, #ffffff);
+    border-color: rgba(55, 107, 255, 0.35);
+}
+
+.student-calendar-day.reviewed b {
+    color: #274db8;
 }
 
 .student-calendar-day.empty b {
@@ -1647,6 +1720,24 @@ html[data-theme="dark"] .student-modal-status {
     color: #bfdbfe;
 }
 
+html[data-theme="dark"] .student-document-errors {
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(30, 41, 59, 0.92));
+    border-color: rgba(245, 158, 11, 0.34);
+}
+
+html[data-theme="dark"] .student-document-errors-header span {
+    color: #fbbf24;
+}
+
+html[data-theme="dark"] .student-document-error-item {
+    background: linear-gradient(180deg, #253248, #1b2638);
+    border-color: rgba(245, 158, 11, 0.24);
+}
+
+html[data-theme="dark"] .student-document-error-item:hover {
+    border-color: rgba(245, 158, 11, 0.48);
+}
+
 @media (max-width: 1180px) {
     .student-workspace,
     .student-diary-layout,
@@ -1755,6 +1846,73 @@ html[data-theme="dark"] .student-modal-status {
 .student-report-summary-card p {
     margin-bottom: 10px;
     color: var(--muted-text);
+    line-height: 1.45;
+}
+
+.student-review-card {
+    margin-top: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: var(--input-bg);
+    border: 1px solid rgba(78, 95, 198, 0.12);
+    color: var(--text-color);
+}
+
+.student-review-card.reviewed {
+    border-color: rgba(40, 167, 69, 0.28);
+}
+
+.student-review-card.pending {
+    border-color: rgba(255, 193, 7, 0.35);
+}
+
+.student-review-card strong,
+.student-review-card span,
+.student-review-card p {
+    display: block;
+}
+
+.student-review-card strong {
+    margin-bottom: 4px;
+}
+
+.student-review-card span,
+.student-review-card p {
+    color: var(--muted-text);
+    line-height: 1.45;
+}
+
+.student-review-card p {
+    margin: 6px 0 0;
+}
+
+.student-section-comment {
+    margin-bottom: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.24);
+    color: var(--text-color);
+}
+
+.student-section-comment strong,
+.student-section-comment span,
+.student-section-comment p {
+    display: block;
+}
+
+.student-section-comment strong {
+    margin-bottom: 4px;
+}
+
+.student-section-comment span {
+    color: var(--muted-text);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.student-section-comment p {
+    margin: 8px 0 0;
     line-height: 1.45;
 }
 

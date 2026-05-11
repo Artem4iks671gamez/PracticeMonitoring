@@ -27,4 +27,6 @@ public class CurrentUserResponse
     public string? AvatarUrl { get; set; }
 
     public string Theme { get; set; } = "light";
+
+    public bool MustChangePassword { get; set; }
 }

@@ -24,7 +24,9 @@ public class AppDbContext : DbContext
     public DbSet<StudentPracticeReportItem> StudentPracticeReportItems => Set<StudentPracticeReportItem>();
     public DbSet<StudentPracticeSource> StudentPracticeSources => Set<StudentPracticeSource>();
     public DbSet<StudentPracticeAppendix> StudentPracticeAppendices => Set<StudentPracticeAppendix>();
+    public DbSet<StudentPracticeSectionComment> StudentPracticeSectionComments => Set<StudentPracticeSectionComment>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<EmailVerificationCode> EmailVerificationCodes => Set<EmailVerificationCode>();
     public DbSet<ChatThread> ChatThreads => Set<ChatThread>();
     public DbSet<ChatParticipant> ChatParticipants => Set<ChatParticipant>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
@@ -84,6 +86,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.AvatarUrl).HasMaxLength(300);
             entity.Property(x => x.Theme).IsRequired().HasMaxLength(20).HasDefaultValue("light");
             entity.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+            entity.Property(x => x.MustChangePassword).IsRequired().HasDefaultValue(false);
 
             entity.HasIndex(x => x.Email).IsUnique();
 
@@ -210,15 +213,25 @@ public class AppDbContext : DbContext
             entity.Property(x => x.WorkDate).IsRequired();
             entity.Property(x => x.ShortDescription).IsRequired().HasMaxLength(1000);
             entity.Property(x => x.DetailedReport).IsRequired().HasMaxLength(20000);
+            entity.Property(x => x.IsReviewed).IsRequired().HasDefaultValue(false);
+            entity.Property(x => x.SupervisorGrade);
+            entity.Property(x => x.SupervisorComment).HasMaxLength(2000);
+            entity.Property(x => x.ReviewedAtUtc);
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
 
             entity.HasIndex(x => new { x.ProductionPracticeStudentAssignmentId, x.WorkDate }).IsUnique();
+            entity.HasIndex(x => x.ReviewedBySupervisorId);
 
             entity.HasOne(x => x.Assignment)
                 .WithMany(x => x.DiaryEntries)
                 .HasForeignKey(x => x.ProductionPracticeStudentAssignmentId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ReviewedBySupervisor)
+                .WithMany()
+                .HasForeignKey(x => x.ReviewedBySupervisorId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<StudentPracticeDiaryAttachment>(entity =>
@@ -294,6 +307,29 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<StudentPracticeSectionComment>(entity =>
+        {
+            entity.ToTable("student_practice_section_comments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SectionKey).IsRequired().HasMaxLength(80);
+            entity.Property(x => x.Comment).IsRequired().HasMaxLength(2000);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            entity.HasIndex(x => new { x.ProductionPracticeStudentAssignmentId, x.SectionKey }).IsUnique();
+            entity.HasIndex(x => x.SupervisorId);
+
+            entity.HasOne(x => x.Assignment)
+                .WithMany(x => x.SectionComments)
+                .HasForeignKey(x => x.ProductionPracticeStudentAssignmentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Supervisor)
+                .WithMany()
+                .HasForeignKey(x => x.SupervisorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.ToTable("notifications");
@@ -311,6 +347,24 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EmailVerificationCode>(entity =>
+        {
+            entity.ToTable("email_verification_codes");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Purpose).IsRequired().HasMaxLength(40);
+            entity.Property(x => x.CodeHash).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.PayloadJson).HasMaxLength(4000);
+            entity.Property(x => x.Attempts).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.ExpiresAtUtc).IsRequired();
+            entity.Property(x => x.ConsumedAtUtc);
+
+            entity.HasIndex(x => new { x.Email, x.Purpose, x.ConsumedAtUtc });
+            entity.HasIndex(x => x.ExpiresAtUtc);
         });
 
         modelBuilder.Entity<ChatThread>(entity =>

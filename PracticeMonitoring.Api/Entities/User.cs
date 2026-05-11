@@ -29,4 +29,6 @@ public class User
     public string Theme { get; set; } = "light";
 
     public bool IsActive { get; set; } = true;
+
+    public bool MustChangePassword { get; set; }
 }

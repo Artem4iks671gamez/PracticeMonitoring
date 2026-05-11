@@ -88,6 +88,8 @@ public class StudentPracticeDetailsViewModel : StudentPracticeListItemViewModel
     public List<StudentPracticeSourceViewModel> Sources { get; set; } = new();
 
     public List<StudentPracticeAppendixViewModel> Appendices { get; set; } = new();
+
+    public List<StudentPracticeSectionCommentViewModel> SectionComments { get; set; } = new();
 }
 
 public class StudentPracticeCompetencyViewModel
@@ -119,6 +121,16 @@ public class StudentPracticeDiaryEntryViewModel
     public string ShortDescription { get; set; } = string.Empty;
 
     public string DetailedReport { get; set; } = string.Empty;
+
+    public bool IsReviewed { get; set; }
+
+    public int? SupervisorGrade { get; set; }
+
+    public string? SupervisorComment { get; set; }
+
+    public DateTime? ReviewedAtUtc { get; set; }
+
+    public string? ReviewedBySupervisorFullName { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 
@@ -196,6 +208,19 @@ public class StudentPracticeAppendixViewModel
     public DateTime CreatedAtUtc { get; set; }
 }
 
+public class StudentPracticeSectionCommentViewModel
+{
+    public string SectionKey { get; set; } = string.Empty;
+
+    public string SectionTitle { get; set; } = string.Empty;
+
+    public string Comment { get; set; } = string.Empty;
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    public string SupervisorFullName { get; set; } = string.Empty;
+}
+
 public class StudentPracticeAppendixUploadResponseViewModel
 {
     public StudentPracticeDetailsViewModel Details { get; set; } = new();
@@ -239,6 +264,8 @@ public class StudentPracticeDiaryEntryRequestViewModel
     public string? ShortDescription { get; set; }
 
     public string? DetailedReport { get; set; }
+
+    public List<int> KeptAttachmentIds { get; set; } = new();
 
     public List<StudentPracticeDiaryFigureRequestViewModel> Figures { get; set; } = new();
 }

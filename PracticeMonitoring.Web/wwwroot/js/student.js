@@ -571,7 +571,9 @@ function initStudentWorkspace(workspace) {
         renderPracticeReportMetadata(details);
         state.sourcesEditMode = !Array.isArray(details.sources) || details.sources.length === 0;
         renderSources(details.sources || []);
+        renderSectionComment('sources', '#studentSourcesComment');
         renderAppendices(details.appendices || []);
+        setPracticeReportButtonState(false, 'Проверяется готовность отчёта...');
         renderPracticeReportPreview(details.assignmentId);
     }
 
@@ -619,6 +621,7 @@ function initStudentWorkspace(workspace) {
 
     function renderOrganization(details) {
         fillOrganizationForm(details);
+        renderSectionComment('organization', '#studentOrganizationComment');
         $('#studentOrganizationReadonly').innerHTML = [
             ['Полное название организации', details.organizationFullName || details.organizationName],
             ['Сокращенное название', details.organizationShortName],
@@ -682,6 +685,7 @@ function initStudentWorkspace(workspace) {
         if ($('#providedMaterialsDescription')) $('#providedMaterialsDescription').value = details.providedMaterialsDescription || '';
         if ($('#workScheduleDescription')) $('#workScheduleDescription').value = details.workScheduleDescription || '';
         if ($('#introductionMainGoal')) $('#introductionMainGoal').value = details.introductionMainGoal || '';
+        renderSectionComment('introduction', '#studentIntroductionComment');
         renderIntroductionReadonly(details);
         setIntroductionEditMode(!hasIntroductionContent(details) && !state.introductionEditCompletedByAssignment.has(details.assignmentId));
     }
@@ -958,15 +962,17 @@ function initStudentWorkspace(workspace) {
         $('#studentDiaryCalendar').innerHTML = days.map(day => {
             const date = toDateInputValue(day);
             const weekend = day.getDay() === 0 || day.getDay() === 6;
-            const filled = entries.has(date);
+            const entry = entries.get(date);
+            const filled = Boolean(entry);
+            const reviewed = Boolean(entry?.isReviewed && entry?.supervisorGrade);
             return `
                 <button type="button"
-                        class="student-calendar-day ${weekend ? 'weekend' : ''} ${filled ? 'filled' : 'empty'} ${state.selectedDate === date ? 'active' : ''}"
+                        class="student-calendar-day ${weekend ? 'weekend' : ''} ${filled ? 'filled' : 'empty'} ${reviewed ? 'reviewed' : ''} ${state.selectedDate === date ? 'active' : ''}"
                         data-calendar-date="${date}"
                         ${weekend ? 'disabled' : ''}>
                     <span>${day.getDate()}</span>
                     <small>${formatWeekday(day)}</small>
-                    <b>${weekend ? 'выходной' : filled ? 'готово' : 'пусто'}</b>
+                    <b>${weekend ? 'выходной' : reviewed ? `оценка ${entry.supervisorGrade}` : filled ? 'на проверке' : 'пусто'}</b>
                 </button>`;
         }).join('');
     }
@@ -988,6 +994,7 @@ function initStudentWorkspace(workspace) {
         setReportSaveState('saved', entry?.updatedAtUtc ? `Сохранено ${formatDateTime(entry.updatedAtUtc)}` : 'Сохранено');
         renderDiaryCalendar(state.currentDetails);
         renderReportSummary();
+        renderDiaryReview(entry);
         if (state.reportEditorOpen) {
             renderReportEditor();
         }
@@ -1003,6 +1010,55 @@ function initStudentWorkspace(workspace) {
         $('#studentReportPreviewUpdated').textContent = entry?.updatedAtUtc ? `Обновлено ${formatDateTime(entry.updatedAtUtc)}` : 'Не сохранялся';
         $('#studentReportPreviewExcerpt').textContent = buildReportExcerpt(state.reportDocument);
         $('#diaryDetailedReport').value = JSON.stringify(prepareReportDocumentForSave(state.reportDocument).document);
+    }
+
+    function renderDiaryReview(entry) {
+        const target = $('#studentDiaryReviewCard');
+        if (!target) {
+            return;
+        }
+
+        if (!entry) {
+            target.className = 'student-review-card pending';
+            target.innerHTML = `
+                <strong>Проверка руководителем</strong>
+                <span>День ещё не сохранён и не отправлен на проверку.</span>`;
+            return;
+        }
+
+        if (entry.isReviewed && entry.supervisorGrade) {
+            target.className = 'student-review-card reviewed';
+            target.innerHTML = `
+                <strong>Проверено руководителем</strong>
+                <span>Оценка: ${entry.supervisorGrade}${entry.reviewedAtUtc ? ` · ${formatDateTime(entry.reviewedAtUtc)}` : ''}</span>
+                ${entry.supervisorComment ? `<p>${escapeHtml(entry.supervisorComment)}</p>` : '<p>Комментарий не оставлен.</p>'}`;
+            return;
+        }
+
+        target.className = 'student-review-card pending';
+        target.innerHTML = `
+            <strong>Ожидает проверки руководителем</strong>
+            <span>После проверки здесь появятся оценка и комментарий. Если изменить день после проверки, проверка будет сброшена.</span>`;
+    }
+
+    function renderSectionComment(sectionKey, selector) {
+        const target = $(selector);
+        if (!target) {
+            return;
+        }
+
+        const comment = (state.currentDetails?.sectionComments || []).find(item => item.sectionKey === sectionKey);
+        if (!comment) {
+            target.hidden = true;
+            target.innerHTML = '';
+            return;
+        }
+
+        target.hidden = false;
+        target.innerHTML = `
+            <strong>Комментарий руководителя</strong>
+            <span>${escapeHtml(comment.sectionTitle || '')}${comment.updatedAtUtc ? ` · ${formatDateTime(comment.updatedAtUtc)}` : ''}</span>
+            <p>${escapeHtml(comment.comment || '')}</p>`;
     }
 
     function openReportEditor() {
@@ -2224,6 +2280,13 @@ function initStudentWorkspace(workspace) {
             return;
         }
 
+        const readiness = getPracticeReportReadiness(state.currentDetails);
+        if (!readiness.ready) {
+            renderDocumentErrors({ message: readiness.message, missing: readiness.missing });
+            showStatus(readiness.message, true);
+            return;
+        }
+
         const url = `${urls.downloadPracticeReport}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`;
         const response = await fetch(url);
         if (!response.ok) {
@@ -2254,22 +2317,25 @@ function initStudentWorkspace(workspace) {
         target.innerHTML = '<div class="student-empty-state">Формируется предпросмотр...</div>';
         const response = await fetch(`${urls.practiceReportPreview}?assignmentId=${encodeURIComponent(assignmentId)}`);
         if (!response.ok) {
+            setPracticeReportButtonState(false, 'Не удалось проверить готовность отчёта.');
             target.innerHTML = '<div class="student-empty-state">Не удалось сформировать предпросмотр отчёта.</div>';
             return;
         }
 
         const data = await response.json();
         if (Array.isArray(data.missing) && data.missing.length) {
+            setPracticeReportButtonState(false, 'Отчёт пока нельзя сформировать.');
             target.innerHTML = `
                 <div class="student-document-readiness error">
                     <strong>Отчёт DOCX пока нельзя сформировать</strong>
-                    <p>Заполните обязательные разделы из списка выше. Предпросмотр HTML отключён, потому что итоговый файл формируется напрямую по шаблону Word.</p>
+                    <p>Заполните все рабочие дни, дождитесь проверки руководителем и исправьте обязательные разделы из списка ниже.</p>
                 </div>`;
             renderDocumentErrors({
                 message: 'Для формирования отчёта нужно заполнить обязательные разделы.',
                 missing: data.missing
             });
         } else {
+            setPracticeReportButtonState(true, '');
             target.innerHTML = `
                 <div class="student-document-readiness">
                     <strong>Данные готовы для формирования DOCX</strong>
@@ -2288,8 +2354,71 @@ function initStudentWorkspace(workspace) {
         const missing = Array.isArray(error?.missing) ? error.missing : [];
         target.hidden = false;
         target.innerHTML = missing.length
-            ? `<strong>${escapeHtml(error?.message || 'Заполните обязательные разделы.')}</strong><ul>${missing.map(item => `<li><button type="button" data-student-modal-tab-link="${escapeHtmlAttribute(item.tab)}">${escapeHtml(item.message)}</button></li>`).join('')}</ul>`
-            : `<strong>${escapeHtml(error?.message || 'Не удалось сформировать отчёт.')}</strong>`;
+            ? `
+                <div class="student-document-errors-header">
+                    <span>Проверка готовности</span>
+                    <strong>${escapeHtml(error?.message || 'Заполните обязательные разделы.')}</strong>
+                </div>
+                <div class="student-document-errors-list">
+                    ${missing.map(item => `
+                        <button type="button" class="student-document-error-item" data-student-modal-tab-link="${escapeHtmlAttribute(item.tab)}">
+                            <span>${escapeHtml(getDocumentTabName(item.tab))}</span>
+                            <strong>${escapeHtml(item.message)}</strong>
+                        </button>
+                    `).join('')}
+                </div>`
+            : `
+                <div class="student-document-errors-header">
+                    <span>Проверка готовности</span>
+                    <strong>${escapeHtml(error?.message || 'Не удалось сформировать отчёт.')}</strong>
+                </div>`;
+    }
+
+    function getDocumentTabName(tab) {
+        return {
+            overview: 'Сведения',
+            organization: 'Организация',
+            diary: 'Дневник',
+            introduction: 'Введение',
+            technicalTools: 'Технические средства',
+            technical: 'Технические средства',
+            sources: 'Источники',
+            appendices: 'Приложения'
+        }[tab] || 'Раздел отчёта';
+    }
+
+    function setPracticeReportButtonState(enabled, title) {
+        const button = $('#downloadPracticeReportButton');
+        if (!button) {
+            return;
+        }
+
+        button.disabled = !enabled;
+        button.title = title || '';
+    }
+
+    function getPracticeReportReadiness(details) {
+        const missing = [];
+        const entries = new Map((details.diaryEntries || []).map(entry => [toDateInputValue(entry.workDate), entry]));
+        getPracticeDays(details.startDate, details.endDate)
+            .filter(day => day.getDay() !== 0 && day.getDay() !== 6)
+            .forEach(day => {
+                const key = toDateInputValue(day);
+                const entry = entries.get(key);
+                if (!entry || !String(entry.shortDescription || '').trim() || !String(entry.detailedReport || '').trim()) {
+                    missing.push({ tab: 'diary', message: `Заполните дневник и подробный отчёт за ${formatDate(day)}.` });
+                    return;
+                }
+                if (!entry.isReviewed || !entry.supervisorGrade) {
+                    missing.push({ tab: 'diary', message: `День ${formatDate(day)} должен быть проверен руководителем и оценён.` });
+                }
+            });
+
+        return {
+            ready: missing.length === 0,
+            message: 'Отчёт можно сформировать только после заполнения и проверки всех рабочих дней практики.',
+            missing
+        };
     }
 
     function getFileNameFromDisposition(disposition) {

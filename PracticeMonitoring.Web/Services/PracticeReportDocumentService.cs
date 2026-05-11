@@ -158,13 +158,36 @@ public class PracticeReportDocumentService
         if (!practice.ReportItems.Any(x => x.Category == "TechnicalTool"))
             missing.Add(new PracticeReportValidationItem("technicalTools", "TechnicalTool", "Добавьте технические средства."));
 
-        if (!practice.DiaryEntries.Any(x => !string.IsNullOrWhiteSpace(x.ShortDescription)))
-            missing.Add(new PracticeReportValidationItem("diary", "DiaryEntries", "Заполните краткие записи дневника."));
-
-        foreach (var entry in practice.DiaryEntries)
-            ValidateDetailedReport(entry, missing);
+        ValidateDiaryCompleteness(practice, missing);
 
         return missing;
+    }
+
+    private static void ValidateDiaryCompleteness(StudentPracticeDetailsViewModel practice, List<PracticeReportValidationItem> missing)
+    {
+        var entries = practice.DiaryEntries
+            .GroupBy(x => x.WorkDate.Date)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(item => item.UpdatedAtUtc).First());
+
+        foreach (var workDate in GetWorkDays(practice.StartDate, practice.EndDate))
+        {
+            if (!entries.TryGetValue(workDate.Date, out var entry))
+            {
+                missing.Add(new PracticeReportValidationItem("diary", workDate.ToString("yyyy-MM-dd"), $"Заполните дневник и подробный отчёт за {FormatDate(workDate)}."));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.ShortDescription))
+                missing.Add(new PracticeReportValidationItem("diary", entry.WorkDate.ToString("yyyy-MM-dd"), $"Заполните краткую запись дневника за {FormatDate(entry.WorkDate)}."));
+
+            if (string.IsNullOrWhiteSpace(entry.DetailedReport))
+                missing.Add(new PracticeReportValidationItem("diary", "DetailedReport", $"Заполните подробный отчёт за {FormatDate(entry.WorkDate)}."));
+            else
+                ValidateDetailedReport(entry, missing);
+
+            if (!entry.IsReviewed || !entry.SupervisorGrade.HasValue)
+                missing.Add(new PracticeReportValidationItem("diary", entry.WorkDate.ToString("yyyy-MM-dd"), $"День {FormatDate(entry.WorkDate)} должен быть проверен руководителем, и по нему должна быть выставлена оценка."));
+        }
     }
 
     private static void ValidateDetailedReport(StudentPracticeDiaryEntryViewModel entry, List<PracticeReportValidationItem> missing)
@@ -910,6 +933,15 @@ public class PracticeReportDocumentService
     private static string FormatDate(DateTime date)
     {
         return date.ToString("dd.MM.yyyy", RuCulture);
+    }
+
+    private static IEnumerable<DateTime> GetWorkDays(DateTime startDate, DateTime endDate)
+    {
+        for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+                yield return date;
+        }
     }
 
     private static string BuildFileName(StudentPracticeDetailsViewModel practice)

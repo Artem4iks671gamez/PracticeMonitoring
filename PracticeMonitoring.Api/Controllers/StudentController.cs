@@ -130,7 +130,7 @@ public class StudentController : ControllerBase
                 "StudentPracticeDetails",
                 "Студент заполнил сведения о практике",
                 $"{assignment.Student.FullName} сохранил организацию, руководителя от организации и содержание задания по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\".",
-                "/Supervisor");
+                $"/Supervisor/Index?assignmentId={assignment.Id}");
         }
 
         await _context.SaveChangesAsync();
@@ -158,6 +158,10 @@ public class StudentController : ControllerBase
 
         var workDate = ToUtcDate(request.WorkDate);
         var entry = assignment.DiaryEntries.FirstOrDefault(x => x.WorkDate.Date == workDate.Date);
+        var isNewEntry = entry is null;
+        var hadDetailedReport = !string.IsNullOrWhiteSpace(entry?.DetailedReport);
+        var previousDetailedReport = entry?.DetailedReport ?? string.Empty;
+        var previousShortDescription = entry?.ShortDescription ?? string.Empty;
         var now = DateTime.UtcNow;
 
         if (entry is null)
@@ -174,6 +178,9 @@ public class StudentController : ControllerBase
         try
         {
             var keptAttachmentIds = request.KeptAttachmentIds.ToHashSet();
+            foreach (var attachmentId in ExtractReportAttachmentIds(request.DetailedReport))
+                keptAttachmentIds.Add(attachmentId);
+
             var attachmentsToRemove = entry.Attachments
                 .Where(x => !keptAttachmentIds.Contains(x.Id))
                 .ToList();
@@ -191,6 +198,11 @@ public class StudentController : ControllerBase
 
             entry.ShortDescription = request.ShortDescription!.Trim();
             entry.DetailedReport = request.DetailedReport!.Trim();
+            entry.IsReviewed = false;
+            entry.SupervisorGrade = null;
+            entry.SupervisorComment = null;
+            entry.ReviewedAtUtc = null;
+            entry.ReviewedBySupervisorId = null;
             entry.UpdatedAtUtc = now;
 
             await _context.SaveChangesAsync();
@@ -201,6 +213,30 @@ public class StudentController : ControllerBase
                 return BadRequest(new { message = "Проверьте подробный отчёт за день.", errors = reportErrors });
 
             ApplyDiaryAttachmentMetadata(entry, entry.DetailedReport);
+
+            var detailedReportChanged = !string.Equals(previousDetailedReport, entry.DetailedReport, StringComparison.Ordinal);
+            var shortDescriptionChanged = !string.Equals(previousShortDescription, entry.ShortDescription, StringComparison.Ordinal);
+            if (assignment.SupervisorId.HasValue && (isNewEntry || detailedReportChanged || shortDescriptionChanged))
+            {
+                var hasDetailedReport = !string.IsNullOrWhiteSpace(entry.DetailedReport);
+                var title = hasDetailedReport && (isNewEntry || !hadDetailedReport)
+                    ? "Студент добавил отчёт за день"
+                    : hasDetailedReport && detailedReportChanged
+                        ? "Студент изменил отчёт за день"
+                        : "Студент обновил дневник";
+                var message = hasDetailedReport && (isNewEntry || !hadDetailedReport)
+                    ? $"{assignment.Student.FullName} добавил подробный отчёт за {workDate:dd.MM.yyyy} по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\"."
+                    : hasDetailedReport && detailedReportChanged
+                        ? $"{assignment.Student.FullName} изменил подробный отчёт за {workDate:dd.MM.yyyy} по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\"."
+                        : $"{assignment.Student.FullName} обновил запись дневника за {workDate:dd.MM.yyyy} по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\".";
+
+                _notificationService.Add(
+                    assignment.SupervisorId.Value,
+                    "StudentDiary",
+                    title,
+                    message,
+                    $"/Supervisor/Index?assignmentId={assignment.Id}");
+            }
 
             await _context.SaveChangesAsync();
         }
@@ -218,7 +254,7 @@ public class StudentController : ControllerBase
         int assignmentId,
         [FromForm] DateTime workDate,
         [FromForm] string? title,
-        [FromForm] IFormFile? file)
+        IFormFile? file)
     {
         var assignment = await LoadStudentAssignmentAsync(assignmentId);
         if (assignment is null)
@@ -354,7 +390,7 @@ public class StudentController : ControllerBase
         int assignmentId,
         [FromForm] string? title,
         [FromForm] string? description,
-        [FromForm] IFormFile? file)
+        IFormFile? file)
     {
         var assignment = await LoadStudentAssignmentAsync(assignmentId);
         if (assignment is null)
@@ -486,9 +522,13 @@ public class StudentController : ControllerBase
                 .ThenInclude(x => x.GeneralCompetencies)
             .Include(x => x.DiaryEntries)
                 .ThenInclude(x => x.Attachments)
+            .Include(x => x.DiaryEntries)
+                .ThenInclude(x => x.ReviewedBySupervisor)
             .Include(x => x.ReportItems)
             .Include(x => x.Sources)
             .Include(x => x.Appendices)
+            .Include(x => x.SectionComments)
+                .ThenInclude(x => x.Supervisor)
             .Where(x => x.Id == assignmentId && x.StudentId == studentId.Value);
 
         if (asNoTracking)
@@ -894,6 +934,42 @@ public class StudentController : ControllerBase
         }
     }
 
+    private static HashSet<int> ExtractReportAttachmentIds(string? reportJson)
+    {
+        var ids = new HashSet<int>();
+        if (string.IsNullOrWhiteSpace(reportJson))
+            return ids;
+
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(reportJson);
+        }
+        catch
+        {
+            return ids;
+        }
+
+        if (root is not JsonObject document)
+            return ids;
+
+        var content = GetReportBlocks(document);
+        if (content is null)
+            return ids;
+
+        foreach (var node in content.OfType<JsonObject>())
+        {
+            if (!IsReportImageNode(node))
+                continue;
+
+            var attachmentId = node["attachmentId"]?.GetValue<int?>();
+            if (attachmentId is > 0)
+                ids.Add(attachmentId.Value);
+        }
+
+        return ids;
+    }
+
     private static void RebuildReportAttachmentIndex(JsonObject document, JsonArray content)
     {
         var attachments = new JsonArray();
@@ -1073,6 +1149,11 @@ public class StudentController : ControllerBase
                     WorkDate = x.WorkDate,
                     ShortDescription = x.ShortDescription,
                     DetailedReport = x.DetailedReport,
+                    IsReviewed = x.IsReviewed,
+                    SupervisorGrade = x.SupervisorGrade,
+                    SupervisorComment = x.SupervisorComment,
+                    ReviewedAtUtc = x.ReviewedAtUtc,
+                    ReviewedBySupervisorFullName = x.ReviewedBySupervisor?.FullName,
                     UpdatedAtUtc = x.UpdatedAtUtc,
                     Attachments = x.Attachments
                         .OrderBy(a => a.SortOrder)
@@ -1123,6 +1204,17 @@ public class StudentController : ControllerBase
                     SizeBytes = x.SizeBytes,
                     CreatedAtUtc = x.CreatedAtUtc
                 })
+                .ToList(),
+            SectionComments = assignment.SectionComments
+                .OrderBy(x => x.SectionKey)
+                .Select(x => new StudentPracticeSectionCommentResponse
+                {
+                    SectionKey = x.SectionKey,
+                    SectionTitle = GetSectionTitle(x.SectionKey),
+                    Comment = x.Comment,
+                    UpdatedAtUtc = x.UpdatedAtUtc,
+                    SupervisorFullName = x.Supervisor.FullName
+                })
                 .ToList()
         };
     }
@@ -1162,6 +1254,17 @@ public class StudentController : ControllerBase
         {
             "09.02.07" => "Информационные системы и программирование",
             _ => fallback
+        };
+    }
+
+    private static string GetSectionTitle(string sectionKey)
+    {
+        return sectionKey switch
+        {
+            "organization" => "Данные об организации",
+            "introduction" => "Введение",
+            "sources" => "Источники",
+            _ => sectionKey
         };
     }
 

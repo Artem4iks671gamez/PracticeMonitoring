@@ -34,4 +34,7 @@ public class RegisterViewModel
 
     [Required(ErrorMessage = "Выберите группу")]
     public int? GroupId { get; set; }
+
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Код должен состоять из 6 цифр")]
+    public string? Code { get; set; }
 }

@@ -14,6 +14,11 @@
             <div class="validation-error">@ViewBag.Error</div>
         }
 
+        @if (ViewBag.Success != null)
+        {
+            <div class="student-alert student-alert-success">@ViewBag.Success</div>
+        }
+
         <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
 
         <form asp-action="Register" method="post" class="auth-form" id="registerForm" novalidate>
@@ -90,7 +95,17 @@
                 <span asp-validation-for="ConfirmPassword" class="field-validation-error"></span>
             </div>
 
-            <button type="submit" class="login-button">Зарегистрироваться</button>
+            <div class="form-group">
+                <label asp-for="Code" class="form-label">Код из письма</label>
+                <input asp-for="Code" class="form-input" placeholder="Введите 6 цифр" inputmode="numeric" autocomplete="one-time-code" />
+                <span asp-validation-for="Code" class="field-validation-error"></span>
+            </div>
+
+            <button type="submit" asp-action="SendRegistrationCode" class="admin-secondary-button admin-full-button">
+                Отправить код на почту
+            </button>
+
+            <button type="submit" asp-action="Register" class="login-button">Подтвердить регистрацию</button>
         </form>
 
         <div class="login-footer">

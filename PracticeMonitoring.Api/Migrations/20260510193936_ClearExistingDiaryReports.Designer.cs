@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PracticeMonitoring.Api.Data;
@@ -11,9 +12,11 @@ using PracticeMonitoring.Api.Data;
 namespace PracticeMonitoring.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510193936_ClearExistingDiaryReports")]
+    partial class ClearExistingDiaryReports
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -180,54 +183,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("chat_threads", (string)null);
-                });
-
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.EmailVerificationCode", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ConsumedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PayloadJson")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAtUtc");
-
-                    b.HasIndex("Email", "Purpose", "ConsumedAtUtc");
-
-                    b.ToTable("email_verification_codes", (string)null);
                 });
 
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.Group", b =>
@@ -749,46 +704,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.ToTable("student_practice_report_items", (string)null);
                 });
 
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeSectionComment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Comment")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ProductionPracticeStudentAssignmentId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SectionKey")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<int>("SupervisorId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SupervisorId");
-
-                    b.HasIndex("ProductionPracticeStudentAssignmentId", "SectionKey")
-                        .IsUnique();
-
-                    b.ToTable("student_practice_section_comments", (string)null);
-                });
-
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeSource", b =>
                 {
                     b.Property<int>("Id")
@@ -857,11 +772,6 @@ namespace PracticeMonitoring.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
-
-                    b.Property<bool>("MustChangePassword")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -1079,25 +989,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.Navigation("Assignment");
                 });
 
-            modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeSectionComment", b =>
-                {
-                    b.HasOne("PracticeMonitoring.Api.Entities.ProductionPracticeStudentAssignment", "Assignment")
-                        .WithMany("SectionComments")
-                        .HasForeignKey("ProductionPracticeStudentAssignmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PracticeMonitoring.Api.Entities.User", "Supervisor")
-                        .WithMany()
-                        .HasForeignKey("SupervisorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Assignment");
-
-                    b.Navigation("Supervisor");
-                });
-
             modelBuilder.Entity("PracticeMonitoring.Api.Entities.StudentPracticeSource", b =>
                 {
                     b.HasOne("PracticeMonitoring.Api.Entities.ProductionPracticeStudentAssignment", "Assignment")
@@ -1160,8 +1051,6 @@ namespace PracticeMonitoring.Api.Migrations
                     b.Navigation("DiaryEntries");
 
                     b.Navigation("ReportItems");
-
-                    b.Navigation("SectionComments");
 
                     b.Navigation("Sources");
                 });

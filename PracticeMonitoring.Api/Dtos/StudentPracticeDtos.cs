@@ -88,6 +88,8 @@ public class StudentPracticeDetailsResponse : StudentPracticeListItemResponse
     public List<StudentPracticeSourceResponse> Sources { get; set; } = new();
 
     public List<StudentPracticeAppendixResponse> Appendices { get; set; } = new();
+
+    public List<StudentPracticeSectionCommentResponse> SectionComments { get; set; } = new();
 }
 
 public class StudentPracticeCompetencyResponse
@@ -119,6 +121,16 @@ public class StudentPracticeDiaryEntryResponse
     public string ShortDescription { get; set; } = string.Empty;
 
     public string DetailedReport { get; set; } = string.Empty;
+
+    public bool IsReviewed { get; set; }
+
+    public int? SupervisorGrade { get; set; }
+
+    public string? SupervisorComment { get; set; }
+
+    public DateTime? ReviewedAtUtc { get; set; }
+
+    public string? ReviewedBySupervisorFullName { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 
@@ -181,6 +193,19 @@ public class StudentPracticeAppendixResponse
     public long SizeBytes { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+}
+
+public class StudentPracticeSectionCommentResponse
+{
+    public string SectionKey { get; set; } = string.Empty;
+
+    public string SectionTitle { get; set; } = string.Empty;
+
+    public string Comment { get; set; } = string.Empty;
+
+    public DateTime UpdatedAtUtc { get; set; }
+
+    public string SupervisorFullName { get; set; } = string.Empty;
 }
 
 public class StudentPracticeAppendixUploadResponse
