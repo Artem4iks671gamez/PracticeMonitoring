@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PracticeMonitoring.Api", "P
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PracticeMonitoring.Web", "PracticeMonitoring.Web\PracticeMonitoring.Web.csproj", "{3A88E374-4EDA-4084-A472-BFACE847C6E3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PracticeMonitoring.Mobile", "PracticeMonitoring.Mobile\PracticeMonitoring.Mobile.csproj", "{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{3A88E374-4EDA-4084-A472-BFACE847C6E3}.Release|x64.Build.0 = Release|Any CPU
 		{3A88E374-4EDA-4084-A472-BFACE847C6E3}.Release|x86.ActiveCfg = Release|Any CPU
 		{3A88E374-4EDA-4084-A472-BFACE847C6E3}.Release|x86.Build.0 = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|x64.Build.0 = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Debug|x86.Build.0 = Debug|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|x64.ActiveCfg = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|x64.Build.0 = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|x86.ActiveCfg = Release|Any CPU
+		{30022CA5-3CAC-43AE-A0FC-73FB48AC54B3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

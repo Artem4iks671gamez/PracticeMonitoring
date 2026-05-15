@@ -1,0 +1,1782 @@
+@page "/"
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject AppSession Session
+@inject PracticeMonitoringApiClient Api
+@implements IDisposable
+
+<div class="app-shell @(Session.User?.Theme == "dark" ? "theme-dark" : "")">
+    @if (!_ready)
+    {
+        <div class="loading-screen">
+            <div class="brand-mark">PM</div>
+            <strong>PracticeMonitoring</strong>
+            <span>Подключение к API...</span>
+        </div>
+    }
+    else if (!Session.IsAuthenticated)
+    {
+        <section class="auth-screen">
+            <div class="auth-brand">
+                <div class="brand-mark">PM</div>
+                <div>
+                    <span>PracticeMonitoring</span>
+                    <strong>Кабинет студента</strong>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_status))
+            {
+                <div class="alert @(_statusIsError ? "alert-error" : "alert-success")">@_status</div>
+            }
+
+            <nav class="auth-tabs" aria-label="Авторизация">
+                <button type="button" class="@AuthTabClass("login")" @onclick='() => SetAuthMode("login")'>Вход</button>
+                <button type="button" class="@AuthTabClass("register")" @onclick='() => SetAuthMode("register")'>Регистрация</button>
+                <button type="button" class="@AuthTabClass("forgot")" @onclick='() => SetAuthMode("forgot")'>Забыли пароль?</button>
+            </nav>
+
+            @if (_authMode == "login")
+            {
+                <EditForm Model="_login" OnValidSubmit="LoginAsync" class="form-card">
+                    <DataAnnotationsValidator />
+                    <label>Email</label>
+                    <InputText @bind-Value="_login.Email" inputmode="email" autocomplete="username" />
+                    <ValidationMessage For="() => _login.Email" />
+                    <label>Пароль</label>
+                    <InputText @bind-Value="_login.Password" type="password" autocomplete="current-password" />
+                    <ValidationMessage For="() => _login.Password" />
+                    <button class="primary-button" disabled="@_busy">Войти</button>
+                    <div class="auth-footer">
+                        <span>Нет аккаунта?</span>
+                        <button type="button" class="link-button" @onclick='() => SetAuthMode("register")'>Зарегистрироваться</button>
+                    </div>
+                </EditForm>
+            }
+            else if (_authMode == "register")
+            {
+                <EditForm Model="_register" OnValidSubmit="RegisterStepAsync" class="form-card">
+                    <DataAnnotationsValidator />
+                    <h1 class="auth-title">Регистрация</h1>
+                    <p class="auth-subtitle">Создайте новую учетную запись</p>
+                    <div class="grid-2">
+                        <div>
+                            <label>Фамилия</label>
+                            <InputText @bind-Value="_register.Surname" />
+                            <ValidationMessage For="() => _register.Surname" />
+                        </div>
+                        <div>
+                            <label>Имя</label>
+                            <InputText @bind-Value="_register.Name" />
+                            <ValidationMessage For="() => _register.Name" />
+                        </div>
+                    </div>
+                    <label>Отчество</label>
+                    <InputText @bind-Value="_register.Patronymic" />
+                    <label>Email</label>
+                    <InputText @bind-Value="_register.Email" inputmode="email" autocomplete="username" />
+                    <ValidationMessage For="() => _register.Email" />
+                    <label>Пароль</label>
+                    <InputText @bind-Value="_register.Password" type="password" autocomplete="new-password" />
+                    <ValidationMessage For="() => _register.Password" />
+                    <label>Подтвердите пароль</label>
+                    <InputText @bind-Value="_register.ConfirmPassword" type="password" autocomplete="new-password" />
+                    <ValidationMessage For="() => _register.ConfirmPassword" />
+                    <label>Специальность</label>
+                    <InputSelect TValue="int?" Value="_register.SpecialtyId" ValueChanged="OnSpecialtyChangedAsync" ValueExpression="() => _register.SpecialtyId">
+                        <option value="">Выберите специальность</option>
+                        @foreach (var specialty in _specialties)
+                        {
+                            <option value="@specialty.Id">@specialty.Code @specialty.Name</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _register.SpecialtyId" />
+                    <label>Группа</label>
+                    <InputSelect @bind-Value="_register.GroupId">
+                        <option value="">Выберите группу</option>
+                        @foreach (var group in _groups)
+                        {
+                            <option value="@group.Id">@group.Name, @group.Course курс</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => _register.GroupId" />
+
+                    @if (_registrationCodeSent)
+                    {
+                        <label>Код из письма</label>
+                        <InputText @bind-Value="_register.Code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+                        <ValidationMessage For="() => _register.Code" />
+                    }
+
+                    <button class="primary-button" disabled="@_busy">@(_registrationCodeSent ? "Завершить регистрацию" : "Получить код")</button>
+                    <div class="auth-footer">
+                        <span>Уже есть аккаунт?</span>
+                        <button type="button" class="link-button" @onclick='() => SetAuthMode("login")'>Вернуться ко входу</button>
+                    </div>
+                </EditForm>
+            }
+            else if (_authMode == "forgot")
+            {
+                <EditForm Model="_forgot" OnValidSubmit="ForgotPasswordAsync" class="form-card">
+                    <DataAnnotationsValidator />
+                    <p class="auth-subtitle">Введите email аккаунта</p>
+                    <label>Email</label>
+                    <InputText @bind-Value="_forgot.Email" inputmode="email" autocomplete="username" />
+                    <ValidationMessage For="() => _forgot.Email" />
+
+                    <button class="primary-button" disabled="@_busy">Отправить код</button>
+                    <div class="auth-footer">
+                        <button type="button" class="link-button" @onclick='() => SetAuthMode("login")'>Вернуться ко входу</button>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <EditForm Model="_reset" OnValidSubmit="ResetPasswordAsync" class="form-card">
+                    <DataAnnotationsValidator />
+                    <h1 class="auth-title">Новый пароль</h1>
+                    <p class="auth-subtitle">Введите код из письма и новый пароль</p>
+                    <label>Email</label>
+                    <InputText @bind-Value="_reset.Email" inputmode="email" autocomplete="username" />
+                    <ValidationMessage For="() => _reset.Email" />
+                    <label>Код из письма</label>
+                    <InputText @bind-Value="_reset.Code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+                    <ValidationMessage For="() => _reset.Code" />
+                    <label>Новый пароль</label>
+                    <InputText @bind-Value="_reset.NewPassword" type="password" autocomplete="new-password" />
+                    <ValidationMessage For="() => _reset.NewPassword" />
+                    <label>Подтвердите пароль</label>
+                    <InputText @bind-Value="_reset.ConfirmPassword" type="password" autocomplete="new-password" />
+                    <ValidationMessage For="() => _reset.ConfirmPassword" />
+
+                    <button class="primary-button" disabled="@_busy">Сменить пароль</button>
+                    <div class="auth-footer">
+                        <button type="button" class="link-button" @onclick='() => SetAuthMode("forgot")'>Отправить код заново</button>
+                    </div>
+                </EditForm>
+            }
+        </section>
+    }
+    else
+    {
+        <main class="student-app">
+            <header class="student-header">
+                <div class="student-identity">
+                    <div class="avatar">@Initials</div>
+                    <div>
+                        <span>@(Session.User?.GroupName is null ? "Студент" : $"Студент группы {Session.User.GroupName}")</span>
+                        <h1>@Session.User?.FullName</h1>
+                        <p>@($"{Session.User?.SpecialtyCode} {Session.User?.SpecialtyName}".Trim())</p>
+                    </div>
+                </div>
+                <button class="icon-button" @onclick="RefreshAllAsync">↻</button>
+            </header>
+
+            @if (!string.IsNullOrWhiteSpace(_status))
+            {
+                <div class="alert @(_statusIsError ? "alert-error" : "alert-success")">@_status</div>
+            }
+
+            <nav class="bottom-tabs">
+                <button class="@MainTabClass("practices")" @onclick='() => _mainTab = "practices"'>Практики</button>
+                <button class="@MainTabClass("chats")" @onclick='() => _mainTab = "chats"'>Чаты @UnreadChatBadge</button>
+                <button class="@MainTabClass("notifications")" @onclick='() => _mainTab = "notifications"'>Уведомления @UnreadNotificationBadge</button>
+                <button class="@MainTabClass("profile")" @onclick='() => _mainTab = "profile"'>Профиль</button>
+            </nav>
+
+            @if (_mainTab == "practices")
+            {
+                <section class="content-stack">
+                    <div class="toolbar">
+                        <input placeholder="Поиск практики" @bind="_practiceSearch" @bind:event="oninput" />
+                        <select @bind="_practiceFilter">
+                            <option value="active">Активные</option>
+                            <option value="completed">Завершенные</option>
+                            <option value="all">Все</option>
+                        </select>
+                    </div>
+
+                    @foreach (var practice in FilteredPractices)
+                    {
+                        <article class="practice-card" @onclick="() => OpenPracticeAsync(practice.AssignmentId)">
+                            <div>
+                                <span class="chip">@practice.PracticeIndex</span>
+                                <span class="chip @(practice.IsCompleted ? "muted" : "active")">@(practice.IsCompleted ? "Завершена" : "Активна")</span>
+                                @if (practice.IsDetailsOverdue)
+                                {
+                                    <span class="chip warn">Просрочены сведения</span>
+                                }
+                            </div>
+                            <h2>@practice.Name</h2>
+                            <p>@practice.ProfessionalModuleCode @practice.ProfessionalModuleName</p>
+                            <div class="card-meta">
+                                <span>@DateRange(practice.StartDate, practice.EndDate)</span>
+                                <span>Дневник: @practice.DiaryEntriesCount/@practice.WorkDaysCount</span>
+                            </div>
+                        </article>
+                    }
+
+                    @if (!FilteredPractices.Any())
+                    {
+                        <div class="empty-state">Назначенные практики не найдены.</div>
+                    }
+                </section>
+            }
+            else if (_mainTab == "chats")
+            {
+                <section class="content-stack">
+                    <div class="toolbar">
+                        <input placeholder="Поиск руководителя" @bind="_contactSearch" @bind:event="oninput" />
+                        <button class="secondary-button" @onclick="SearchContactsAsync">Найти</button>
+                    </div>
+                    @foreach (var contact in _contacts)
+                    {
+                        <article class="list-card" @onclick="() => StartChatAsync(contact)">
+                            <strong>@contact.FullName</strong>
+                            <span>@contact.Subtitle</span>
+                        </article>
+                    }
+                    @foreach (var thread in _chatThreads)
+                    {
+                        <article class="list-card" @onclick="() => OpenThreadAsync(thread.Id)">
+                            <strong>@thread.OtherUser.FullName</strong>
+                            <span>@thread.LastMessagePreview</span>
+                            @if (thread.UnreadCount > 0)
+                            {
+                                <em>@thread.UnreadCount</em>
+                            }
+                        </article>
+                    }
+                </section>
+            }
+            else if (_mainTab == "notifications")
+            {
+                <section class="content-stack">
+                    <button class="secondary-button" @onclick="MarkAllNotificationsReadAsync">Отметить все прочитанными</button>
+                    @foreach (var notification in _notifications)
+                    {
+                        <article class="list-card @(notification.IsRead ? "" : "unread")" @onclick="() => MarkNotificationReadAsync(notification.Id)">
+                            <strong>@notification.Title</strong>
+                            <span>@notification.Message</span>
+                            <small>@notification.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small>
+                        </article>
+                    }
+                </section>
+            }
+            else
+            {
+                <EditForm Model="_profile" OnValidSubmit="SaveProfileAsync" class="content-stack">
+                    <div class="form-card">
+                        <label>Фамилия</label>
+                        <InputText @bind-Value="_profile.Surname" />
+                        <label>Имя</label>
+                        <InputText @bind-Value="_profile.FirstName" />
+                        <label>Отчество</label>
+                        <InputText @bind-Value="_profile.Patronymic" />
+                        <label>Email</label>
+                        <InputText @bind-Value="_profile.Email" inputmode="email" />
+                        <label>Тема</label>
+                        <InputSelect @bind-Value="_profile.Theme">
+                            <option value="light">Светлая</option>
+                            <option value="dark">Темная</option>
+                        </InputSelect>
+                        <button class="primary-button" disabled="@_busy">Сохранить профиль</button>
+                    </div>
+                    <div class="form-card">
+                        <label>Текущий пароль</label>
+                        <InputText @bind-Value="_changePassword.CurrentPassword" type="password" />
+                        <label>Новый пароль</label>
+                        <InputText @bind-Value="_changePassword.NewPassword" type="password" autocomplete="new-password" />
+                        <label>Подтвердите пароль</label>
+                        <InputText @bind-Value="_changePassword.ConfirmPassword" type="password" autocomplete="new-password" />
+                        <button type="button" class="secondary-button" disabled="@_busy" @onclick="ChangePasswordAsync">Сменить пароль</button>
+                    </div>
+                    <button type="button" class="danger-button" @onclick="LogoutAsync">Выйти</button>
+                </EditForm>
+            }
+        </main>
+    }
+
+    @if (_selectedPractice is not null)
+    {
+        <div class="modal-backdrop">
+            <section class="practice-modal">
+                <header class="modal-header">
+                    <div>
+                        <span>@_selectedPractice.PracticeIndex</span>
+                        <h2>@_selectedPractice.Name</h2>
+                        <p>@DateRange(_selectedPractice.StartDate, _selectedPractice.EndDate)</p>
+                    </div>
+                    <button class="icon-button light" @onclick="ClosePractice">×</button>
+                </header>
+
+                <div class="modal-tabs">
+                    @foreach (var tab in _practiceTabs)
+                    {
+                        <button class="@PracticeTabClass(tab.Key)" @onclick="() => _practiceTab = tab.Key">@tab.Value</button>
+                    }
+                </div>
+
+                <div class="modal-body">
+                    @if (_practiceTab == "overview")
+                    {
+                        <div class="content-stack">
+                            <InfoRow Label="Руководитель" Value="@(_selectedPractice.SupervisorFullName ?? "Не назначен")" />
+                            <InfoRow Label="Организация" Value="@(_selectedPractice.OrganizationFullName ?? "Не указана")" />
+                            <InfoRow Label="Часы" Value="@($"{_selectedPractice.Hours}")" />
+                            <h3>Компетенции</h3>
+                            @foreach (var competency in _selectedPractice.Competencies)
+                            {
+                                <div class="list-card">
+                                    <strong>@competency.CompetencyCode</strong>
+                                    <span>@competency.CompetencyDescription</span>
+                                    <small>@competency.WorkTypes</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (_practiceTab == "organization")
+                    {
+                        <section class="content-stack">
+                            <div class="section-head">
+                                <div>
+                                    <h3>Организация</h3>
+                                    <span>@(_organizationEditMode ? "Редактирование" : "Сохраненные сведения")</span>
+                                </div>
+                                @if (!_organizationEditMode)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="StartOrganizationEdit">Редактировать</button>
+                                }
+                            </div>
+
+                            @if (!_organizationEditMode)
+                            {
+                                <div class="readonly-grid">
+                                    <InfoRow Label="Полное название" Value="@DisplayValue(_selectedPractice.OrganizationFullName ?? _selectedPractice.OrganizationName)" />
+                                    <InfoRow Label="Сокращенное название" Value="@DisplayValue(_selectedPractice.OrganizationShortName)" />
+                                    <InfoRow Label="Адрес" Value="@DisplayValue(_selectedPractice.OrganizationAddress)" />
+                                    <InfoRow Label="Руководитель" Value="@DisplayValue(_selectedPractice.OrganizationSupervisorFullName)" />
+                                    <InfoRow Label="Должность" Value="@DisplayValue(_selectedPractice.OrganizationSupervisorPosition)" />
+                                    <InfoRow Label="Телефон" Value="@DisplayValue(_selectedPractice.OrganizationSupervisorPhone)" />
+                                    <InfoRow Label="Email" Value="@DisplayValue(_selectedPractice.OrganizationSupervisorEmail)" />
+                                    <InfoRow Label="Содержание задания" Value="@DisplayValue(_selectedPractice.PracticeTaskContent)" />
+                                </div>
+                            }
+                            else
+                            {
+                                <EditForm Model="_organization" OnValidSubmit="SaveOrganizationAsync" class="form-card">
+                                    <label>Полное название организации</label>
+                                    <InputText @bind-Value="_organization.OrganizationFullName" />
+                                    <label>Сокращенное название</label>
+                                    <InputText @bind-Value="_organization.OrganizationShortName" />
+                                    <label>Адрес</label>
+                                    <InputText @bind-Value="_organization.OrganizationAddress" />
+                                    <label>ФИО руководителя</label>
+                                    <InputText @bind-Value="_organization.OrganizationSupervisorFullName" />
+                                    <label>Должность</label>
+                                    <InputText @bind-Value="_organization.OrganizationSupervisorPosition" />
+                                    <label>Телефон</label>
+                                    <InputText @bind-Value="_organization.OrganizationSupervisorPhone" inputmode="tel" />
+                                    <label>Email руководителя</label>
+                                    <InputText @bind-Value="_organization.OrganizationSupervisorEmail" inputmode="email" />
+                                    <label>Содержание задания</label>
+                                    <InputTextArea @bind-Value="_organization.PracticeTaskContent" />
+                                    <div class="form-actions">
+                                        <button class="primary-button" disabled="@_busy">Сохранить</button>
+                                        @if (_selectedPractice.HasRequiredDetails)
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="CancelOrganizationEdit">Отмена</button>
+                                        }
+                                    </div>
+                                </EditForm>
+                            }
+                        </section>
+                    }
+                    else if (_practiceTab == "diary")
+                    {
+                        <section class="content-stack">
+                            <div class="toolbar">
+                                <input type="date" value="@_diaryDateText" @onchange="OnDiaryDateChanged" />
+                                <button class="secondary-button" @onclick="LoadDiaryDate">Открыть</button>
+                            </div>
+                            <EditForm Model="_diary" OnValidSubmit="SaveDiaryAsync" class="form-card">
+                                <label>Краткое описание</label>
+                                <InputTextArea @bind-Value="_diary.ShortDescription" />
+                                <label>Подробный отчет за день</label>
+                                <div class="day-report-card">
+                                    <div class="day-report-summary">
+                                        <strong>@ReportStatsText</strong>
+                                        <span>@ReportExcerpt</span>
+                                    </div>
+                                    <div class="report-toolbar">
+                                        <button type="button" class="secondary-button" @onclick="AddReportTextBlock">+ Текст</button>
+                                        <button type="button" class="secondary-button" @onclick="AddReportTableBlock">+ Таблица</button>
+                                        <button type="button" class="secondary-button" @onclick="AddReportImageBlock">+ Рисунок</button>
+                                    </div>
+
+                                    @if (_reportBlocks.Count == 0)
+                                    {
+                                        <div class="empty-state">Добавьте текст, таблицу или рисунок для подробного отчета.</div>
+                                    }
+
+                                    @for (var index = 0; index < _reportBlocks.Count; index++)
+                                    {
+                                        var block = _reportBlocks[index];
+                                        <section class="report-block" @key="block.Id">
+                                            <div class="report-block-head">
+                                                <strong>@ReportBlockTitle(block, index)</strong>
+                                                <div>
+                                                    <button type="button" class="icon-button tiny" disabled="@(index == 0)" @onclick="() => MoveReportBlock(block, -1)">↑</button>
+                                                    <button type="button" class="icon-button tiny" disabled="@(index == _reportBlocks.Count - 1)" @onclick="() => MoveReportBlock(block, 1)">↓</button>
+                                                    <button type="button" class="icon-button tiny danger" @onclick="() => RemoveReportBlock(block)">×</button>
+                                                </div>
+                                            </div>
+
+                                            @if (block.Type == "text")
+                                            {
+                                                <select @bind="block.Mode">
+                                                    <option value="paragraph">Обычный текст</option>
+                                                    <option value="bullet_list">Маркированный список</option>
+                                                    <option value="numbered_list">Нумерованный список</option>
+                                                </select>
+                                                <textarea rows="6" placeholder="Опишите выполненную работу, решения, проблемы и результат дня" @bind="block.Content"></textarea>
+                                            }
+                                            else if (block.Type == "table")
+                                            {
+                                                <input placeholder="Название таблицы" @bind="block.Title" />
+                                                <label class="inline-check">
+                                                    <input type="checkbox" @bind="block.HasHeaderRow" />
+                                                    первая строка является заголовком
+                                                </label>
+                                                <div class="report-table-wrap">
+                                                    <table class="report-table-editor">
+                                                        <tbody>
+                                                            @foreach (var row in block.Rows)
+                                                            {
+                                                                <tr @key="row.Id">
+                                                                    @foreach (var cell in row.Cells)
+                                                                    {
+                                                                        <td @key="cell.Id">
+                                                                            <textarea rows="2" @bind="cell.Text"></textarea>
+                                                                        </td>
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div class="report-mini-actions">
+                                                    <button type="button" class="secondary-button" @onclick="() => AddReportTableRow(block)">+ Строка</button>
+                                                    <button type="button" class="secondary-button" @onclick="() => AddReportTableColumn(block)">+ Столбец</button>
+                                                    <button type="button" class="secondary-button" disabled="@(block.Rows.Count <= 1)" @onclick="() => RemoveReportTableRow(block)">− Строка</button>
+                                                    <button type="button" class="secondary-button" disabled="@(!CanRemoveReportTableColumn(block))" @onclick="() => RemoveReportTableColumn(block)">− Столбец</button>
+                                                </div>
+                                            }
+                                            else if (block.Type == "image")
+                                            {
+                                                <input placeholder="Название рисунка" @bind="block.Title" />
+                                                <input placeholder="Описание изображения" @bind="block.Alt" />
+                                                @if (!string.IsNullOrWhiteSpace(block.PreviewUrl))
+                                                {
+                                                    <img class="report-image-preview" src="@block.PreviewUrl" alt="@block.Alt" />
+                                                }
+                                                else if (block.AttachmentId.HasValue)
+                                                {
+                                                    <div class="report-file-pill">Прикреплено: @DisplayValue(block.FileName)</div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="empty-state">Изображение не выбрано.</div>
+                                                }
+                                                <InputFile OnChange="args => OnReportImageSelected(block, args)" accept="image/png,image/jpeg,image/webp" />
+                                            }
+                                        </section>
+                                    }
+                                </div>
+                                <button class="primary-button" disabled="@_busy">Сохранить день</button>
+                            </EditForm>
+                            @foreach (var entry in _selectedPractice.DiaryEntries.OrderByDescending(x => x.WorkDate))
+                            {
+                                <article class="list-card" @onclick="() => SelectDiaryEntry(entry)">
+                                    <strong>@entry.WorkDate.ToString("dd.MM.yyyy")</strong>
+                                    <span>@entry.ShortDescription</span>
+                                    @if (entry.IsReviewed)
+                                    {
+                                        <small>Проверено: @entry.SupervisorGrade</small>
+                                    }
+                                </article>
+                            }
+                        </section>
+                    }
+                    else if (_practiceTab == "intro")
+                    {
+                        <section class="content-stack">
+                            <div class="section-head">
+                                <div>
+                                    <h3>Введение</h3>
+                                    <span>@(_introEditMode ? "Редактирование" : "Сохраненные сведения")</span>
+                                </div>
+                                @if (!_introEditMode)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="StartIntroEdit">Редактировать</button>
+                                }
+                            </div>
+
+                            @if (!_introEditMode)
+                            {
+                                <div class="readonly-grid">
+                                    <InfoRow Label="Основная цель" Value="@DisplayValue(_selectedPractice.IntroductionMainGoal)" />
+                                    <InfoRow Label="Выполняемые обязанности" Value="@DisplayValue(_selectedPractice.StudentDuties)" />
+                                    <InfoRow Label="Предоставленные материалы" Value="@DisplayValue(_selectedPractice.ProvidedMaterialsDescription)" />
+                                    <InfoRow Label="График работы" Value="@DisplayValue(_selectedPractice.WorkScheduleDescription)" />
+                                </div>
+                            }
+                            else
+                            {
+                                <EditForm Model="_organization" OnValidSubmit="SaveOrganizationAsync" class="form-card">
+                                    <label>Основная цель</label>
+                                    <InputTextArea @bind-Value="_organization.IntroductionMainGoal" />
+                                    <label>Выполняемые обязанности</label>
+                                    <InputTextArea @bind-Value="_organization.StudentDuties" />
+                                    <label>Предоставленные материалы</label>
+                                    <InputTextArea @bind-Value="_organization.ProvidedMaterialsDescription" />
+                                    <label>График работы</label>
+                                    <InputTextArea @bind-Value="_organization.WorkScheduleDescription" />
+                                    <div class="form-actions">
+                                        <button class="primary-button" disabled="@_busy">Сохранить введение</button>
+                                        @if (HasIntroductionContent(_selectedPractice))
+                                        {
+                                            <button type="button" class="secondary-button" @onclick="CancelIntroEdit">Отмена</button>
+                                        }
+                                    </div>
+                                </EditForm>
+                            }
+                        </section>
+                    }
+                    else if (_practiceTab == "technical")
+                    {
+                        <section class="content-stack">
+                            <div class="section-head">
+                                <div>
+                                    <h3>Таблицы</h3>
+                                    <span>@(_technicalEditMode ? "Редактирование" : "Сохраненные сведения")</span>
+                                </div>
+                                @if (!_technicalEditMode)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="StartTechnicalEdit">Редактировать</button>
+                                }
+                            </div>
+
+                            @if (!_technicalEditMode)
+                            {
+                                @if (_selectedPractice.ReportItems.Any(IsTechnicalReportItem))
+                                {
+                                    @foreach (var item in _selectedPractice.ReportItems.Where(IsTechnicalReportItem).OrderBy(x => x.SortOrder))
+                                    {
+                                        <article class="list-card">
+                                            <strong>@ReportItemCategoryLabel(item.Category): @DisplayValue(item.Name)</strong>
+                                            <span>@DisplayValue(item.Description)</span>
+                                        </article>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="empty-state">Технические средства и ПО пока не заполнены.</div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="toolbar">
+                                    <button type="button" class="secondary-button" @onclick='() => AddReportItem("TechnicalTool")'>+ Техническое средство</button>
+                                    <button type="button" class="secondary-button" @onclick='() => AddReportItem("SoftwareTool")'>+ ПО/технология</button>
+                                </div>
+                                @foreach (var item in _reportItems)
+                                {
+                                    <div class="form-card compact">
+                                        <select @bind="item.Category">
+                                            <option value="TechnicalTool">Техническое средство</option>
+                                            <option value="SoftwareTool">Программное средство</option>
+                                            <option value="IntroductionWorkType">Вид работ</option>
+                                            <option value="IntroductionSoftwareTechnology">Технология</option>
+                                        </select>
+                                        <input placeholder="Название" @bind="item.Name" />
+                                        <textarea placeholder="Описание" @bind="item.Description"></textarea>
+                                    </div>
+                                }
+                                <div class="form-actions">
+                                    <button type="button" class="primary-button" @onclick="SaveReportItemsAsync">Сохранить таблицы</button>
+                                    @if (_selectedPractice.ReportItems.Any(IsTechnicalReportItem))
+                                    {
+                                        <button type="button" class="secondary-button" @onclick="CancelTechnicalEdit">Отмена</button>
+                                    }
+                                </div>
+                            }
+                        </section>
+                    }
+                    else if (_practiceTab == "sources")
+                    {
+                        <section class="content-stack">
+                            <div class="section-head">
+                                <div>
+                                    <h3>Источники</h3>
+                                    <span>@(_sourcesEditMode ? "Редактирование" : "Сохраненный список")</span>
+                                </div>
+                                @if (!_sourcesEditMode)
+                                {
+                                    <button type="button" class="secondary-button" @onclick="StartSourcesEdit">Редактировать</button>
+                                }
+                            </div>
+
+                            @if (!_sourcesEditMode)
+                            {
+                                @if (_selectedPractice.Sources.Count > 0)
+                                {
+                                    @foreach (var source in _selectedPractice.Sources.OrderBy(x => x.SortOrder))
+                                    {
+                                        <article class="list-card">
+                                            <strong>@source.Title</strong>
+                                            @if (!string.IsNullOrWhiteSpace(source.Url))
+                                            {
+                                                <span>@source.Url</span>
+                                            }
+                                            <small>@DisplayValue(source.Description)</small>
+                                        </article>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="empty-state">Источники пока не указаны.</div>
+                                }
+                            }
+                            else
+                            {
+                                <button type="button" class="secondary-button" @onclick="AddSource">+ Источник</button>
+                                @foreach (var source in _sources)
+                                {
+                                    <div class="form-card compact">
+                                        <input placeholder="Название" @bind="source.Title" />
+                                        <input placeholder="URL" @bind="source.Url" />
+                                        <textarea placeholder="Описание" @bind="source.Description"></textarea>
+                                    </div>
+                                }
+                                <div class="form-actions">
+                                    <button type="button" class="primary-button" @onclick="SaveSourcesAsync">Сохранить источники</button>
+                                    @if (_selectedPractice.Sources.Count > 0)
+                                    {
+                                        <button type="button" class="secondary-button" @onclick="CancelSourcesEdit">Отмена</button>
+                                    }
+                                </div>
+                            }
+                        </section>
+                    }
+                    else if (_practiceTab == "appendices")
+                    {
+                        <section class="content-stack">
+                            <div class="form-card">
+                                <label>Название приложения</label>
+                                <input @bind="_appendixTitle" />
+                                <label>Описание</label>
+                                <textarea @bind="_appendixDescription"></textarea>
+                                <InputFile OnChange="OnAppendixFileSelected" />
+                                <button class="primary-button" @onclick="UploadAppendixAsync">Загрузить</button>
+                            </div>
+                            @foreach (var appendix in _selectedPractice.Appendices)
+                            {
+                                <article class="list-card">
+                                    <strong>@appendix.Title</strong>
+                                    <span>@appendix.FileName</span>
+                                    <button class="secondary-button" @onclick="() => DownloadAppendixAsync(appendix.Id)">Открыть</button>
+                                    <button class="danger-button" @onclick="() => DeleteAppendixAsync(appendix.Id)">Удалить</button>
+                                </article>
+                            }
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="content-stack">
+                            <button class="primary-button" @onclick="DownloadPracticeReportAsync">Сформировать отчет практики</button>
+                            <button class="secondary-button" disabled>Аттестационный лист</button>
+                            <button class="secondary-button" disabled>Дневник практики</button>
+                        </section>
+                    }
+                </div>
+            </section>
+        </div>
+    }
+
+    @if (_thread is not null)
+    {
+        <div class="modal-backdrop">
+            <section class="practice-modal chat-modal">
+                <header class="modal-header">
+                    <div>
+                        <span>@_thread.OtherUser.Subtitle</span>
+                        <h2>@_thread.OtherUser.FullName</h2>
+                    </div>
+                    <button class="icon-button light" @onclick="CloseThread">×</button>
+                </header>
+                <div class="messages">
+                    @foreach (var message in _thread.Messages)
+                    {
+                        <div class="message @(message.SenderUserId == Session.User?.Id ? "own" : "")">
+                            <span>@message.SenderFullName</span>
+                            <p>@message.Text</p>
+                            @foreach (var file in message.Attachments)
+                            {
+                                <button class="link-button" @onclick="() => DownloadChatAttachmentAsync(file.Id, file.FileName)">@file.FileName</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="chat-compose">
+                    <textarea placeholder="Сообщение" @bind="_chatText"></textarea>
+                    <InputFile OnChange="OnChatFileSelected" />
+                    <button class="primary-button" @onclick="SendMessageAsync">Отправить</button>
+                </div>
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _ready;
+    private bool _busy;
+    private bool _statusIsError;
+    private string _status = string.Empty;
+    private string _authMode = "login";
+    private string _mainTab = "practices";
+    private string _practiceTab = "overview";
+    private string _practiceSearch = string.Empty;
+    private string _practiceFilter = "active";
+    private bool _organizationEditMode;
+    private bool _introEditMode;
+    private bool _technicalEditMode;
+    private bool _sourcesEditMode;
+    private bool _registrationCodeSent;
+    private string _diaryDateText = DateTime.Today.ToString("yyyy-MM-dd");
+    private string _contactSearch = string.Empty;
+    private string _chatText = string.Empty;
+    private string _appendixTitle = string.Empty;
+    private string? _appendixDescription;
+    private IBrowserFile? _appendixFile;
+    private IBrowserFile? _chatFile;
+    private ChatUser? _pendingChatTarget;
+
+    private readonly LoginRequest _login = new();
+    private readonly RegisterRequest _register = new();
+    private readonly ForgotPasswordRequest _forgot = new();
+    private readonly PasswordResetRequest _reset = new();
+    private readonly ChangePasswordRequest _changePassword = new();
+    private UpdateProfileRequest _profile = new();
+    private StudentPracticeOrganizationRequest _organization = new();
+    private StudentPracticeDiaryEntryRequest _diary = new();
+    private List<StudentPracticeReportItemRequest> _reportItems = new();
+    private List<StudentPracticeSourceRequest> _sources = new();
+    private List<DayReportBlockModel> _reportBlocks = new();
+    private List<StudentPracticeListItem> _practices = new();
+    private List<SpecialtyItem> _specialties = new();
+    private List<GroupItem> _groups = new();
+    private List<NotificationItem> _notifications = new();
+    private List<ChatThreadItem> _chatThreads = new();
+    private List<ChatUser> _contacts = new();
+    private StudentPracticeDetails? _selectedPractice;
+    private ChatThreadDetails? _thread;
+
+    private readonly Dictionary<string, string> _practiceTabs = new()
+    {
+        ["overview"] = "Сведения",
+        ["organization"] = "Организация",
+        ["diary"] = "Дневник",
+        ["intro"] = "Введение",
+        ["technical"] = "Таблицы",
+        ["sources"] = "Источники",
+        ["appendices"] = "Приложения",
+        ["documents"] = "Документы"
+    };
+
+    private static readonly JsonSerializerOptions DayReportJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private const long MaxReportImageSizeBytes = 8 * 1024 * 1024;
+
+    private IEnumerable<StudentPracticeListItem> FilteredPractices => _practices
+        .Where(x => _practiceFilter == "all" || (_practiceFilter == "active" && !x.IsCompleted) || (_practiceFilter == "completed" && x.IsCompleted))
+        .Where(x => string.IsNullOrWhiteSpace(_practiceSearch) ||
+            $"{x.PracticeIndex} {x.Name} {x.ProfessionalModuleCode} {x.ProfessionalModuleName} {x.SupervisorFullName} {x.OrganizationName}".Contains(_practiceSearch, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(x => x.StartDate);
+
+    private string Initials => string.Join("", new[] { Session.User?.Surname?.FirstOrDefault(), Session.User?.FirstName?.FirstOrDefault() }.Where(x => x.HasValue).Select(x => x!.Value));
+    private string UnreadNotificationBadge => _notifications.Count(x => !x.IsRead) > 0 ? $"({_notifications.Count(x => !x.IsRead)})" : string.Empty;
+    private string UnreadChatBadge => _chatThreads.Sum(x => x.UnreadCount) > 0 ? $"({_chatThreads.Sum(x => x.UnreadCount)})" : string.Empty;
+    private string ReportStatsText => $"{_reportBlocks.Count(x => x.Type == "text")} текст · {_reportBlocks.Count(x => x.Type == "table")} таблиц · {_reportBlocks.Count(x => x.Type == "image")} рисунков";
+    private string ReportExcerpt
+    {
+        get
+        {
+            var text = string.Join(" · ", _reportBlocks
+                .Select(block => block.Type switch
+                {
+                    "table" => block.Title,
+                    "image" => block.Title,
+                    _ => block.Content
+                })
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim()));
+
+            if (string.IsNullOrWhiteSpace(text))
+                return "Отчет пока пустой. Добавьте текст, таблицу или рисунок.";
+
+            return text.Length > 160 ? $"{text[..160]}..." : text;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += StateHasChanged;
+        try
+        {
+            await Session.InitializeAsync(Api);
+            _specialties = await Api.GetSpecialtiesAsync();
+            if (Session.IsAuthenticated)
+                await LoadStudentWorkspaceAsync();
+
+            if (_specialties.Count == 0 && !Session.IsAuthenticated)
+                SetStatus($"API не ответило. Проверьте, что PracticeMonitoring.Api запущен на {Session.BaseUrl}.", true);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось подключиться к API: {ex.Message}", true);
+        }
+        _ready = true;
+    }
+
+    private async Task LoginAsync()
+    {
+        await RunAsync(async () =>
+        {
+            var result = await Api.LoginAsync(_login);
+            if (!result.Success || result.Data is null)
+            {
+                SetStatus(result.ErrorMessage, true);
+                return;
+            }
+
+            if (result.Data.Role != "Student")
+            {
+                SetStatus("Мобильное приложение доступно только студентам.", true);
+                return;
+            }
+
+            var user = await Api.GetCurrentUserAsync(result.Data.Token);
+            if (user is null)
+            {
+                SetStatus("Не удалось получить профиль.", true);
+                return;
+            }
+
+            await Session.SignInAsync(result.Data.Token, user);
+            SyncProfile();
+            await LoadStudentWorkspaceAsync();
+            SetStatus(result.Data.MustChangePassword ? "Войдите и смените временный пароль в профиле." : string.Empty, false);
+        });
+    }
+
+    private async Task RegisterStepAsync()
+    {
+        await RunAsync(async () =>
+        {
+            if (!_registrationCodeSent)
+            {
+                var result = await Api.SendRegistrationCodeAsync(_register);
+                _registrationCodeSent = result.Success;
+                SetStatus(result.Success ? "Код подтверждения отправлен на email." : result.ErrorMessage, !result.Success);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_register.Code))
+            {
+                SetStatus("Введите код подтверждения.", true);
+                return;
+            }
+
+            var registerResult = await Api.RegisterAsync(_register);
+            if (!registerResult.Success || registerResult.Data is null)
+            {
+                SetStatus(registerResult.ErrorMessage, true);
+                return;
+            }
+
+            var user = await Api.GetCurrentUserAsync(registerResult.Data.Token);
+            if (user is null)
+            {
+                SetStatus("Регистрация выполнена, но профиль не загрузился.", true);
+                return;
+            }
+
+            await Session.SignInAsync(registerResult.Data.Token, user);
+            SyncProfile();
+            await LoadStudentWorkspaceAsync();
+        });
+    }
+
+    private async Task ForgotPasswordAsync()
+    {
+        await RunAsync(async () =>
+        {
+            var result = await Api.ForgotPasswordAsync(_forgot.Email);
+            if (!result.Success)
+            {
+                SetStatus(result.ErrorMessage, true);
+                return;
+            }
+
+            _reset.Email = _forgot.Email;
+            _reset.Code = string.Empty;
+            _reset.NewPassword = string.Empty;
+            _reset.ConfirmPassword = string.Empty;
+            _authMode = "reset";
+            SetStatus("Если аккаунт существует, код отправлен на email.", false);
+        });
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        await RunAsync(async () =>
+        {
+            var resetResult = await Api.ResetPasswordAsync(_reset);
+            SetStatus(resetResult.Success ? "Пароль изменен. Теперь можно войти." : resetResult.ErrorMessage, !resetResult.Success);
+            if (resetResult.Success)
+            {
+                _reset.Code = string.Empty;
+                _reset.NewPassword = string.Empty;
+                _reset.ConfirmPassword = string.Empty;
+                _authMode = "login";
+            }
+        });
+    }
+
+    private async Task OnSpecialtyChangedAsync(int? value)
+    {
+        _register.SpecialtyId = value;
+        _register.GroupId = null;
+        _groups = value.HasValue ? await Api.GetGroupsAsync(value.Value) : new List<GroupItem>();
+    }
+
+    private async Task LoadStudentWorkspaceAsync()
+    {
+        SyncProfile();
+        _practices = await Api.GetPracticesAsync();
+        _notifications = await Api.GetNotificationsAsync();
+        _chatThreads = await Api.GetChatThreadsAsync();
+    }
+
+    private async Task RefreshAllAsync() => await RunAsync(LoadStudentWorkspaceAsync);
+
+    private async Task OpenPracticeAsync(int assignmentId)
+    {
+        await RunAsync(async () =>
+        {
+            _selectedPractice = await Api.GetPracticeAsync(assignmentId);
+            if (_selectedPractice is null)
+            {
+                SetStatus("Не удалось открыть практику.", true);
+                return;
+            }
+
+            _practiceTab = "overview";
+            SyncPracticeForms();
+        });
+    }
+
+    private void SyncPracticeForms()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        _organization = new StudentPracticeOrganizationRequest
+        {
+            OrganizationName = _selectedPractice.OrganizationName,
+            OrganizationFullName = _selectedPractice.OrganizationFullName,
+            OrganizationShortName = _selectedPractice.OrganizationShortName,
+            OrganizationAddress = _selectedPractice.OrganizationAddress,
+            OrganizationSupervisorFullName = _selectedPractice.OrganizationSupervisorFullName,
+            OrganizationSupervisorPosition = _selectedPractice.OrganizationSupervisorPosition,
+            OrganizationSupervisorPhone = _selectedPractice.OrganizationSupervisorPhone,
+            OrganizationSupervisorEmail = _selectedPractice.OrganizationSupervisorEmail,
+            PracticeTaskContent = _selectedPractice.PracticeTaskContent,
+            StudentDuties = _selectedPractice.StudentDuties,
+            ProvidedMaterialsDescription = _selectedPractice.ProvidedMaterialsDescription,
+            WorkScheduleDescription = _selectedPractice.WorkScheduleDescription,
+            IntroductionMainGoal = _selectedPractice.IntroductionMainGoal
+        };
+
+        _reportItems = _selectedPractice.ReportItems.Select(x => new StudentPracticeReportItemRequest { Category = x.Category, Name = x.Name, Description = x.Description }).ToList();
+        _sources = _selectedPractice.Sources.Select(x => new StudentPracticeSourceRequest { Title = x.Title, Url = x.Url, Description = x.Description }).ToList();
+        _organizationEditMode = !_selectedPractice.HasRequiredDetails;
+        _introEditMode = !HasIntroductionContent(_selectedPractice);
+        _technicalEditMode = !_selectedPractice.ReportItems.Any(IsTechnicalReportItem);
+        _sourcesEditMode = _selectedPractice.Sources.Count == 0;
+        _diaryDateText = _selectedPractice.StartDate.ToString("yyyy-MM-dd");
+        LoadDiaryDate();
+    }
+
+    private void StartOrganizationEdit() => _organizationEditMode = true;
+    private void StartIntroEdit() => _introEditMode = true;
+    private void StartTechnicalEdit() => _technicalEditMode = true;
+    private void StartSourcesEdit() => _sourcesEditMode = true;
+
+    private void CancelOrganizationEdit()
+    {
+        SyncOrganizationForm();
+        _organizationEditMode = false;
+    }
+
+    private void CancelIntroEdit()
+    {
+        SyncOrganizationForm();
+        _introEditMode = false;
+    }
+
+    private void CancelTechnicalEdit()
+    {
+        if (_selectedPractice is not null)
+            _reportItems = _selectedPractice.ReportItems.Select(x => new StudentPracticeReportItemRequest { Category = x.Category, Name = x.Name, Description = x.Description }).ToList();
+
+        _technicalEditMode = false;
+    }
+
+    private void CancelSourcesEdit()
+    {
+        if (_selectedPractice is not null)
+            _sources = _selectedPractice.Sources.Select(x => new StudentPracticeSourceRequest { Title = x.Title, Url = x.Url, Description = x.Description }).ToList();
+
+        _sourcesEditMode = false;
+    }
+
+    private void SyncOrganizationForm()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        _organization = new StudentPracticeOrganizationRequest
+        {
+            OrganizationName = _selectedPractice.OrganizationName,
+            OrganizationFullName = _selectedPractice.OrganizationFullName,
+            OrganizationShortName = _selectedPractice.OrganizationShortName,
+            OrganizationAddress = _selectedPractice.OrganizationAddress,
+            OrganizationSupervisorFullName = _selectedPractice.OrganizationSupervisorFullName,
+            OrganizationSupervisorPosition = _selectedPractice.OrganizationSupervisorPosition,
+            OrganizationSupervisorPhone = _selectedPractice.OrganizationSupervisorPhone,
+            OrganizationSupervisorEmail = _selectedPractice.OrganizationSupervisorEmail,
+            PracticeTaskContent = _selectedPractice.PracticeTaskContent,
+            StudentDuties = _selectedPractice.StudentDuties,
+            ProvidedMaterialsDescription = _selectedPractice.ProvidedMaterialsDescription,
+            WorkScheduleDescription = _selectedPractice.WorkScheduleDescription,
+            IntroductionMainGoal = _selectedPractice.IntroductionMainGoal
+        };
+    }
+
+    private async Task SaveOrganizationAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        await SavePracticeResultAsync(await Api.SaveOrganizationAsync(_selectedPractice.AssignmentId, _organization), "Сведения сохранены.");
+    }
+
+    private void LoadDiaryDate()
+    {
+        if (_selectedPractice is null || !DateTime.TryParse(_diaryDateText, out var date))
+            return;
+
+        var entry = _selectedPractice.DiaryEntries.FirstOrDefault(x => x.WorkDate.Date == date.Date);
+        _diary = new StudentPracticeDiaryEntryRequest
+        {
+            WorkDate = date,
+            ShortDescription = entry?.ShortDescription ?? string.Empty,
+            DetailedReport = string.IsNullOrWhiteSpace(entry?.DetailedReport) ? "{\"version\":3,\"type\":\"practice-day-report\",\"blocks\":[]}" : entry!.DetailedReport,
+            KeptAttachmentIds = entry?.Attachments.Select(x => x.Id).ToList() ?? new List<int>()
+        };
+        _reportBlocks = ParseDayReport(_diary.DetailedReport, entry?.Attachments ?? new List<StudentPracticeDiaryAttachment>());
+    }
+
+    private void OnDiaryDateChanged(ChangeEventArgs args)
+    {
+        _diaryDateText = args.Value?.ToString() ?? DateTime.Today.ToString("yyyy-MM-dd");
+        LoadDiaryDate();
+    }
+
+    private void SelectDiaryEntry(StudentPracticeDiaryEntry entry)
+    {
+        _diaryDateText = entry.WorkDate.ToString("yyyy-MM-dd");
+        LoadDiaryDate();
+    }
+
+    private async Task SaveDiaryAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        if (DateTime.TryParse(_diaryDateText, out var date))
+            _diary.WorkDate = date;
+
+        _diary.DetailedReport = SerializeDayReport();
+        _diary.Figures = BuildDiaryFigures();
+
+        await SavePracticeResultAsync(await Api.SaveDiaryEntryAsync(_selectedPractice.AssignmentId, _diary), "День сохранен.");
+    }
+
+    private void AddReportTextBlock()
+        => _reportBlocks.Add(new DayReportBlockModel { Id = MakeReportId("text"), Type = "text", Mode = "paragraph" });
+
+    private void AddReportTableBlock()
+        => _reportBlocks.Add(new DayReportBlockModel
+        {
+            Id = MakeReportId("table"),
+            Type = "table",
+            Title = "Результаты работы",
+            HasHeaderRow = true,
+            Rows =
+            {
+                new DayReportTableRowModel
+                {
+                    Id = MakeReportId("row"),
+                    Cells =
+                    {
+                        new DayReportTableCellModel { Id = MakeReportId("cell"), Text = "Показатель" },
+                        new DayReportTableCellModel { Id = MakeReportId("cell"), Text = "Описание" }
+                    }
+                },
+                new DayReportTableRowModel
+                {
+                    Id = MakeReportId("row"),
+                    Cells =
+                    {
+                        new DayReportTableCellModel { Id = MakeReportId("cell") },
+                        new DayReportTableCellModel { Id = MakeReportId("cell") }
+                    }
+                }
+            }
+        });
+
+    private void AddReportImageBlock()
+        => _reportBlocks.Add(new DayReportBlockModel
+        {
+            Id = MakeReportId("image"),
+            Type = "image",
+            Title = "Рисунок",
+            UploadClientId = MakeReportId("upload")
+        });
+
+    private void RemoveReportBlock(DayReportBlockModel block) => _reportBlocks.Remove(block);
+
+    private void MoveReportBlock(DayReportBlockModel block, int direction)
+    {
+        var index = _reportBlocks.IndexOf(block);
+        var targetIndex = index + direction;
+        if (index < 0 || targetIndex < 0 || targetIndex >= _reportBlocks.Count)
+            return;
+
+        _reportBlocks.RemoveAt(index);
+        _reportBlocks.Insert(targetIndex, block);
+    }
+
+    private void AddReportTableRow(DayReportBlockModel block)
+    {
+        var columns = Math.Max(1, block.Rows.FirstOrDefault()?.Cells.Count ?? 2);
+        block.Rows.Add(new DayReportTableRowModel
+        {
+            Id = MakeReportId("row"),
+            Cells = Enumerable.Range(0, columns)
+                .Select(_ => new DayReportTableCellModel { Id = MakeReportId("cell") })
+                .ToList()
+        });
+    }
+
+    private void AddReportTableColumn(DayReportBlockModel block)
+    {
+        if (block.Rows.Count == 0)
+            block.Rows.Add(new DayReportTableRowModel { Id = MakeReportId("row") });
+
+        foreach (var row in block.Rows)
+            row.Cells.Add(new DayReportTableCellModel { Id = MakeReportId("cell") });
+    }
+
+    private void RemoveReportTableRow(DayReportBlockModel block)
+    {
+        if (block.Rows.Count > 1)
+            block.Rows.RemoveAt(block.Rows.Count - 1);
+    }
+
+    private void RemoveReportTableColumn(DayReportBlockModel block)
+    {
+        if (!CanRemoveReportTableColumn(block))
+            return;
+
+        foreach (var row in block.Rows)
+            row.Cells.RemoveAt(row.Cells.Count - 1);
+    }
+
+    private static bool CanRemoveReportTableColumn(DayReportBlockModel block)
+        => block.Rows.Count > 0 && block.Rows.All(row => row.Cells.Count > 1);
+
+    private async Task OnReportImageSelected(DayReportBlockModel block, InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+            return;
+
+        if (file.Size > MaxReportImageSizeBytes)
+        {
+            SetStatus("Размер рисунка не должен превышать 8 МБ.", true);
+            return;
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/png" : file.ContentType;
+        if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus("К подробному отчету можно прикреплять только изображения.", true);
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(MaxReportImageSizeBytes);
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        var base64 = Convert.ToBase64String(memory.ToArray());
+
+        block.AttachmentId = null;
+        block.UploadClientId = string.IsNullOrWhiteSpace(block.UploadClientId) ? MakeReportId("upload") : block.UploadClientId;
+        block.FileName = file.Name;
+        block.MimeType = contentType;
+        block.Base64Content = base64;
+        block.PreviewUrl = $"data:{contentType};base64,{base64}";
+        if (string.IsNullOrWhiteSpace(block.Title))
+            block.Title = Path.GetFileNameWithoutExtension(file.Name);
+    }
+
+    private string SerializeDayReport()
+    {
+        var blocks = _reportBlocks.Select(block =>
+        {
+            if (block.Type == "table")
+            {
+                var rows = block.Rows.Count > 0 ? block.Rows : new List<DayReportTableRowModel>
+                {
+                    new() { Id = MakeReportId("row"), Cells = { new DayReportTableCellModel { Id = MakeReportId("cell") } } }
+                };
+
+                return (object)new
+                {
+                    type = "table",
+                    id = block.Id,
+                    title = block.Title?.Trim(),
+                    hasHeaderRow = block.HasHeaderRow,
+                    rows = rows.Select(row => new
+                    {
+                        id = row.Id,
+                        cells = row.Cells.Select(cell => new
+                        {
+                            id = cell.Id,
+                            text = cell.Text?.Trim(),
+                            colspan = 1,
+                            rowspan = 1,
+                            hidden = false
+                        })
+                    })
+                };
+            }
+
+            if (block.Type == "image")
+            {
+                if (!block.AttachmentId.HasValue && string.IsNullOrWhiteSpace(block.UploadClientId))
+                    block.UploadClientId = MakeReportId("upload");
+
+                return (object)new
+                {
+                    type = "image",
+                    id = block.Id,
+                    title = block.Title?.Trim(),
+                    attachmentId = block.AttachmentId,
+                    uploadClientId = block.AttachmentId.HasValue ? null : block.UploadClientId,
+                    alt = block.Alt?.Trim(),
+                    imageUrl = block.ImageUrl
+                };
+            }
+
+            return new
+            {
+                type = "text",
+                id = block.Id,
+                content = block.Content?.Trim(),
+                mode = string.IsNullOrWhiteSpace(block.Mode) ? "paragraph" : block.Mode
+            };
+        }).ToList();
+
+        return JsonSerializer.Serialize(new
+        {
+            version = 3,
+            type = "practice-day-report",
+            blocks
+        }, DayReportJsonOptions);
+    }
+
+    private List<StudentPracticeDiaryFigureRequest> BuildDiaryFigures()
+        => _reportBlocks
+            .Where(block => block.Type == "image" && !string.IsNullOrWhiteSpace(block.Base64Content))
+            .Select((block, index) => new StudentPracticeDiaryFigureRequest
+            {
+                ClientId = block.UploadClientId,
+                Caption = string.IsNullOrWhiteSpace(block.Title) ? "Рисунок" : block.Title.Trim(),
+                FileName = string.IsNullOrWhiteSpace(block.FileName) ? "figure.png" : block.FileName,
+                ContentType = string.IsNullOrWhiteSpace(block.MimeType) ? "image/png" : block.MimeType,
+                Base64Content = block.Base64Content,
+                SortOrder = index + 1
+            })
+            .ToList();
+
+    private static List<DayReportBlockModel> ParseDayReport(string? value, List<StudentPracticeDiaryAttachment> attachments)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return new List<DayReportBlockModel> { new() { Id = MakeReportId("text"), Type = "text", Mode = "paragraph" } };
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+            JsonElement blocksElement;
+            if (!root.TryGetProperty("blocks", out blocksElement) && !root.TryGetProperty("content", out blocksElement))
+                return new List<DayReportBlockModel> { new() { Id = MakeReportId("text"), Type = "text", Content = value, Mode = "paragraph" } };
+
+            var blocks = blocksElement.EnumerateArray()
+                .Select(block => ParseDayReportBlock(block, attachments))
+                .Where(block => block is not null)
+                .Select(block => block!)
+                .ToList();
+
+            return blocks.Count > 0
+                ? blocks
+                : new List<DayReportBlockModel> { new() { Id = MakeReportId("text"), Type = "text", Mode = "paragraph" } };
+        }
+        catch
+        {
+            return new List<DayReportBlockModel> { new() { Id = MakeReportId("text"), Type = "text", Content = value, Mode = "paragraph" } };
+        }
+    }
+
+    private static DayReportBlockModel? ParseDayReportBlock(JsonElement element, List<StudentPracticeDiaryAttachment> attachments)
+    {
+        var type = GetJsonString(element, "type") ?? "text";
+        var id = GetJsonString(element, "id") ?? MakeReportId(type);
+        if (type is "table")
+        {
+            var block = new DayReportBlockModel
+            {
+                Id = id,
+                Type = "table",
+                Title = GetJsonString(element, "title") ?? GetJsonString(element, "caption"),
+                HasHeaderRow = GetJsonBool(element, "hasHeaderRow") || GetJsonBool(element, "hasHeader")
+            };
+
+            if (element.TryGetProperty("rows", out var rowsElement) && rowsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var rowElement in rowsElement.EnumerateArray())
+                {
+                    var row = new DayReportTableRowModel { Id = GetJsonString(rowElement, "id") ?? MakeReportId("row") };
+                    if (rowElement.TryGetProperty("cells", out var cellsElement) && cellsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var cellElement in cellsElement.EnumerateArray())
+                        {
+                            if (GetJsonBool(cellElement, "hidden"))
+                                continue;
+
+                            row.Cells.Add(new DayReportTableCellModel
+                            {
+                                Id = GetJsonString(cellElement, "id") ?? MakeReportId("cell"),
+                                Text = GetJsonString(cellElement, "text")
+                            });
+                        }
+                    }
+
+                    if (row.Cells.Count > 0)
+                        block.Rows.Add(row);
+                }
+            }
+
+            if (block.Rows.Count == 0)
+                block.Rows.Add(new DayReportTableRowModel { Id = MakeReportId("row"), Cells = { new DayReportTableCellModel { Id = MakeReportId("cell") } } });
+
+            return block;
+        }
+
+        if (type is "image" or "figure")
+        {
+            var attachmentId = GetJsonInt(element, "attachmentId");
+            var attachment = attachmentId.HasValue ? attachments.FirstOrDefault(x => x.Id == attachmentId.Value) : null;
+            return new DayReportBlockModel
+            {
+                Id = id,
+                Type = "image",
+                Title = GetJsonString(element, "title") ?? GetJsonString(element, "caption") ?? attachment?.Caption,
+                AttachmentId = attachmentId,
+                UploadClientId = GetJsonString(element, "uploadClientId"),
+                ImageUrl = GetJsonString(element, "imageUrl"),
+                Alt = GetJsonString(element, "alt"),
+                FileName = GetJsonString(element, "fileName") ?? attachment?.FileName,
+                MimeType = GetJsonString(element, "mimeType") ?? attachment?.ContentType
+            };
+        }
+
+        return new DayReportBlockModel
+        {
+            Id = id,
+            Type = "text",
+            Content = GetJsonString(element, "content") ?? GetJsonString(element, "text") ?? string.Empty,
+            Mode = GetJsonString(element, "mode") ?? "paragraph"
+        };
+    }
+
+    private static string? GetJsonString(JsonElement element, string property)
+        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static bool GetJsonBool(JsonElement element, string property)
+        => element.TryGetProperty(property, out var value) &&
+           (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False) &&
+           value.GetBoolean();
+
+    private static int? GetJsonInt(JsonElement element, string property)
+        => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null;
+
+    private static string MakeReportId(string prefix) => $"{prefix}-{Guid.NewGuid():N}"[..Math.Min(prefix.Length + 9, prefix.Length + 33)];
+
+    private static string ReportBlockTitle(DayReportBlockModel block, int index)
+        => block.Type switch
+        {
+            "table" => $"Таблица {index + 1}",
+            "image" => $"Рисунок {index + 1}",
+            _ => $"Текстовый блок {index + 1}"
+        };
+
+    private void AddReportItem(string category) => _reportItems.Add(new StudentPracticeReportItemRequest { Category = category });
+
+    private async Task SaveReportItemsAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        await SavePracticeResultAsync(await Api.SaveReportItemsAsync(_selectedPractice.AssignmentId, new StudentPracticeReportItemsRequest { Items = _reportItems }), "Таблицы сохранены.");
+    }
+
+    private void AddSource() => _sources.Add(new StudentPracticeSourceRequest());
+
+    private async Task SaveSourcesAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        await SavePracticeResultAsync(await Api.SaveSourcesAsync(_selectedPractice.AssignmentId, new StudentPracticeSourcesRequest { Sources = _sources }), "Источники сохранены.");
+    }
+
+    private void OnAppendixFileSelected(InputFileChangeEventArgs args) => _appendixFile = args.File;
+
+    private async Task UploadAppendixAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        var result = await Api.UploadAppendixAsync(_selectedPractice.AssignmentId, _appendixTitle, _appendixDescription, _appendixFile);
+        if (result.Success && result.Data is not null)
+        {
+            _selectedPractice = result.Data.Details;
+            SyncPracticeForms();
+            _appendixTitle = string.Empty;
+            _appendixDescription = null;
+            _appendixFile = null;
+            SetStatus("Приложение загружено.", false);
+        }
+        else
+        {
+            SetStatus(result.ErrorMessage, true);
+        }
+    }
+
+    private async Task DeleteAppendixAsync(int appendixId)
+    {
+        var result = await Api.DeleteAppendixAsync(appendixId);
+        SetStatus(result.Success ? "Приложение удалено." : result.ErrorMessage, !result.Success);
+        if (result.Success && _selectedPractice is not null)
+            await OpenPracticeAsync(_selectedPractice.AssignmentId);
+    }
+
+    private async Task DownloadAppendixAsync(int appendixId)
+    {
+        var file = await Api.DownloadAsync($"api/student/appendices/{appendixId}/download", "appendix.bin");
+        if (file is not null)
+            await Api.SaveAndOpenFileAsync(file);
+    }
+
+    private async Task DownloadPracticeReportAsync()
+    {
+        if (_selectedPractice is null)
+            return;
+
+        var file = await Api.DownloadAsync($"api/student/practices/{_selectedPractice.AssignmentId}/report/download", "practice-report.docx");
+        if (file is null)
+            SetStatus("Не удалось сформировать отчет. Проверьте заполнение данных.", true);
+        else
+            await Api.SaveAndOpenFileAsync(file);
+    }
+
+    private async Task SavePracticeResultAsync(ApiResult<StudentPracticeDetails> result, string successMessage)
+    {
+        if (result.Success && result.Data is not null)
+        {
+            _selectedPractice = result.Data;
+            SyncPracticeForms();
+            _practices = await Api.GetPracticesAsync();
+            SetStatus(successMessage, false);
+        }
+        else
+        {
+            SetStatus(result.ErrorMessage, true);
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        await RunAsync(async () =>
+        {
+            var result = await Api.UpdateProfileAsync(_profile);
+            if (result.Success && result.Data is not null)
+            {
+                Session.SetUser(result.Data);
+                SyncProfile();
+                SetStatus("Профиль сохранен.", false);
+            }
+            else
+            {
+                SetStatus(result.ErrorMessage, true);
+            }
+        });
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        await RunAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(_changePassword.NewPassword))
+            {
+                SetStatus("Введите новый пароль.", true);
+                return;
+            }
+
+            if (_changePassword.NewPassword != _changePassword.ConfirmPassword)
+            {
+                SetStatus("Пароли не совпадают.", true);
+                return;
+            }
+
+            var result = await Api.ChangePasswordAsync(_changePassword);
+            SetStatus(result.Success ? "Пароль изменен." : result.ErrorMessage, !result.Success);
+            if (result.Success)
+            {
+                _changePassword.CurrentPassword = null;
+                _changePassword.NewPassword = string.Empty;
+                _changePassword.ConfirmPassword = string.Empty;
+            }
+        });
+    }
+
+    private void SyncProfile()
+    {
+        if (Session.User is null)
+            return;
+
+        _profile = new UpdateProfileRequest
+        {
+            Surname = Session.User.Surname,
+            FirstName = Session.User.FirstName,
+            Patronymic = Session.User.Patronymic,
+            Email = Session.User.Email,
+            AvatarUrl = Session.User.AvatarUrl,
+            Theme = Session.User.Theme
+        };
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Session.ClearAsync();
+        _selectedPractice = null;
+        _thread = null;
+        _status = string.Empty;
+    }
+
+    private async Task MarkNotificationReadAsync(int id)
+    {
+        var result = await Api.MarkNotificationReadAsync(id);
+        if (result.Success)
+            _notifications = await Api.GetNotificationsAsync();
+    }
+
+    private async Task MarkAllNotificationsReadAsync()
+    {
+        var result = await Api.MarkAllNotificationsReadAsync();
+        if (result.Success)
+            _notifications = await Api.GetNotificationsAsync();
+    }
+
+    private async Task SearchContactsAsync()
+    {
+        _contacts = await Api.SearchContactsAsync(_contactSearch);
+    }
+
+    private void StartChatAsync(ChatUser contact)
+    {
+        _pendingChatTarget = contact;
+        _thread = new ChatThreadDetails { OtherUser = contact };
+    }
+
+    private async Task OpenThreadAsync(int id)
+    {
+        _thread = await Api.GetChatThreadAsync(id);
+        _pendingChatTarget = null;
+        _chatThreads = await Api.GetChatThreadsAsync();
+    }
+
+    private void OnChatFileSelected(InputFileChangeEventArgs args) => _chatFile = args.File;
+
+    private async Task SendMessageAsync()
+    {
+        if (_thread is null)
+            return;
+
+        var result = await Api.SendChatMessageAsync(_thread.Id, _thread.Id == 0 ? _pendingChatTarget?.Id : null, _chatText, _chatFile);
+        if (result.Success && result.Data is not null)
+        {
+            _chatText = string.Empty;
+            _chatFile = null;
+            _thread = await Api.GetChatThreadAsync(result.Data.ThreadId);
+            _chatThreads = await Api.GetChatThreadsAsync();
+            _contacts.Clear();
+        }
+        else
+        {
+            SetStatus(result.ErrorMessage, true);
+        }
+    }
+
+    private async Task DownloadChatAttachmentAsync(int id, string fileName)
+    {
+        var file = await Api.DownloadAsync($"api/chats/attachments/{id}/download", fileName);
+        if (file is not null)
+            await Api.SaveAndOpenFileAsync(file);
+    }
+
+    private void ClosePractice()
+    {
+        _selectedPractice = null;
+        _status = string.Empty;
+    }
+
+    private void CloseThread()
+    {
+        _thread = null;
+        _pendingChatTarget = null;
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _status = string.Empty;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка: {ex.Message}", true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        _status = message;
+        _statusIsError = isError;
+    }
+
+    private void SetAuthMode(string mode)
+    {
+        _authMode = mode;
+        _status = string.Empty;
+    }
+
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "Не указано" : value.Trim();
+
+    private static bool HasIntroductionContent(StudentPracticeDetails? details)
+        => details is not null && new[]
+        {
+            details.IntroductionMainGoal,
+            details.StudentDuties,
+            details.ProvidedMaterialsDescription,
+            details.WorkScheduleDescription
+        }.Any(value => !string.IsNullOrWhiteSpace(value));
+
+    private static bool IsTechnicalReportItem(StudentPracticeReportItem item)
+        => item.Category is "TechnicalTool" or "SoftwareTool";
+
+    private static string ReportItemCategoryLabel(string category)
+        => category switch
+        {
+            "TechnicalTool" => "Техническое средство",
+            "SoftwareTool" => "Программное средство",
+            "IntroductionWorkType" => "Вид работ",
+            "IntroductionSoftwareTechnology" => "Технология",
+            _ => "Пункт отчета"
+        };
+
+    private string MainTabClass(string tab) => _mainTab == tab ? "active" : string.Empty;
+    private string AuthTabClass(string mode) => (_authMode == mode || mode == "forgot" && _authMode == "reset") ? "active" : string.Empty;
+    private string PracticeTabClass(string tab) => _practiceTab == tab ? "active" : string.Empty;
+    private static string DateRange(DateTime start, DateTime end) => $"{start:dd.MM.yyyy} - {end:dd.MM.yyyy}";
+
+    private sealed class DayReportBlockModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = "text";
+        public string? Content { get; set; }
+        public string Mode { get; set; } = "paragraph";
+        public string? Title { get; set; }
+        public bool HasHeaderRow { get; set; }
+        public List<DayReportTableRowModel> Rows { get; set; } = new();
+        public int? AttachmentId { get; set; }
+        public string? UploadClientId { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? Alt { get; set; }
+        public string? FileName { get; set; }
+        public string? MimeType { get; set; }
+        public string? Base64Content { get; set; }
+        public string? PreviewUrl { get; set; }
+    }
+
+    private sealed class DayReportTableRowModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public List<DayReportTableCellModel> Cells { get; set; } = new();
+    }
+
+    private sealed class DayReportTableCellModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? Text { get; set; }
+    }
+
+    public void Dispose()
+    {
+        Session.Changed -= StateHasChanged;
+    }
+}

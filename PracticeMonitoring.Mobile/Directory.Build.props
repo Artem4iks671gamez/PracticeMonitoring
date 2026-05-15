@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(SystemDrive)\pm-mobile-build\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(SystemDrive)\pm-mobile-build\bin\</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

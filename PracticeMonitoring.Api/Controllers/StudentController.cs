@@ -330,9 +330,7 @@ public class StudentController : ControllerBase
         if (errors.Count > 0)
             return BadRequest(new { message = "Проверьте таблицы отчёта.", errors });
 
-        _context.StudentPracticeReportItems.RemoveRange(assignment.ReportItems);
-
-        assignment.ReportItems = request.Items
+        var reportItems = request.Items
             .Where(x => !string.IsNullOrWhiteSpace(x.Name))
             .Select((x, index) => new StudentPracticeReportItem
             {
@@ -341,10 +339,17 @@ public class StudentController : ControllerBase
                 Name = x.Name!.Trim(),
                 Description = NormalizeOptional(x.Description),
                 SortOrder = index + 1
-            })
-            .ToList();
+            });
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.StudentPracticeReportItems
+            .Where(x => x.ProductionPracticeStudentAssignmentId == assignment.Id)
+            .ExecuteDeleteAsync();
+
+        _context.StudentPracticeReportItems.AddRange(reportItems);
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         _context.ChangeTracker.Clear();
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
@@ -364,9 +369,7 @@ public class StudentController : ControllerBase
         if (errors.Count > 0)
             return BadRequest(new { message = "Проверьте список источников.", errors });
 
-        _context.StudentPracticeSources.RemoveRange(assignment.Sources);
-
-        assignment.Sources = request.Sources
+        var sources = request.Sources
             .Where(x => !string.IsNullOrWhiteSpace(x.Title))
             .Select((x, index) => new StudentPracticeSource
             {
@@ -375,11 +378,19 @@ public class StudentController : ControllerBase
                 Url = NormalizeOptional(x.Url),
                 Description = NormalizeOptional(x.Description),
                 SortOrder = index + 1
-            })
-            .ToList();
+            });
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.StudentPracticeSources
+            .Where(x => x.ProductionPracticeStudentAssignmentId == assignment.Id)
+            .ExecuteDeleteAsync();
+
+        _context.StudentPracticeSources.AddRange(sources);
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
+        _context.ChangeTracker.Clear();
         assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
         return Ok(MapDetails(assignment!));
     }
