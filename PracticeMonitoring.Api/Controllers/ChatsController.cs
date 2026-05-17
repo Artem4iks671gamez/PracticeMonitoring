@@ -42,7 +42,7 @@ public class ChatsController : ControllerBase
                     {
                         p.User.FullName,
                         p.User.Email,
-                        Role = p.User.Role.Name,
+                        Role = p.User.Role!.Name,
                         p.User.AvatarUrl,
                         GroupName = p.User.Group != null ? p.User.Group.Name : null,
                         SpecialtyCode = p.User.Group != null && p.User.Group.Specialty != null ? p.User.Group.Specialty.Code : null,
@@ -121,7 +121,7 @@ public class ChatsController : ControllerBase
             .AsNoTracking()
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(x => x.Specialty)
+                .ThenInclude(x => x!.Specialty)
             .Where(x => accessibleUserIds.Contains(x.Id));
 
         if (!string.IsNullOrWhiteSpace(normalizedQuery))
@@ -143,10 +143,10 @@ public class ChatsController : ControllerBase
                 Id = x.Id,
                 FullName = x.FullName,
                 Email = x.Email,
-                Role = x.Role.Name,
+                Role = x.Role!.Name,
                 AvatarUrl = x.AvatarUrl,
                 Subtitle = BuildSubtitle(
-                    x.Role.Name,
+                    x.Role!.Name,
                     x.Group != null ? x.Group.Name : null,
                     x.Group != null && x.Group.Specialty != null ? x.Group.Specialty.Code : null,
                     x.Group != null && x.Group.Specialty != null ? x.Group.Specialty.Name : null)
@@ -171,7 +171,7 @@ public class ChatsController : ControllerBase
             .AsNoTracking()
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(x => x.Specialty)
+                .ThenInclude(x => x!.Specialty)
             .FirstOrDefaultAsync(x => x.Id == request.TargetUserId && x.IsActive);
 
         if (targetUser is null)
@@ -197,10 +197,10 @@ public class ChatsController : ControllerBase
                 Id = targetUser.Id,
                 FullName = targetUser.FullName,
                 Email = targetUser.Email,
-                Role = targetUser.Role.Name,
+                Role = targetUser.Role!.Name,
                 AvatarUrl = targetUser.AvatarUrl,
                 Subtitle = BuildSubtitle(
-                    targetUser.Role.Name,
+                    targetUser.Role!.Name,
                     targetUser.Group?.Name,
                     targetUser.Group?.Specialty?.Code,
                     targetUser.Group?.Specialty?.Name)
@@ -222,7 +222,7 @@ public class ChatsController : ControllerBase
             .Include(x => x.Participants)
                 .ThenInclude(x => x.User)
                     .ThenInclude(x => x.Group)
-                        .ThenInclude(x => x.Specialty)
+                        .ThenInclude(x => x!.Specialty)
             .Include(x => x.Messages.OrderBy(m => m.CreatedAtUtc))
                 .ThenInclude(x => x.SenderUser)
             .Include(x => x.Messages)
@@ -246,10 +246,10 @@ public class ChatsController : ControllerBase
                 Id = otherParticipant.UserId,
                 FullName = otherParticipant.User.FullName,
                 Email = otherParticipant.User.Email,
-                Role = otherParticipant.User.Role.Name,
+                Role = otherParticipant.User.Role!.Name,
                 AvatarUrl = otherParticipant.User.AvatarUrl,
                 Subtitle = BuildSubtitle(
-                    otherParticipant.User.Role.Name,
+                    otherParticipant.User.Role!.Name,
                     otherParticipant.User.Group?.Name,
                     otherParticipant.User.Group?.Specialty?.Code,
                     otherParticipant.User.Group?.Specialty?.Name)
@@ -455,7 +455,7 @@ public class ChatsController : ControllerBase
 
         var supervisorIds = await _context.Users
             .AsNoTracking()
-            .Where(x => x.IsActive && x.Id != currentUserId && x.Role.Name == "Supervisor")
+            .Where(x => x.IsActive && x.Id != currentUserId && x.Role!.Name == "Supervisor")
             .Select(x => x.Id)
             .ToListAsync();
 

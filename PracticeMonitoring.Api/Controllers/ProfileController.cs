@@ -32,7 +32,7 @@ public class ProfileController : ControllerBase
         var user = await _context.Users
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(g => g.Specialty)
+                .ThenInclude(g => g!.Specialty)
             .FirstOrDefaultAsync(x => x.Id == userId);
 
         if (user is null)
@@ -85,7 +85,7 @@ public class ProfileController : ControllerBase
             Id = user.Id,
             FullName = user.FullName,
             Email = user.Email,
-            Role = user.Role.Name,
+            Role = user.Role!.Name,
             Surname = user.Surname,
             FirstName = user.FirstName,
             Patronymic = user.Patronymic,

@@ -374,3 +374,6 @@ secrets.json
 .env
 .env.*
 /PracticeMonitoring.Web/Templates
+!/PracticeMonitoring.Web/templates/
+/PracticeMonitoring.Web/templates/*
+!/PracticeMonitoring.Web/templates/*.docx

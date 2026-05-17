@@ -1,4 +1,4 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const workspace = document.querySelector('[data-student-workspace]');
     if (workspace) {
         initStudentWorkspace(workspace);
@@ -17,6 +17,10 @@ function initStudentWorkspace(workspace) {
         deleteAppendix: workspace.dataset.deleteAppendixUrl || '',
         downloadAppendix: workspace.dataset.downloadAppendixUrl || '',
         downloadDiaryAttachment: workspace.dataset.downloadDiaryAttachmentUrl || '',
+        attestationPreview: workspace.dataset.attestationPreviewUrl || '',
+        downloadAttestation: workspace.dataset.downloadAttestationUrl || '',
+        practiceDiaryPreview: workspace.dataset.practiceDiaryPreviewUrl || '',
+        downloadPracticeDiary: workspace.dataset.downloadPracticeDiaryUrl || '',
         practiceReportPreview: workspace.dataset.practiceReportPreviewUrl || '',
         downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || ''
     };
@@ -39,7 +43,8 @@ function initStudentWorkspace(workspace) {
         reportEditorOpen: false,
         sourcesEditMode: false,
         introductionEditCompletedByAssignment: new Set(),
-        technicalEditCompletedByAssignment: new Set()
+        technicalEditCompletedByAssignment: new Set(),
+        attestationPreviewUrls: null
     };
 
     const technicalComputerLabel = 'Компьютер';
@@ -134,6 +139,17 @@ function initStudentWorkspace(workspace) {
             hideStatus();
         });
         $('#saveTechnicalToolsButton')?.addEventListener('click', saveTechnicalTools);
+        $('#downloadAttestationButton')?.addEventListener('click', openAttestationPreview);
+        $('#closeAttestationPreviewButton')?.addEventListener('click', closeAttestationPreview);
+        $('#studentAttestationPreviewModal')?.addEventListener('click', event => {
+            if (event.target.id === 'studentAttestationPreviewModal') {
+                closeAttestationPreview();
+            }
+        });
+        $('#downloadAttestationDocxButton')?.addEventListener('click', () => downloadAttestationFromPreview('docx'));
+        $('#downloadAttestationPdfButton')?.addEventListener('click', () => downloadAttestationFromPreview('pdf'));
+        $('#downloadAttestationArchiveButton')?.addEventListener('click', () => downloadAttestationFromPreview('archive'));
+        $('#downloadPracticeDiaryButton')?.addEventListener('click', openPracticeDiaryPreview);
         $('#downloadPracticeReportButton')?.addEventListener('click', downloadPracticeReport);
         $('#editSourcesButton')?.addEventListener('click', () => {
             state.sourcesEditMode = true;
@@ -507,7 +523,7 @@ function initStudentWorkspace(workspace) {
                 </div>
                 <div class="student-practice-date-cell">
                     <strong>${formatDate(practice.startDate)} - ${formatDate(practice.endDate)}</strong>
-                    <small>${practice.hours || 0} ч. · до ${formatDate(practice.detailsDueDate)} заполнить организацию</small>
+                    <small>${practice.hours || 0} �. � �� ${formatDate(practice.detailsDueDate)} ��������� �����������</small>
                 </div>
                 <div class="student-practice-supervisor-cell">
                     <strong>${escapeHtml(practice.supervisorFullName || 'Не назначен')}</strong>
@@ -561,7 +577,7 @@ function initStudentWorkspace(workspace) {
 
     function renderPracticeModal(details) {
         $('#studentPracticeModalTitle').textContent = `${details.practiceIndex} ${details.name}`;
-        $('#studentPracticeModalSubtitle').textContent = `${formatDate(details.startDate)} - ${formatDate(details.endDate)} · ${details.hours} ч. · ${details.supervisorFullName || 'руководитель не назначен'}`;
+        $('#studentPracticeModalSubtitle').textContent = `${formatDate(details.startDate)} - ${formatDate(details.endDate)} � ${details.hours} �. � ${details.supervisorFullName || '������������ �� ��������'}`;
         $('#studentPracticeModalEyebrow').textContent = details.isCompleted ? 'Завершённая практика' : 'Активная практика';
         renderOverview(details);
         renderOrganization(details);
@@ -573,6 +589,8 @@ function initStudentWorkspace(workspace) {
         renderSources(details.sources || []);
         renderSectionComment('sources', '#studentSourcesComment');
         renderAppendices(details.appendices || []);
+        if ($('#studentAttestationErrors')) $('#studentAttestationErrors').hidden = true;
+        if ($('#studentDocumentErrors')) $('#studentDocumentErrors').hidden = true;
         setPracticeReportButtonState(false, 'Проверяется готовность отчёта...');
         renderPracticeReportPreview(details.assignmentId);
     }
@@ -603,7 +621,7 @@ function initStudentWorkspace(workspace) {
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
                 .map(item => `
                     <article class="student-compact-card">
-                        <strong>${escapeHtml(item.competencyCode)} · ${escapeHtml(item.competencyDescription)}</strong>
+                        <strong>${escapeHtml(item.competencyCode)} � ${escapeHtml(item.competencyDescription)}</strong>
                         <small>Общая компетенция</small>
                     </article>`)
                 .join('')
@@ -612,7 +630,7 @@ function initStudentWorkspace(workspace) {
         $('#studentPracticeCompetencies').innerHTML = competencies.length
             ? competencies.map(item => `
                 <article class="student-compact-card">
-                    <strong>${escapeHtml(item.competencyCode)} · ${escapeHtml(item.competencyDescription)}</strong>
+                    <strong>${escapeHtml(item.competencyCode)} � ${escapeHtml(item.competencyDescription)}</strong>
                     <p>${escapeHtml(item.workTypes)}</p>
                     <small>${item.hours || 0} ч.</small>
                 </article>`).join('')
@@ -1005,7 +1023,7 @@ function initStudentWorkspace(workspace) {
 
     function renderReportSummary() {
         const stats = getReportStats(state.reportDocument);
-        $('#studentReportPreviewStats').textContent = `${stats.text} текстовых блоков · ${stats.tables} таблиц · ${stats.figures} рисунков`;
+        $('#studentReportPreviewStats').textContent = `${stats.text} ��������� ������ � ${stats.tables} ������ � ${stats.figures} ��������`;
         const entry = getSelectedDiaryEntry();
         $('#studentReportPreviewUpdated').textContent = entry?.updatedAtUtc ? `Обновлено ${formatDateTime(entry.updatedAtUtc)}` : 'Не сохранялся';
         $('#studentReportPreviewExcerpt').textContent = buildReportExcerpt(state.reportDocument);
@@ -1030,7 +1048,7 @@ function initStudentWorkspace(workspace) {
             target.className = 'student-review-card reviewed';
             target.innerHTML = `
                 <strong>Проверено руководителем</strong>
-                <span>Оценка: ${entry.supervisorGrade}${entry.reviewedAtUtc ? ` · ${formatDateTime(entry.reviewedAtUtc)}` : ''}</span>
+                <span>������: ${entry.supervisorGrade}${entry.reviewedAtUtc ? ` � ${formatDateTime(entry.reviewedAtUtc)}` : ''}</span>
                 ${entry.supervisorComment ? `<p>${escapeHtml(entry.supervisorComment)}</p>` : '<p>Комментарий не оставлен.</p>'}`;
             return;
         }
@@ -1057,7 +1075,7 @@ function initStudentWorkspace(workspace) {
         target.hidden = false;
         target.innerHTML = `
             <strong>Комментарий руководителя</strong>
-            <span>${escapeHtml(comment.sectionTitle || '')}${comment.updatedAtUtc ? ` · ${formatDateTime(comment.updatedAtUtc)}` : ''}</span>
+            <span>${escapeHtml(comment.sectionTitle || '')}${comment.updatedAtUtc ? ` � ${formatDateTime(comment.updatedAtUtc)}` : ''}</span>
             <p>${escapeHtml(comment.comment || '')}</p>`;
     }
 
@@ -2231,7 +2249,7 @@ function initStudentWorkspace(workspace) {
                 <article class="student-compact-card">
                     <strong>${escapeHtml(item.title)}</strong>
                     <p>${escapeHtml(item.description || item.fileName)}</p>
-                    <small>${escapeHtml(item.fileName)} · ${formatBytes(item.sizeBytes)} · ${item.isPending ? 'загружено локально' : formatDateTime(item.createdAtUtc)}</small>
+                    <small>${escapeHtml(item.fileName)} � ${formatBytes(item.sizeBytes)} � ${item.isPending ? '��������� ��������' : formatDateTime(item.createdAtUtc)}</small>
                     <div class="student-appendix-actions">
                         ${item.isPending
                             ? '<button type="button" class="student-mini-button" disabled>Скачать</button><button type="button" class="student-mini-button" disabled>Удалить</button>'
@@ -2271,8 +2289,157 @@ function initStudentWorkspace(workspace) {
 
     function updateAppendixFileName() {
         const file = $('#appendixFile')?.files?.[0];
-        $('#appendixFileName').textContent = file ? `${file.name} · ${formatBytes(file.size)}` : 'Файл не выбран';
+        $('#appendixFileName').textContent = file ? `${file.name} � ${formatBytes(file.size)}` : '���� �� ������';
         clearFieldError('AppendixFile');
+    }
+
+    async function openAttestationPreview() {
+        return openDocumentPreview({
+            endpoint: urls.attestationPreview,
+            title: 'Аттестационный лист',
+            fallbackFileName: 'PDF-предпросмотр аттестационного листа',
+            missingMessage: 'Для формирования аттестационного листа нужны обязательные реквизиты.',
+            statusMessage: 'Заполните обязательные реквизиты аттестационного листа.',
+            requestErrorMessage: 'Не удалось открыть предпросмотр аттестационного листа.',
+            renderErrors: renderAttestationErrors,
+            clearErrors: () => {
+                const target = $('#studentAttestationErrors');
+                if (target) {
+                    target.hidden = true;
+                }
+            }
+        });
+    }
+
+    async function openPracticeDiaryPreview() {
+        return openDocumentPreview({
+            endpoint: urls.practiceDiaryPreview,
+            title: 'Дневник практики',
+            fallbackFileName: 'PDF-предпросмотр дневника практики',
+            missingMessage: 'Для формирования дневника практики нужны обязательные данные.',
+            statusMessage: 'Заполните обязательные данные дневника практики.',
+            requestErrorMessage: 'Не удалось открыть предпросмотр дневника практики.',
+            renderErrors: error => renderDocumentErrors(error, 'Не удалось сформировать дневник практики.'),
+            clearErrors: () => {
+                const target = $('#studentDocumentErrors');
+                if (target) {
+                    target.hidden = true;
+                }
+            }
+        });
+    }
+
+    async function openDocumentPreview(options) {
+        if (!state.currentDetails || !options.endpoint) {
+            return;
+        }
+
+        const response = await fetch(`${options.endpoint}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`, { cache: 'no-store' });
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            options.renderErrors(error);
+            showStatus(error?.message || options.requestErrorMessage, true);
+            return;
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data.missing) && data.missing.length) {
+            options.renderErrors({
+                message: options.missingMessage,
+                missing: data.missing
+            });
+            showStatus(options.statusMessage, true);
+            return;
+        }
+
+        state.attestationPreviewUrls = {
+            docx: data.docxUrl,
+            pdf: data.pdfUrl,
+            archive: data.archiveUrl || ''
+        };
+
+        const title = $('#studentAttestationPreviewTitle');
+        if (title) {
+            title.textContent = options.title;
+        }
+
+        const fileName = $('#studentAttestationPreviewFileName');
+        if (fileName) {
+            fileName.textContent = data.pdfFileName || data.fileName || options.fallbackFileName;
+        }
+
+        const archiveButton = $('#downloadAttestationArchiveButton');
+        if (archiveButton) {
+            archiveButton.hidden = !data.archiveUrl;
+        }
+
+        const frame = $('#studentAttestationPdfFrame');
+        if (frame) {
+            frame.src = buildPdfFrameUrl(data.previewUrl || '');
+        }
+
+        options.clearErrors();
+        hideStatus();
+        $('#studentAttestationPreviewModal').hidden = false;
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeAttestationPreview() {
+        const modal = $('#studentAttestationPreviewModal');
+        if (modal) {
+            modal.hidden = true;
+        }
+
+        const frame = $('#studentAttestationPdfFrame');
+        if (frame) {
+            frame.src = 'about:blank';
+        }
+
+        state.attestationPreviewUrls = null;
+        document.body.style.overflow = $('#studentPracticeModal')?.hidden ? '' : 'hidden';
+    }
+
+    function downloadAttestationFromPreview(format) {
+        const url = state.attestationPreviewUrls?.[format];
+        if (!url) {
+            return;
+        }
+
+        window.location.href = url;
+    }
+
+    function buildPdfFrameUrl(previewUrl) {
+        try {
+            const url = new URL(previewUrl, window.location.origin);
+            url.searchParams.set('v', String(Date.now()));
+            url.hash = 'toolbar=1&navpanes=0&view=FitH';
+            return url.toString();
+        } catch {
+            const separator = String(previewUrl || '').includes('?') ? '&' : '?';
+            return `${previewUrl}${separator}v=${Date.now()}#toolbar=1&navpanes=0&view=FitH`;
+        }
+    }
+
+    async function downloadPracticeDiary() {
+        if (!state.currentDetails) {
+            return;
+        }
+
+        const url = `${urls.downloadPracticeDiary}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            renderDocumentErrors(error, 'Не удалось сформировать дневник практики.');
+            showStatus(error?.message || 'Не удалось сформировать дневник практики.', true);
+            return;
+        }
+
+        await downloadBlobResponse(
+            response,
+            `practice-diary-${state.currentDetails.practiceIndex || state.currentDetails.assignmentId}.docx`);
+
+        $('#studentDocumentErrors').hidden = true;
+        showStatus('Дневник практики сформирован.', false);
     }
 
     async function downloadPracticeReport() {
@@ -2296,16 +2463,23 @@ function initStudentWorkspace(workspace) {
             return;
         }
 
+        await downloadBlobResponse(
+            response,
+            `practice-report-${state.currentDetails.practiceIndex || state.currentDetails.assignmentId}.docx`);
+
+        $('#studentDocumentErrors').hidden = true;
+        showStatus('Отчёт практики сформирован.', false);
+    }
+
+    async function downloadBlobResponse(response, fallbackFileName) {
         const blob = await response.blob();
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = getFileNameFromDisposition(response.headers.get('content-disposition')) || `practice-report-${state.currentDetails.practiceIndex || state.currentDetails.assignmentId}.docx`;
+        link.download = getFileNameFromDisposition(response.headers.get('content-disposition')) || fallbackFileName;
         document.body.appendChild(link);
         link.click();
         link.remove();
         URL.revokeObjectURL(link.href);
-        $('#studentDocumentErrors').hidden = true;
-        showStatus('Отчёт практики сформирован.', false);
     }
 
     async function renderPracticeReportPreview(assignmentId) {
@@ -2339,21 +2513,35 @@ function initStudentWorkspace(workspace) {
             target.innerHTML = `
                 <div class="student-document-readiness">
                     <strong>Данные готовы для формирования DOCX</strong>
-                    <p>Нажмите «Сформировать отчёт практики», чтобы получить настоящий документ по шаблону Word.</p>
+                    <p>������� ������������� ����� ��������, ����� �������� ��������� �������� �� ������� Word.</p>
                 </div>`;
             $('#studentDocumentErrors').hidden = true;
         }
     }
 
-    function renderDocumentErrors(error) {
+    function renderDocumentErrors(error, fallbackMessage = 'Не удалось сформировать отчёт.') {
         const target = $('#studentDocumentErrors');
         if (!target) {
             return;
         }
 
-        const missing = Array.isArray(error?.missing) ? error.missing : [];
         target.hidden = false;
-        target.innerHTML = missing.length
+        target.innerHTML = buildDocumentErrorsHtml(error, fallbackMessage);
+    }
+
+    function renderAttestationErrors(error) {
+        const target = $('#studentAttestationErrors');
+        if (!target) {
+            return;
+        }
+
+        target.hidden = false;
+        target.innerHTML = buildDocumentErrorsHtml(error, 'Не удалось сформировать аттестационный лист.');
+    }
+
+    function buildDocumentErrorsHtml(error, fallbackMessage) {
+        const missing = Array.isArray(error?.missing) ? error.missing : [];
+        return missing.length
             ? `
                 <div class="student-document-errors-header">
                     <span>Проверка готовности</span>
@@ -2370,7 +2558,7 @@ function initStudentWorkspace(workspace) {
             : `
                 <div class="student-document-errors-header">
                     <span>Проверка готовности</span>
-                    <strong>${escapeHtml(error?.message || 'Не удалось сформировать отчёт.')}</strong>
+                    <strong>${escapeHtml(error?.message || fallbackMessage)}</strong>
                 </div>`;
     }
 
@@ -2444,6 +2632,10 @@ function initStudentWorkspace(workspace) {
             requestCloseReportEditor();
             return;
         }
+        const attestationModal = $('#studentAttestationPreviewModal');
+        if (attestationModal && !attestationModal.hidden) {
+            closeAttestationPreview();
+        }
         $('#studentPracticeModal').hidden = true;
         document.body.style.overflow = '';
         state.currentDetails = null;
@@ -2502,6 +2694,10 @@ function initStudentWorkspace(workspace) {
             name: details.name,
             specialtyCode: details.specialtyCode,
             specialtyName: details.specialtyName,
+            qualificationName: details.qualificationName,
+            studentFullName: details.studentFullName,
+            studentGroup: details.studentGroup,
+            studentCourse: details.studentCourse,
             professionalModuleCode: details.professionalModuleCode,
             professionalModuleName: details.professionalModuleName,
             hours: details.hours,
@@ -2510,6 +2706,9 @@ function initStudentWorkspace(workspace) {
             isCompleted: details.isCompleted,
             supervisorFullName: details.supervisorFullName,
             organizationName: details.organizationName,
+            organizationFullName: details.organizationFullName,
+            organizationShortName: details.organizationShortName,
+            organizationAddress: details.organizationAddress,
             hasRequiredDetails: details.hasRequiredDetails,
             detailsDueDate: details.detailsDueDate,
             isDetailsOverdue: details.isDetailsOverdue,
@@ -2730,7 +2929,7 @@ function buildReportExcerpt(reportDocument) {
             return block.content || stripHtml(block.html || '');
         })
         .filter(Boolean)
-        .join(' · ');
+        .join(' � ');
     return text.length > 180 ? `${text.slice(0, 180)}...` : text;
 }
 

@@ -1,4 +1,4 @@
-﻿.student-shell {
+.student-shell {
     padding: 28px 24px 40px;
 }
 
@@ -1399,6 +1399,121 @@
     padding-left: 24px;
 }
 
+.student-attestation-preview-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2250;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: clamp(8px, 1.3vw, 18px);
+    background: rgba(15, 23, 42, 0.62);
+}
+
+.student-attestation-preview-backdrop[hidden] {
+    display: none;
+}
+
+.student-attestation-preview-modal {
+    width: min(1440px, 100%);
+    height: calc(100dvh - clamp(16px, 2.6vw, 36px));
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 24px;
+    background: #eef3fb;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.34);
+}
+
+.student-attestation-preview-header {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: center;
+    padding: 18px 22px;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid rgba(203, 213, 225, 0.82);
+}
+
+.student-attestation-preview-header h2 {
+    margin: 0 0 4px;
+    color: #0f172a;
+    font-size: 24px;
+}
+
+.student-attestation-preview-header p {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.student-attestation-preview-header .student-modal-close {
+    background: rgba(15, 23, 42, 0.08);
+    color: #0f172a;
+}
+
+.student-attestation-preview-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    overflow: hidden;
+    background: #525659;
+}
+
+.student-attestation-preview-body iframe {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: #525659;
+}
+
+.student-attestation-preview-actions {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(203, 213, 225, 0.82);
+}
+
+.student-attestation-preview-actions .student-primary-button,
+.student-attestation-preview-actions .student-secondary-button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 132px;
+    min-height: 40px;
+}
+
+@media (max-height: 720px) {
+    .student-attestation-preview-header {
+        padding: 10px 16px;
+    }
+
+    .student-attestation-preview-header h2 {
+        font-size: 20px;
+    }
+
+    .student-attestation-preview-actions {
+        padding: 10px 14px;
+    }
+
+    .student-attestation-preview-actions .student-primary-button,
+    .student-attestation-preview-actions .student-secondary-button {
+        min-height: 36px;
+    }
+}
+
 .student-field-error {
     min-height: 18px;
     margin-top: 6px;
@@ -2425,26 +2540,40 @@ html[data-theme="dark"] .student-report-workspace {
     border-color: rgba(148, 163, 184, 0.18);
 }
 
+html[data-theme="dark"] .student-attestation-preview-modal {
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
 html[data-theme="dark"] .student-report-workspace-header,
 html[data-theme="dark"] .student-report-toolbar,
 html[data-theme="dark"] .student-report-side-panel,
-html[data-theme="dark"] .student-report-properties-panel {
+html[data-theme="dark"] .student-report-properties-panel,
+html[data-theme="dark"] .student-attestation-preview-header,
+html[data-theme="dark"] .student-attestation-preview-actions {
     background: #172033;
     border-color: rgba(148, 163, 184, 0.18);
 }
 
 html[data-theme="dark"] .student-report-workspace-header h2,
+html[data-theme="dark"] .student-attestation-preview-header h2,
 html[data-theme="dark"] .student-report-side-panel h3,
 html[data-theme="dark"] .student-report-properties-panel h3 {
     color: #f8fafc;
 }
 
 html[data-theme="dark"] .student-report-workspace-header p,
+html[data-theme="dark"] .student-attestation-preview-header p,
 html[data-theme="dark"] .student-report-outline small,
 html[data-theme="dark"] .student-report-outline-empty,
 html[data-theme="dark"] .student-report-side-hint,
 html[data-theme="dark"] .student-report-properties-panel p {
     color: #94a3b8;
+}
+
+html[data-theme="dark"] .student-attestation-preview-header .student-modal-close {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 html[data-theme="dark"] .student-report-toolbar button,

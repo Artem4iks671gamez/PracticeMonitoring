@@ -1,4 +1,4 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @model PracticeMonitoring.Web.Models.Student.StudentPageViewModel
 
 @{
@@ -33,6 +33,10 @@
      data-delete-appendix-url="@Url.Action("DeleteAppendix", "Student")"
      data-download-appendix-url="@Url.Action("DownloadAppendix", "Student")"
      data-download-diary-attachment-url="@Url.Action("DownloadDiaryAttachment", "Student")"
+     data-attestation-preview-url="@Url.Action("GetAttestationPreview", "Student")"
+     data-download-attestation-url="@Url.Action("DownloadAttestation", "Student")"
+     data-practice-diary-preview-url="@Url.Action("GetPracticeDiaryPreview", "Student")"
+     data-download-practice-diary-url="@Url.Action("DownloadPracticeDiary", "Student")"
      data-practice-report-preview-url="@Url.Action("GetPracticeReportPreview", "Student")"
      data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")">
     <section class="student-hero-card">
@@ -188,7 +192,7 @@
 
                                     <div class="student-practice-date-cell">
                                         <strong>@practice.StartDate.ToString("dd.MM.yyyy") - @practice.EndDate.ToString("dd.MM.yyyy")</strong>
-                                        <small>@practice.Hours ч. · до @practice.DetailsDueDate.ToString("dd.MM.yyyy") заполнить организацию</small>
+                                        <small>@practice.Hours �. � �� @practice.DetailsDueDate.ToString("dd.MM.yyyy") ��������� �����������</small>
                                     </div>
 
                                     <div class="student-practice-supervisor-cell">
@@ -280,12 +284,12 @@
                     <form id="studentOrganizationForm" class="student-form-grid" hidden novalidate>
                         <div class="form-group student-form-wide">
                             <label class="form-label" for="organizationFullName">Полное название организации</label>
-                            <input class="form-input" id="organizationFullName" name="organizationFullName" maxlength="500" placeholder="Например: Общество с ограниченной ответственностью «Информационные системы»" />
+                            <input class="form-input" id="organizationFullName" name="organizationFullName" maxlength="500" placeholder="��������: �������� � ������������ ���������������� ��������������� ��������" />
                             <div class="student-field-error" data-field-error="OrganizationFullName"></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="organizationShortName">Сокращенное название</label>
-                            <input class="form-input" id="organizationShortName" name="organizationShortName" maxlength="300" placeholder="ООО «Информационные системы»" />
+                            <input class="form-input" id="organizationShortName" name="organizationShortName" maxlength="300" placeholder="��� ��������������� ��������" />
                             <div class="student-field-error" data-field-error="OrganizationShortName"></div>
                         </div>
                         <div class="form-group">
@@ -354,7 +358,7 @@
                                     <h4>Отдельный документ для итогового отчёта</h4>
                                     <p id="studentReportPreviewExcerpt">Отчёт пока пустой. Откройте редактор и добавьте текст, таблицу или рисунок.</p>
                                     <div class="student-report-summary-meta">
-                                        <span id="studentReportPreviewStats">0 текстовых блоков · 0 таблиц · 0 рисунков</span>
+                                        <span id="studentReportPreviewStats">0 ��������� ������ � 0 ������ � 0 ��������</span>
                                         <span id="studentReportPreviewUpdated">Не сохранялся</span>
                                     </div>
                                 </div>
@@ -505,10 +509,11 @@
                             <span>Отчёт формируется автоматически по шаблону DOCX.</span>
                         </div>
                         <div class="student-document-actions">
-                            <button type="button" class="student-secondary-button" disabled>Сформировать аттестационный лист</button>
-                            <button type="button" class="student-secondary-button" disabled>Сформировать дневник практики</button>
+                            <button type="button" class="student-primary-button" id="downloadAttestationButton">Сформировать аттестационный лист</button>
+                            <button type="button" class="student-primary-button" id="downloadPracticeDiaryButton">Сформировать дневник практики</button>
                             <button type="button" class="student-primary-button" id="downloadPracticeReportButton">Сформировать отчёт практики</button>
                         </div>
+                        <div class="student-document-errors" id="studentAttestationErrors" hidden></div>
                         <div class="student-document-errors" id="studentDocumentErrors" hidden></div>
                         <div class="student-practice-report-preview-shell" id="studentPracticeReportPreviewShell">
                             <div class="student-empty-state">Предпросмотр отчёта появится после открытия практики.</div>
@@ -516,6 +521,29 @@
                     </div>
                 </section>
             </div>
+        </div>
+    </div>
+
+    <div class="student-attestation-preview-backdrop" id="studentAttestationPreviewModal" hidden>
+        <div class="student-attestation-preview-modal" role="dialog" aria-modal="true" aria-labelledby="studentAttestationPreviewTitle">
+            <header class="student-attestation-preview-header">
+                <div>
+                    <span class="student-report-workspace-eyebrow">Предпросмотр документа</span>
+                    <h2 id="studentAttestationPreviewTitle">Аттестационный лист</h2>
+                    <p id="studentAttestationPreviewFileName">PDF-предпросмотр</p>
+                </div>
+                <button type="button" class="student-modal-close" id="closeAttestationPreviewButton">×</button>
+            </header>
+
+            <div class="student-attestation-preview-body">
+                <iframe id="studentAttestationPdfFrame" title="PDF-предпросмотр документа"></iframe>
+            </div>
+
+            <footer class="student-attestation-preview-actions">
+                <button type="button" class="student-secondary-button" id="downloadAttestationDocxButton">Скачать DOCX</button>
+                <button type="button" class="student-secondary-button" id="downloadAttestationPdfButton">Скачать PDF</button>
+                <button type="button" class="student-primary-button" id="downloadAttestationArchiveButton">Скачать архив</button>
+            </footer>
         </div>
     </div>
 

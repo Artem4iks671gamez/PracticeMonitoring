@@ -1,6 +1,9 @@
 using PracticeMonitoring.Web.Services;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpContextAccessor();
@@ -51,6 +54,7 @@ builder.Services.AddHttpClient<NotificationApiService>(client =>
 });
 
 builder.Services.AddScoped<AttestationSheetService>();
+builder.Services.AddScoped<PracticeDiaryDocumentService>();
 builder.Services.AddScoped<PracticeReportDocumentService>();
 
 var app = builder.Build();

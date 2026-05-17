@@ -36,6 +36,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AccountEmailService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddScoped<TemporaryPasswordService>();
+builder.Services.AddScoped<DemoDataSeeder>();
 
 builder.Services.AddCors(options =>
 {
@@ -88,6 +89,13 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Databas
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
+}
+
+if (app.Configuration.GetValue<bool>("DemoData:Seed"))
+{
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+    await seeder.SeedAsync();
 }
 
 if (app.Environment.IsDevelopment())

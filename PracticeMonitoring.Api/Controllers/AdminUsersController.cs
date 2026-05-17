@@ -40,7 +40,7 @@ public class AdminUsersController : ControllerBase
         var users = await _context.Users
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(g => g.Specialty)
+                .ThenInclude(g => g!.Specialty)
             .OrderBy(x => x.Surname)
             .ThenBy(x => x.FirstName)
             .Select(x => new AdminUserListItemResponse
@@ -48,7 +48,7 @@ public class AdminUsersController : ControllerBase
                 Id = x.Id,
                 FullName = x.FullName,
                 Email = x.Email,
-                Role = x.Role.Name,
+                Role = x.Role!.Name,
                 IsActive = x.IsActive,
                 AvatarUrl = x.AvatarUrl,
                 GroupId = x.GroupId,
@@ -73,7 +73,7 @@ public class AdminUsersController : ControllerBase
         var user = await _context.Users
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(g => g.Specialty)
+                .ThenInclude(g => g!.Specialty)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (user is null)
@@ -108,7 +108,7 @@ public class AdminUsersController : ControllerBase
         TrackChange(changes, "Имя", user.FirstName, request.FirstName.Trim());
         TrackChange(changes, "Отчество", user.Patronymic, string.IsNullOrWhiteSpace(request.Patronymic) ? null : request.Patronymic.Trim());
         TrackChange(changes, "Email", user.Email, email);
-        TrackChange(changes, "Роль", user.Role.Name, role.Name);
+        TrackChange(changes, "Роль", user.Role!.Name, role.Name);
         TrackChange(changes, "Активность", user.IsActive ? "Активен" : "Неактивен", request.IsActive ? "Активен" : "Неактивен");
         TrackChange(changes, "Группа", user.Group?.Name, group?.Name);
 
@@ -161,7 +161,7 @@ public class AdminUsersController : ControllerBase
         user = await _context.Users
             .Include(x => x.Role)
             .Include(x => x.Group)
-                .ThenInclude(g => g.Specialty)
+                .ThenInclude(g => g!.Specialty)
             .FirstAsync(x => x.Id == id);
 
         return Ok(MapUser(user));
@@ -250,7 +250,7 @@ public class AdminUsersController : ControllerBase
             Id = x.Id,
             FullName = x.FullName,
             Email = x.Email,
-            Role = x.Role.Name,
+            Role = x.Role!.Name,
             IsActive = x.IsActive,
             AvatarUrl = x.AvatarUrl,
             GroupId = x.GroupId,

@@ -815,7 +815,7 @@ function initSupervisorWorkspace(workspace) {
     function formatBytes(value) {
         const size = Number(value || 0);
         if (size < 1024) {
-            return `${size} Б`;
+            return `${size} Р‘`;
         }
         if (size < 1024 * 1024) {
             return `${(size / 1024).toFixed(1)} КБ`;
