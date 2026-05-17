@@ -561,7 +561,8 @@ function initStudentWorkspace(workspace) {
         if (forceReload || !state.detailsByAssignment.has(assignmentId)) {
             const response = await fetch(`${urls.getPractice}?assignmentId=${encodeURIComponent(assignmentId)}`, { cache: 'no-store' });
             if (!response.ok) {
-                showStatus('Не удалось загрузить практику.', true);
+                const message = await readErrorMessage(response, 'Не удалось загрузить практику.');
+                showStatus(message, true);
                 return null;
             }
             state.detailsByAssignment.set(assignmentId, await response.json());
@@ -2660,6 +2661,15 @@ function initStudentWorkspace(workspace) {
         status.hidden = true;
         status.textContent = '';
         status.classList.remove('error');
+    }
+
+    async function readErrorMessage(response, fallback) {
+        try {
+            const data = await response.json();
+            return data?.message || fallback;
+        } catch {
+            return fallback;
+        }
     }
 
     function openPracticeFromQuery() {

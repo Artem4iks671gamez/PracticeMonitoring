@@ -85,11 +85,20 @@ public class StudentController : Controller
         if (token is null)
             return Unauthorized();
 
-        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
-        if (practice is null)
-            return NotFound();
+        var result = await _studentApiService.GetPracticeResultAsync(token, assignmentId);
+        if (!result.Success || result.Data is null)
+        {
+            var statusCode = result.StatusCode is >= 400 and <= 599
+                ? result.StatusCode
+                : StatusCodes.Status502BadGateway;
 
-        return Json(practice);
+            return StatusCode(statusCode, new
+            {
+                message = result.ErrorMessage ?? "Не удалось загрузить практику."
+            });
+        }
+
+        return Json(result.Data);
     }
 
     [HttpPost]

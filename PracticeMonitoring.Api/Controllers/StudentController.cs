@@ -88,11 +88,11 @@ public class StudentController : ControllerBase
     [HttpGet("practices/{assignmentId:int}")]
     public async Task<ActionResult<StudentPracticeDetailsResponse>> GetPractice(int assignmentId)
     {
-        var assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        if (assignment is null)
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        if (details is null)
             return NotFound();
 
-        return Ok(MapDetails(assignment));
+        return Ok(details);
     }
 
     [HttpPut("practices/{assignmentId:int}/organization")]
@@ -135,9 +135,8 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _context.ChangeTracker.Clear();
-        assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        return Ok(MapDetails(assignment!));
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        return details is null ? NotFound() : Ok(details);
     }
 
     [HttpPut("practices/{assignmentId:int}/diary")]
@@ -245,8 +244,8 @@ public class StudentController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
-        assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        return Ok(MapDetails(assignment!));
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        return details is null ? NotFound() : Ok(details);
     }
 
     [HttpPost("practices/{assignmentId:int}/diary-attachments")]
@@ -346,9 +345,8 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _context.ChangeTracker.Clear();
-        assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        return Ok(MapDetails(assignment!));
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        return details is null ? NotFound() : Ok(details);
     }
 
     [HttpPut("practices/{assignmentId:int}/sources")]
@@ -380,8 +378,8 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
-        return Ok(MapDetails(assignment!));
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        return details is null ? NotFound() : Ok(details);
     }
 
     [HttpPost("practices/{assignmentId:int}/appendices")]
@@ -425,11 +423,13 @@ public class StudentController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _context.ChangeTracker.Clear();
-        assignment = await LoadStudentAssignmentAsync(assignmentId, asNoTracking: true);
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        if (details is null)
+            return NotFound();
+
         return Ok(new StudentPracticeAppendixUploadResponse
         {
-            Details = MapDetails(assignment!),
+            Details = details,
             Appendix = new StudentPracticeAppendixResponse
             {
                 Id = appendix.Id,
@@ -535,6 +535,152 @@ public class StudentController : ControllerBase
             query = query.AsNoTracking();
 
         return await query.FirstOrDefaultAsync();
+    }
+
+    private async Task<StudentPracticeDetailsResponse?> LoadStudentPracticeDetailsResponseAsync(int assignmentId)
+    {
+        var studentId = GetCurrentUserId();
+        if (studentId is null)
+            return null;
+
+        var details = await _context.ProductionPracticeStudentAssignments
+            .AsNoTracking()
+            .Where(x => x.Id == assignmentId && x.StudentId == studentId.Value)
+            .Select(x => new StudentPracticeDetailsResponse
+            {
+                AssignmentId = x.Id,
+                PracticeId = x.ProductionPractice.Id,
+                PracticeIndex = x.ProductionPractice.PracticeIndex,
+                Name = x.ProductionPractice.Name,
+                SpecialtyCode = x.ProductionPractice.Specialty.Code,
+                SpecialtyName = x.ProductionPractice.Specialty.Name,
+                QualificationName = x.ProductionPractice.Specialty.Name,
+                StudentFullName = x.Student.FullName,
+                StudentGroup = x.Student.Group != null ? x.Student.Group.Name : string.Empty,
+                StudentCourse = x.Student.Group != null ? x.Student.Group.Course : null,
+                ProfessionalModuleCode = x.ProductionPractice.ProfessionalModuleCode,
+                ProfessionalModuleName = x.ProductionPractice.ProfessionalModuleName,
+                Hours = x.ProductionPractice.Hours,
+                StartDate = x.ProductionPractice.StartDate,
+                EndDate = x.ProductionPractice.EndDate,
+                SupervisorFullName = x.Supervisor != null ? x.Supervisor.FullName : null,
+                OrganizationName = x.OrganizationFullName ?? x.OrganizationName,
+                OrganizationFullName = x.OrganizationFullName ?? x.OrganizationName,
+                OrganizationShortName = x.OrganizationShortName,
+                OrganizationAddress = x.OrganizationAddress,
+                AssignedAtUtc = x.AssignedAtUtc,
+                OrganizationSupervisorFullName = x.OrganizationSupervisorFullName,
+                OrganizationSupervisorPosition = x.OrganizationSupervisorPosition,
+                OrganizationSupervisorPhone = x.OrganizationSupervisorPhone,
+                OrganizationSupervisorEmail = x.OrganizationSupervisorEmail,
+                PracticeTaskContent = x.PracticeTaskContent,
+                StudentDuties = x.StudentDuties,
+                ProvidedMaterialsDescription = x.ProvidedMaterialsDescription,
+                WorkScheduleDescription = x.WorkScheduleDescription,
+                IntroductionMainGoal = x.IntroductionMainGoal,
+                GeneralCompetencies = x.ProductionPractice.GeneralCompetencies
+                    .OrderBy(g => g.SortOrder)
+                    .ThenBy(g => g.Id)
+                    .Select(g => new StudentPracticeGeneralCompetencyResponse
+                    {
+                        CompetencyCode = g.CompetencyCode,
+                        CompetencyDescription = g.CompetencyDescription,
+                        SortOrder = g.SortOrder
+                    })
+                    .ToList(),
+                Competencies = x.ProductionPractice.Competencies
+                    .OrderBy(c => c.Id)
+                    .Select(c => new StudentPracticeCompetencyResponse
+                    {
+                        CompetencyCode = c.CompetencyCode,
+                        CompetencyDescription = c.CompetencyDescription,
+                        WorkTypes = c.WorkTypes,
+                        Hours = c.Hours
+                    })
+                    .ToList(),
+                DiaryEntries = x.DiaryEntries
+                    .OrderByDescending(d => d.WorkDate)
+                    .Select(d => new StudentPracticeDiaryEntryResponse
+                    {
+                        Id = d.Id,
+                        WorkDate = d.WorkDate,
+                        ShortDescription = d.ShortDescription,
+                        DetailedReport = d.DetailedReport,
+                        IsReviewed = d.IsReviewed,
+                        SupervisorGrade = d.SupervisorGrade,
+                        SupervisorComment = d.SupervisorComment,
+                        ReviewedAtUtc = d.ReviewedAtUtc,
+                        ReviewedBySupervisorFullName = d.ReviewedBySupervisor != null ? d.ReviewedBySupervisor.FullName : null,
+                        UpdatedAtUtc = d.UpdatedAtUtc,
+                        Attachments = d.Attachments
+                            .OrderBy(a => a.SortOrder)
+                            .Select(a => new StudentPracticeDiaryAttachmentResponse
+                            {
+                                Id = a.Id,
+                                Caption = a.Caption,
+                                FileName = a.FileName,
+                                ContentType = a.ContentType,
+                                SizeBytes = a.SizeBytes,
+                                SortOrder = a.SortOrder
+                            })
+                            .ToList()
+                    })
+                    .ToList(),
+                ReportItems = x.ReportItems
+                    .OrderBy(r => r.Category)
+                    .ThenBy(r => r.SortOrder)
+                    .Select(r => new StudentPracticeReportItemResponse
+                    {
+                        Id = r.Id,
+                        Category = r.Category,
+                        Name = r.Name,
+                        Description = r.Description,
+                        SortOrder = r.SortOrder
+                    })
+                    .ToList(),
+                Sources = x.Sources
+                    .OrderBy(s => s.SortOrder)
+                    .Select(s => new StudentPracticeSourceResponse
+                    {
+                        Id = s.Id,
+                        Title = s.Title,
+                        Url = s.Url,
+                        Description = s.Description,
+                        SortOrder = s.SortOrder
+                    })
+                    .ToList(),
+                Appendices = x.Appendices
+                    .OrderBy(a => a.CreatedAtUtc)
+                    .Select(a => new StudentPracticeAppendixResponse
+                    {
+                        Id = a.Id,
+                        Title = a.Title,
+                        Description = a.Description,
+                        FileName = a.FileName,
+                        ContentType = a.ContentType,
+                        SizeBytes = a.SizeBytes,
+                        CreatedAtUtc = a.CreatedAtUtc
+                    })
+                    .ToList(),
+                SectionComments = x.SectionComments
+                    .OrderBy(c => c.SectionKey)
+                    .Select(c => new StudentPracticeSectionCommentResponse
+                    {
+                        SectionKey = c.SectionKey,
+                        SectionTitle = c.SectionKey,
+                        Comment = c.Comment,
+                        UpdatedAtUtc = c.UpdatedAtUtc,
+                        SupervisorFullName = c.Supervisor != null ? c.Supervisor.FullName : string.Empty
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync();
+
+        if (details is null)
+            return null;
+
+        ApplyCalculatedFields(details);
+        return details;
     }
 
     private Dictionary<string, string[]> ValidateOrganization(StudentPracticeOrganizationRequest request)
@@ -1229,6 +1375,32 @@ public class StudentController : ControllerBase
                (!string.IsNullOrWhiteSpace(assignment.OrganizationSupervisorPhone) ||
                 !string.IsNullOrWhiteSpace(assignment.OrganizationSupervisorEmail)) &&
                !string.IsNullOrWhiteSpace(assignment.PracticeTaskContent);
+    }
+
+    private static void ApplyCalculatedFields(StudentPracticeDetailsResponse details)
+    {
+        details.SpecialtyName = GetSpecialtyDisplayName(details.SpecialtyCode, details.QualificationName);
+        details.DetailsDueDate = details.StartDate.Date.AddDays(2);
+        details.IsCompleted = IsCompleted(details.EndDate);
+        details.HasRequiredDetails = HasRequiredDetails(details);
+        details.IsDetailsOverdue = !details.HasRequiredDetails && DateTime.UtcNow.Date > details.DetailsDueDate;
+        details.DiaryEntriesCount = details.DiaryEntries.Count;
+        details.WorkDaysCount = CountWorkDays(details.StartDate, details.EndDate);
+
+        foreach (var comment in details.SectionComments)
+            comment.SectionTitle = GetSectionTitle(comment.SectionKey);
+    }
+
+    private static bool HasRequiredDetails(StudentPracticeDetailsResponse details)
+    {
+        return !string.IsNullOrWhiteSpace(details.OrganizationFullName ?? details.OrganizationName) &&
+               !string.IsNullOrWhiteSpace(details.OrganizationShortName) &&
+               !string.IsNullOrWhiteSpace(details.OrganizationAddress) &&
+               !string.IsNullOrWhiteSpace(details.OrganizationSupervisorFullName) &&
+               !string.IsNullOrWhiteSpace(details.OrganizationSupervisorPosition) &&
+               (!string.IsNullOrWhiteSpace(details.OrganizationSupervisorPhone) ||
+                !string.IsNullOrWhiteSpace(details.OrganizationSupervisorEmail)) &&
+               !string.IsNullOrWhiteSpace(details.PracticeTaskContent);
     }
 
     private static int CountWorkDays(DateTime startDate, DateTime endDate)

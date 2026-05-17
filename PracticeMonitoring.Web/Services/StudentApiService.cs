@@ -25,13 +25,68 @@ public class StudentApiService
 
     public async Task<StudentPracticeDetailsViewModel?> GetPracticeAsync(string token, int assignmentId)
     {
-        using var request = CreateAuthorizedRequest(HttpMethod.Get, $"api/student/practices/{assignmentId}", token);
-        var response = await _httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            return null;
+        var result = await GetPracticeResultAsync(token, assignmentId);
+        return result.Success ? result.Data : null;
+    }
 
-        var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<StudentPracticeDetailsViewModel>(json, _jsonOptions);
+    public async Task<StudentApiResult<StudentPracticeDetailsViewModel>> GetPracticeResultAsync(string token, int assignmentId)
+    {
+        using var request = CreateAuthorizedRequest(HttpMethod.Get, $"api/student/practices/{assignmentId}", token);
+
+        try
+        {
+            var response = await _httpClient.SendAsync(request);
+            var json = await response.Content.ReadAsStringAsync();
+
+            var result = new StudentApiResult<StudentPracticeDetailsViewModel>
+            {
+                Success = response.IsSuccessStatusCode,
+                StatusCode = (int)response.StatusCode
+            };
+
+            if (!response.IsSuccessStatusCode)
+            {
+                result.ErrorMessage = ExtractErrorMessage(json) ?? "Не удалось загрузить практику.";
+                return result;
+            }
+
+            result.Data = JsonSerializer.Deserialize<StudentPracticeDetailsViewModel>(json, _jsonOptions);
+            if (result.Data is null)
+            {
+                result.Success = false;
+                result.StatusCode = StatusCodes.Status502BadGateway;
+                result.ErrorMessage = "API вернул пустые данные практики.";
+            }
+
+            return result;
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new StudentApiResult<StudentPracticeDetailsViewModel>
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status504GatewayTimeout,
+                ErrorMessage = $"API не успел вернуть практику: {ex.Message}"
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new StudentApiResult<StudentPracticeDetailsViewModel>
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status502BadGateway,
+                ErrorMessage = $"API недоступен: {ex.Message}"
+            };
+        }
+        catch (JsonException ex)
+        {
+            return new StudentApiResult<StudentPracticeDetailsViewModel>
+            {
+                Success = false,
+                StatusCode = StatusCodes.Status502BadGateway,
+                ErrorMessage = $"API вернул некорректные данные практики: {ex.Message}"
+            };
+        }
     }
 
     public Task<StudentApiResult<StudentPracticeDetailsViewModel>> SaveOrganizationAsync(
@@ -256,6 +311,24 @@ public class StudentApiService
         var request = new HttpRequestMessage(method, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
+    }
+
+    private static string? ExtractErrorMessage(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("message", out var messageElement))
+                return messageElement.GetString();
+        }
+        catch
+        {
+        }
+
+        return null;
     }
 
     private static string? ExtractFileName(string? rawFileName)
