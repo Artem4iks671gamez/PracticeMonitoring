@@ -113,6 +113,10 @@ public class AdminMaintenanceController : ControllerBase
 
             return Ok(new { message = "База данных успешно восстановлена." });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         finally
         {
             if (System.IO.File.Exists(tempPath))

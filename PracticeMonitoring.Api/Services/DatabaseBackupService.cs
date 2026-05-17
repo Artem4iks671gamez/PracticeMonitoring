@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.ComponentModel;
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 
@@ -19,11 +20,7 @@ public class DatabaseBackupService
                                ?? throw new InvalidOperationException("DefaultConnection is not configured.");
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
-
-        var pgDumpPath = _configuration["PgTools:PgDumpPath"];
-        if (string.IsNullOrWhiteSpace(pgDumpPath))
-            pgDumpPath = "pg_dump";
-
+        var pgDumpPath = ResolveToolPath(_configuration["PgTools:PgDumpPath"], "pg_dump");
         var tempFile = Path.Combine(Path.GetTempPath(), $"practice-monitoring-backup-{DateTime.Now:yyyyMMdd-HHmmss}.dump");
 
         try
@@ -59,10 +56,7 @@ public class DatabaseBackupService
                                ?? throw new InvalidOperationException("DefaultConnection is not configured.");
 
         var builder = new NpgsqlConnectionStringBuilder(connectionString);
-
-        var pgRestorePath = _configuration["PgTools:PgRestorePath"];
-        if (string.IsNullOrWhiteSpace(pgRestorePath))
-            pgRestorePath = "pg_restore";
+        var pgRestorePath = ResolveToolPath(_configuration["PgTools:PgRestorePath"], "pg_restore");
 
         var args =
             $"--clean --if-exists --no-owner --no-privileges " +
@@ -95,7 +89,14 @@ public class DatabaseBackupService
 
         using var process = new Process { StartInfo = startInfo };
 
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (Win32Exception ex)
+        {
+            throw new InvalidOperationException($"Не удалось запустить {fileName}: {ex.Message}", ex);
+        }
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
@@ -106,5 +107,19 @@ public class DatabaseBackupService
         var error = await errorTask;
 
         return (process.ExitCode, output, error);
+    }
+
+    private static string ResolveToolPath(string? configuredPath, string fallbackCommand)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+            return fallbackCommand;
+
+        var trimmed = configuredPath.Trim();
+        var looksLikePath = trimmed.Contains('/') || trimmed.Contains('\\') || Path.IsPathRooted(trimmed);
+
+        if (looksLikePath && !File.Exists(trimmed))
+            return fallbackCommand;
+
+        return trimmed;
     }
 }
