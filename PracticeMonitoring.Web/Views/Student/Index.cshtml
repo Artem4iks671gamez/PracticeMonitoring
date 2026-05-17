@@ -66,7 +66,8 @@
      data-practice-diary-preview-url="@Url.Action("GetPracticeDiaryPreview", "Student")"
      data-download-practice-diary-url="@Url.Action("DownloadPracticeDiary", "Student")"
      data-practice-report-preview-url="@Url.Action("GetPracticeReportPreview", "Student")"
-     data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")">
+     data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")"
+     data-download-practice-report-pdf-url="@Url.Action("DownloadPracticeReportPdf", "Student")">
     <section class="student-hero-card">
         <div class="student-identity">
             <div class="student-avatar student-avatar-compact" id="studentAvatarPreview">
@@ -540,6 +541,7 @@
                             <button type="button" class="student-primary-button" id="downloadAttestationButton">Сформировать аттестационный лист</button>
                             <button type="button" class="student-primary-button" id="downloadPracticeDiaryButton">Сформировать дневник практики</button>
                             <button type="button" class="student-primary-button" id="downloadPracticeReportButton">Сформировать отчёт практики</button>
+                            <button type="button" class="student-primary-button" id="downloadPracticeReportPdfButton">Сформировать отчёт PDF</button>
                         </div>
                         <div class="student-document-errors" id="studentAttestationErrors" hidden></div>
                         <div class="student-document-errors" id="studentDocumentErrors" hidden></div>

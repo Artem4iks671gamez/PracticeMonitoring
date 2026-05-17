@@ -56,6 +56,7 @@ builder.Services.AddHttpClient<NotificationApiService>(client =>
 builder.Services.AddScoped<AttestationSheetService>();
 builder.Services.AddScoped<PracticeDiaryDocumentService>();
 builder.Services.AddScoped<PracticeReportDocumentService>();
+builder.Services.AddScoped<DocxPdfConversionService>();
 
 var app = builder.Build();
 

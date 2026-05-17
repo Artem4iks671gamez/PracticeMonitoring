@@ -15,6 +15,7 @@ public class StudentController : Controller
     private readonly PracticeReportDocumentService _practiceReportDocumentService;
     private readonly PracticeDiaryDocumentService _practiceDiaryDocumentService;
     private readonly AttestationSheetService _attestationSheetService;
+    private readonly DocxPdfConversionService _docxPdfConversionService;
 
     public StudentController(
         AuthApiService authApiService,
@@ -23,7 +24,8 @@ public class StudentController : Controller
         NotificationApiService notificationApiService,
         PracticeReportDocumentService practiceReportDocumentService,
         PracticeDiaryDocumentService practiceDiaryDocumentService,
-        AttestationSheetService attestationSheetService)
+        AttestationSheetService attestationSheetService,
+        DocxPdfConversionService docxPdfConversionService)
     {
         _authApiService = authApiService;
         _chatApiService = chatApiService;
@@ -32,6 +34,7 @@ public class StudentController : Controller
         _practiceReportDocumentService = practiceReportDocumentService;
         _practiceDiaryDocumentService = practiceDiaryDocumentService;
         _attestationSheetService = attestationSheetService;
+        _docxPdfConversionService = docxPdfConversionService;
     }
 
     [HttpGet]
@@ -337,7 +340,16 @@ public class StudentController : Controller
         if (missing.Count > 0)
             return BadRequest(new { message = "Аттестационный лист нельзя показать: заполнены не все обязательные реквизиты.", missing });
 
-        return File(_attestationSheetService.BuildPdf(practice), "application/pdf");
+        try
+        {
+            var docxFileName = _attestationSheetService.BuildFileName(practice);
+            var pdf = await ConvertDocxToPdfAsync(_attestationSheetService.BuildDocx(practice), docxFileName);
+            return File(pdf, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
     }
 
     [HttpGet]
@@ -388,10 +400,16 @@ public class StudentController : Controller
             });
         }
 
-        return File(
-            _attestationSheetService.BuildPdf(practice),
-            "application/pdf",
-            _attestationSheetService.BuildPdfFileName(practice));
+        try
+        {
+            var docxFileName = _attestationSheetService.BuildFileName(practice);
+            var pdf = await ConvertDocxToPdfAsync(_attestationSheetService.BuildDocx(practice), docxFileName);
+            return File(pdf, "application/pdf", _attestationSheetService.BuildPdfFileName(practice));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
     }
 
     [HttpGet]
@@ -418,8 +436,20 @@ public class StudentController : Controller
         using var archiveStream = new MemoryStream();
         using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddZipEntry(archive, _attestationSheetService.BuildFileName(practice), _attestationSheetService.BuildDocx(practice));
-            AddZipEntry(archive, _attestationSheetService.BuildPdfFileName(practice), _attestationSheetService.BuildPdf(practice));
+            var docxFileName = _attestationSheetService.BuildFileName(practice);
+            var docx = _attestationSheetService.BuildDocx(practice);
+            byte[] pdf;
+            try
+            {
+                pdf = await ConvertDocxToPdfAsync(docx, docxFileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return PdfConversionFailed(ex);
+            }
+
+            AddZipEntry(archive, docxFileName, docx);
+            AddZipEntry(archive, _attestationSheetService.BuildPdfFileName(practice), pdf);
         }
 
         return File(
@@ -457,6 +487,42 @@ public class StudentController : Controller
             result.Content,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             result.FileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadPracticeReportPdf(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        var result = await _practiceReportDocumentService.BuildDocxAsync(
+            practice,
+            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId),
+            appendixId => _studentApiService.DownloadAppendixAsync(token, appendixId));
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = "PDF отчёта нельзя сформировать: заполнены не все обязательные разделы.",
+                missing = result.Missing
+            });
+        }
+
+        try
+        {
+            var pdf = await ConvertDocxToPdfAsync(result.Content, result.FileName);
+            return File(pdf, "application/pdf", Path.ChangeExtension(result.FileName, ".pdf"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
     }
 
     [HttpGet]
@@ -505,7 +571,19 @@ public class StudentController : Controller
         if (missing.Count > 0)
             return BadRequest(new { message = "Дневник практики нельзя показать: заполнены не все обязательные данные.", missing });
 
-        return File(_practiceDiaryDocumentService.BuildPdf(practice), "application/pdf");
+        var docxResult = await _practiceDiaryDocumentService.BuildDocxAsync(practice);
+        if (!docxResult.Success)
+            return BadRequest(new { message = "Дневник практики нельзя показать: заполнены не все обязательные данные.", missing = docxResult.Missing });
+
+        try
+        {
+            var pdf = await ConvertDocxToPdfAsync(docxResult.Content, docxResult.FileName);
+            return File(pdf, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
     }
 
     [HttpGet]
@@ -556,15 +634,46 @@ public class StudentController : Controller
             });
         }
 
-        return File(
-            _practiceDiaryDocumentService.BuildPdf(practice),
-            "application/pdf",
-            _practiceDiaryDocumentService.BuildPdfFileName(practice));
+        var docxResult = await _practiceDiaryDocumentService.BuildDocxAsync(practice);
+        if (!docxResult.Success)
+        {
+            return BadRequest(new
+            {
+                message = "PDF дневника практики нельзя сформировать: заполнены не все обязательные данные.",
+                missing = docxResult.Missing
+            });
+        }
+
+        try
+        {
+            var pdf = await ConvertDocxToPdfAsync(docxResult.Content, docxResult.FileName);
+            return File(pdf, "application/pdf", _practiceDiaryDocumentService.BuildPdfFileName(practice));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
     }
 
     private string? GetToken()
     {
         return HttpContext.Session.GetString("Token");
+    }
+
+    private Task<byte[]> ConvertDocxToPdfAsync(byte[] docxContent, string docxFileName)
+    {
+        return _docxPdfConversionService.ConvertDocxToPdfAsync(
+            docxContent,
+            docxFileName,
+            HttpContext.RequestAborted);
+    }
+
+    private ObjectResult PdfConversionFailed(InvalidOperationException exception)
+    {
+        return StatusCode(StatusCodes.Status500InternalServerError, new
+        {
+            message = exception.Message
+        });
     }
 
     private static void AddZipEntry(ZipArchive archive, string fileName, byte[] content)

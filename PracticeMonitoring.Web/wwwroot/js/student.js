@@ -22,7 +22,8 @@ function initStudentWorkspace(workspace) {
         practiceDiaryPreview: workspace.dataset.practiceDiaryPreviewUrl || '',
         downloadPracticeDiary: workspace.dataset.downloadPracticeDiaryUrl || '',
         practiceReportPreview: workspace.dataset.practiceReportPreviewUrl || '',
-        downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || ''
+        downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || '',
+        downloadPracticeReportPdf: workspace.dataset.downloadPracticeReportPdfUrl || ''
     };
 
     const $ = selector => workspace.querySelector(selector);
@@ -151,6 +152,7 @@ function initStudentWorkspace(workspace) {
         $('#downloadAttestationArchiveButton')?.addEventListener('click', () => downloadAttestationFromPreview('archive'));
         $('#downloadPracticeDiaryButton')?.addEventListener('click', openPracticeDiaryPreview);
         $('#downloadPracticeReportButton')?.addEventListener('click', downloadPracticeReport);
+        $('#downloadPracticeReportPdfButton')?.addEventListener('click', downloadPracticeReportPdf);
         $('#editSourcesButton')?.addEventListener('click', () => {
             state.sourcesEditMode = true;
             renderSources(state.currentDetails?.sources || []);
@@ -2472,6 +2474,35 @@ function initStudentWorkspace(workspace) {
         showStatus('Отчёт практики сформирован.', false);
     }
 
+    async function downloadPracticeReportPdf() {
+        if (!state.currentDetails) {
+            return;
+        }
+
+        const readiness = getPracticeReportReadiness(state.currentDetails);
+        if (!readiness.ready) {
+            renderDocumentErrors({ message: readiness.message, missing: readiness.missing });
+            showStatus(readiness.message, true);
+            return;
+        }
+
+        const url = `${urls.downloadPracticeReportPdf}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            renderDocumentErrors(error);
+            showStatus(error?.message || 'Не удалось сформировать PDF отчёта практики.', true);
+            return;
+        }
+
+        await downloadBlobResponse(
+            response,
+            `practice-report-${state.currentDetails.practiceIndex || state.currentDetails.assignmentId}.pdf`);
+
+        $('#studentDocumentErrors').hidden = true;
+        showStatus('PDF отчёта практики сформирован.', false);
+    }
+
     async function downloadBlobResponse(response, fallbackFileName) {
         const blob = await response.blob();
         const link = document.createElement('a');
@@ -2577,13 +2608,13 @@ function initStudentWorkspace(workspace) {
     }
 
     function setPracticeReportButtonState(enabled, title) {
-        const button = $('#downloadPracticeReportButton');
-        if (!button) {
-            return;
-        }
-
-        button.disabled = !enabled;
-        button.title = title || '';
+        ['#downloadPracticeReportButton', '#downloadPracticeReportPdfButton']
+            .map(selector => $(selector))
+            .filter(Boolean)
+            .forEach(button => {
+                button.disabled = !enabled;
+                button.title = title || '';
+            });
     }
 
     function getPracticeReportReadiness(details) {
