@@ -142,6 +142,8 @@ public class DepartmentStaffPracticesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ProductionPracticeDetailsResponse>> Create(ProductionPracticeUpsertRequest request)
     {
+        NormalizePracticeRequest(request);
+
         var validationErrors = await ValidatePracticeRequestAsync(request);
         if (validationErrors.Count > 0)
         {
@@ -206,6 +208,8 @@ public class DepartmentStaffPracticesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ProductionPracticeDetailsResponse>> Update(int id, ProductionPracticeUpsertRequest request)
     {
+        NormalizePracticeRequest(request);
+
         var practice = await _context.ProductionPractices
             .Include(x => x.Specialty)
             .Include(x => x.Competencies)
@@ -874,7 +878,35 @@ public class DepartmentStaffPracticesController : ControllerBase
 
     private static string BuildPracticeDisplayName(string practiceIndex, string name)
     {
-        return $"{practiceIndex} \"{name}\"";
+        return $"{BuildPracticeIndexDisplay(practiceIndex)} \"{name}\"";
+    }
+
+    private static void NormalizePracticeRequest(ProductionPracticeUpsertRequest request)
+    {
+        request.PracticeIndex = StripAcademicPrefix(request.PracticeIndex, "ПП");
+        request.ProfessionalModuleCode = StripAcademicPrefix(request.ProfessionalModuleCode, "ПМ");
+    }
+
+    private static string StripAcademicPrefix(string? value, string prefix)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+            return normalized;
+
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[prefix.Length..].TrimStart();
+            if (normalized.StartsWith(".", StringComparison.Ordinal))
+                normalized = normalized[1..].TrimStart();
+        }
+
+        return normalized;
+    }
+
+    private static string BuildPracticeIndexDisplay(string value)
+    {
+        var normalized = StripAcademicPrefix(value, "ПП");
+        return string.IsNullOrWhiteSpace(normalized) ? string.Empty : $"ПП.{normalized}";
     }
 
     private static string JoinAssignmentNames(IEnumerable<AssignmentSnapshot> assignments)

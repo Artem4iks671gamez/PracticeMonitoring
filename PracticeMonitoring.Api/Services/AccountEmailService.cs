@@ -37,10 +37,10 @@ public class AccountEmailService
     public Task SendAccountDisabledAsync(User user, CancellationToken cancellationToken = default)
         => _emailService.SendAsync(
             user.Email,
-            "Аккаунт Practice Monitoring отключен",
+            "Аккаунт Practice Monitoring отключён",
             $"""
             <p>Здравствуйте, {WebUtility.HtmlEncode(user.FullName)}.</p>
-            <p>Ваш аккаунт в системе Practice Monitoring был отключен администратором.</p>
+            <p>Ваш аккаунт в системе Practice Monitoring был отключён администратором.</p>
             <p>Если это ошибка, обратитесь к администратору системы.</p>
             """,
             cancellationToken);
@@ -55,6 +55,19 @@ public class AccountEmailService
             <p><strong>Email:</strong> {WebUtility.HtmlEncode(user.Email)}</p>
             <p><strong>Первый пароль:</strong> {WebUtility.HtmlEncode(temporaryPassword)}</p>
             <p>При первом входе система попросит заменить этот пароль на постоянный.</p>
+            """,
+            cancellationToken);
+
+    public Task SendPasswordChangedByAdminAsync(User user, string temporaryPassword, CancellationToken cancellationToken = default)
+        => _emailService.SendAsync(
+            user.Email,
+            "Пароль Practice Monitoring изменён",
+            $"""
+            <p>Здравствуйте, {WebUtility.HtmlEncode(user.FullName)}.</p>
+            <p>Администратор сгенерировал для вашего аккаунта новый временный пароль.</p>
+            <p><strong>Email:</strong> {WebUtility.HtmlEncode(user.Email)}</p>
+            <p><strong>Временный пароль:</strong> {WebUtility.HtmlEncode(temporaryPassword)}</p>
+            <p>При следующем входе система попросит заменить этот пароль на постоянный.</p>
             """,
             cancellationToken);
 }

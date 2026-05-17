@@ -2,6 +2,34 @@
 
 @{
     ViewData["Title"] = "Работник отдела";
+
+    static string StripAcademicPrefix(string? value, string prefix)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+            return normalized;
+
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[prefix.Length..].TrimStart();
+            if (normalized.StartsWith(".", StringComparison.Ordinal))
+                normalized = normalized[1..].TrimStart();
+        }
+
+        return normalized;
+    }
+
+    static string FormatPracticeIndex(string? value)
+    {
+        var normalized = StripAcademicPrefix(value, "ПП");
+        return string.IsNullOrWhiteSpace(normalized) ? string.Empty : $"ПП.{normalized}";
+    }
+
+    static string FormatProfessionalModuleCode(string? value)
+    {
+        var normalized = StripAcademicPrefix(value, "ПМ");
+        return string.IsNullOrWhiteSpace(normalized) ? string.Empty : $"ПМ.{normalized}";
+    }
 }
 
 <link rel="stylesheet" href="~/css/DepartmentStaff.css" asp-append-version="true" />
@@ -171,7 +199,7 @@
                                 <div class="practice-card-top">
                                     <div class="practice-card-title-block">
                                         <div class="practice-card-topline">
-                                            <div class="practice-index-chip">@practice.PracticeIndex</div>
+                                            <div class="practice-index-chip">@FormatPracticeIndex(practice.PracticeIndex)</div>
                                             <div class="practice-status-chip @(practice.IsCompleted ? "completed" : "active")">
                                                 @(practice.IsCompleted ? "Завершилась" : "Активна")
                                             </div>
@@ -195,7 +223,7 @@
 
                                     <div class="practice-meta-item">
                                         <span class="practice-meta-label">ПМ</span>
-                                        <span class="practice-meta-value">@practice.ProfessionalModuleCode @practice.ProfessionalModuleName</span>
+                                        <span class="practice-meta-value">@FormatProfessionalModuleCode(practice.ProfessionalModuleCode) @practice.ProfessionalModuleName</span>
                                     </div>
 
                                     <div class="practice-meta-separator"></div>

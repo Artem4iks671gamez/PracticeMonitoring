@@ -229,9 +229,9 @@ public class PracticeReportDocumentService
     {
         return new Dictionary<string, string>
         {
-            ["PRACTICE_INDEX"] = practice.PracticeIndex,
+            ["PRACTICE_INDEX"] = StripAcademicPrefix(practice.PracticeIndex, "ПП"),
             ["PRACTICE_NAME"] = practice.Name,
-            ["PROFESSIONAL_MODULE_CODE"] = practice.ProfessionalModuleCode,
+            ["PROFESSIONAL_MODULE_CODE"] = StripAcademicPrefix(practice.ProfessionalModuleCode, "ПМ"),
             ["PROFESSIONAL_MODULE_NAME"] = practice.ProfessionalModuleName,
             ["SPECIALTY_CODE"] = practice.SpecialtyCode,
             ["SPECIALTY_NAME"] = practice.SpecialtyName,
@@ -946,8 +946,24 @@ public class PracticeReportDocumentService
 
     private static string BuildFileName(StudentPracticeDetailsViewModel practice)
     {
-        var safeIndex = string.Concat(practice.PracticeIndex.Where(ch => char.IsLetterOrDigit(ch) || ch is '.' or '-' or '_'));
+        var safeIndex = string.Concat(StripAcademicPrefix(practice.PracticeIndex, "ПП").Where(ch => char.IsLetterOrDigit(ch) || ch is '.' or '-' or '_'));
         return $"Отчет_практики_{(string.IsNullOrWhiteSpace(safeIndex) ? "practice" : safeIndex)}.docx";
+    }
+
+    private static string StripAcademicPrefix(string? value, string prefix)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+            return normalized;
+
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[prefix.Length..].TrimStart();
+            if (normalized.StartsWith(".", StringComparison.Ordinal))
+                normalized = normalized[1..].TrimStart();
+        }
+
+        return normalized;
     }
 
     private static string ToRussianAppendixLetter(int index)

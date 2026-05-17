@@ -34,5 +34,7 @@ public class AdminSaveUserViewModel
 
     public string? Password { get; set; }
 
+    public bool ResetPassword { get; set; }
+
     public bool IsCreateMode { get; set; }
 }

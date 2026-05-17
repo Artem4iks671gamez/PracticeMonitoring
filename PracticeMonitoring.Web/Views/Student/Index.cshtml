@@ -19,6 +19,34 @@
     var activePracticesCount = Model.Practices.Count(x => !x.IsCompleted);
     var completedPracticesCount = Model.Practices.Count(x => x.IsCompleted);
     var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    static string StripAcademicPrefix(string? value, string prefix)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+            return normalized;
+
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[prefix.Length..].TrimStart();
+            if (normalized.StartsWith(".", StringComparison.Ordinal))
+                normalized = normalized[1..].TrimStart();
+        }
+
+        return normalized;
+    }
+
+    static string FormatPracticeIndex(string? value)
+    {
+        var normalized = StripAcademicPrefix(value, "ПП");
+        return string.IsNullOrWhiteSpace(normalized) ? string.Empty : $"ПП.{normalized}";
+    }
+
+    static string FormatProfessionalModuleCode(string? value)
+    {
+        var normalized = StripAcademicPrefix(value, "ПМ");
+        return string.IsNullOrWhiteSpace(normalized) ? string.Empty : $"ПМ.{normalized}";
+    }
 }
 
 <div class="student-shell"
@@ -179,7 +207,7 @@
                                          data-progress-ready="@practice.HasRequiredDetails.ToString().ToLower()">
                                     <div class="student-practice-title-cell">
                                         <div class="student-practice-chip-row">
-                                            <span class="student-practice-index">@practice.PracticeIndex</span>
+                                            <span class="student-practice-index">@FormatPracticeIndex(practice.PracticeIndex)</span>
                                             <span class="student-practice-state @(practice.IsCompleted ? "completed" : "active")">@(practice.IsCompleted ? "Завершена" : "Активна")</span>
                                             @if (practice.IsDetailsOverdue)
                                             {
@@ -187,12 +215,12 @@
                                             }
                                         </div>
                                         <strong>@practice.Name</strong>
-                                        <small>@practice.ProfessionalModuleCode @practice.ProfessionalModuleName</small>
+                                        <small>@FormatProfessionalModuleCode(practice.ProfessionalModuleCode) @practice.ProfessionalModuleName</small>
                                     </div>
 
                                     <div class="student-practice-date-cell">
                                         <strong>@practice.StartDate.ToString("dd.MM.yyyy") - @practice.EndDate.ToString("dd.MM.yyyy")</strong>
-                                        <small>@practice.Hours �. � �� @practice.DetailsDueDate.ToString("dd.MM.yyyy") ��������� �����������</small>
+                                        <small>@practice.Hours ч. • до @practice.DetailsDueDate.ToString("dd.MM.yyyy") заполнить сведения</small>
                                     </div>
 
                                     <div class="student-practice-supervisor-cell">
@@ -284,12 +312,12 @@
                     <form id="studentOrganizationForm" class="student-form-grid" hidden novalidate>
                         <div class="form-group student-form-wide">
                             <label class="form-label" for="organizationFullName">Полное название организации</label>
-                            <input class="form-input" id="organizationFullName" name="organizationFullName" maxlength="500" placeholder="��������: �������� � ������������ ���������������� ��������������� ��������" />
+                            <input class="form-input" id="organizationFullName" name="organizationFullName" maxlength="500" placeholder="Например: общество с ограниченной ответственностью Профильная практика" />
                             <div class="student-field-error" data-field-error="OrganizationFullName"></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="organizationShortName">Сокращенное название</label>
-                            <input class="form-input" id="organizationShortName" name="organizationShortName" maxlength="300" placeholder="��� ��������������� ��������" />
+                            <input class="form-input" id="organizationShortName" name="organizationShortName" maxlength="300" placeholder="ООО Профильная практика" />
                             <div class="student-field-error" data-field-error="OrganizationShortName"></div>
                         </div>
                         <div class="form-group">
@@ -358,7 +386,7 @@
                                     <h4>Отдельный документ для итогового отчёта</h4>
                                     <p id="studentReportPreviewExcerpt">Отчёт пока пустой. Откройте редактор и добавьте текст, таблицу или рисунок.</p>
                                     <div class="student-report-summary-meta">
-                                        <span id="studentReportPreviewStats">0 ��������� ������ � 0 ������ � 0 ��������</span>
+                                        <span id="studentReportPreviewStats">0 текстовых блоков • 0 таблиц • 0 рисунков</span>
                                         <span id="studentReportPreviewUpdated">Не сохранялся</span>
                                     </div>
                                 </div>

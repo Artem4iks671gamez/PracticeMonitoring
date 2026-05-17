@@ -174,6 +174,30 @@ document.addEventListener('DOMContentLoaded', function () {
         return date.toLocaleDateString('ru-RU');
     }
 
+    function stripAcademicPrefix(value, prefix) {
+        let normalized = String(value || '').trim();
+        if (!normalized) return '';
+
+        if (normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
+            normalized = normalized.slice(prefix.length).trimStart();
+            if (normalized.startsWith('.')) {
+                normalized = normalized.slice(1).trimStart();
+            }
+        }
+
+        return normalized;
+    }
+
+    function formatPracticeIndex(value) {
+        const normalized = stripAcademicPrefix(value, 'ПП');
+        return normalized ? `ПП.${normalized}` : '';
+    }
+
+    function formatProfessionalModuleCode(value) {
+        const normalized = stripAcademicPrefix(value, 'ПМ');
+        return normalized ? `ПМ.${normalized}` : '';
+    }
+
     function switchPanel(targetId) {
         panelButtons.forEach(button => {
             button.classList.toggle('active', button.dataset.panelTarget === targetId);
@@ -670,10 +694,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function getPracticeSearchText(card) {
         return [
             card.dataset.practiceIndex,
+            formatPracticeIndex(card.dataset.practiceIndex),
             card.dataset.name,
             card.dataset.specialtyCode,
             card.dataset.specialtyName,
             card.dataset.professionalModuleCode,
+            formatProfessionalModuleCode(card.dataset.professionalModuleCode),
             card.dataset.professionalModuleName
         ]
             .filter(Boolean)
@@ -1236,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const studentAssignments = details.studentAssignments || [];
 
         if (practiceDetailsTitle) {
-            practiceDetailsTitle.textContent = `${details.practiceIndex} - ${details.name}`;
+            practiceDetailsTitle.textContent = `${formatPracticeIndex(details.practiceIndex)} - ${details.name}`;
         }
 
         if (practiceDetailsSubtitle) {
@@ -1248,7 +1274,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (practiceDetailsOverviewSubtitle) {
-            practiceDetailsOverviewSubtitle.textContent = `${details.practiceIndex} • ${details.specialtyCode} ${details.specialtyName}`;
+            practiceDetailsOverviewSubtitle.textContent = `${formatPracticeIndex(details.practiceIndex)} • ${details.specialtyCode} ${details.specialtyName}`;
         }
 
         if (practiceDetailsOverviewStats) {
@@ -1288,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="department-details-item">
                     <span class="department-details-label">Индекс ПП</span>
-                    <span class="department-details-value">${escapeHtml(details.practiceIndex)}</span>
+                    <span class="department-details-value">${escapeHtml(formatPracticeIndex(details.practiceIndex))}</span>
                 </div>
                 <div class="department-details-item">
                     <span class="department-details-label">Количество часов</span>
@@ -1296,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="department-details-item">
                     <span class="department-details-label">Код ПМ</span>
-                    <span class="department-details-value">${escapeHtml(details.professionalModuleCode)}</span>
+                    <span class="department-details-value">${escapeHtml(formatProfessionalModuleCode(details.professionalModuleCode))}</span>
                 </div>
                 <div class="department-details-item">
                     <span class="department-details-label">Название ПМ</span>
@@ -1417,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                         <div class="department-details-card-meta">
                             <span class="department-details-inline-chip">${escapeHtml(item.groupName || 'Группа не указана')}</span>
-                            <span class="department-details-inline-chip">${escapeHtml(item.practiceIndex)} ${escapeHtml(item.practiceName)}</span>
+                            <span class="department-details-inline-chip">${escapeHtml(formatPracticeIndex(item.practiceIndex))} ${escapeHtml(item.practiceName)}</span>
                         </div>
                     </div>
                 `).join('')
@@ -1429,7 +1455,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? details.practices.map(item => `
                     <div class="department-details-card">
                         <div class="department-details-card-header">
-                            <div class="department-details-card-title">${escapeHtml(item.practiceIndex)} - ${escapeHtml(item.practiceName)}</div>
+                            <div class="department-details-card-title">${escapeHtml(formatPracticeIndex(item.practiceIndex))} - ${escapeHtml(item.practiceName)}</div>
                             <div class="department-details-chip">${item.studentsCount} студ.</div>
                         </div>
                         <div class="department-details-card-meta">
@@ -1463,11 +1489,11 @@ document.addEventListener('DOMContentLoaded', function () {
         resetPracticeForm();
 
         if (practiceIdInput) practiceIdInput.value = details.id;
-        if (practiceIndexInput) practiceIndexInput.value = details.practiceIndex || '';
+        if (practiceIndexInput) practiceIndexInput.value = stripAcademicPrefix(details.practiceIndex, 'ПП');
         if (practiceNameInput) practiceNameInput.value = details.name || '';
         if (practiceSpecialtySelect) practiceSpecialtySelect.value = String(details.specialtyId || '');
         if (practiceHoursInput) practiceHoursInput.value = details.hours || '';
-        if (professionalModuleCodeInput) professionalModuleCodeInput.value = details.professionalModuleCode || '';
+        if (professionalModuleCodeInput) professionalModuleCodeInput.value = stripAcademicPrefix(details.professionalModuleCode, 'ПМ');
         if (professionalModuleNameInput) professionalModuleNameInput.value = details.professionalModuleName || '';
         if (practiceStartDateInput) practiceStartDateInput.value = String(details.startDate || '').slice(0, 10);
         if (practiceEndDateInput) practiceEndDateInput.value = String(details.endDate || '').slice(0, 10);
@@ -1493,10 +1519,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function buildPayload() {
         return {
             id: practiceIdInput?.value ? Number(practiceIdInput.value) : null,
-            practiceIndex: practiceIndexInput?.value.trim() || '',
+            practiceIndex: stripAcademicPrefix(practiceIndexInput?.value, 'ПП'),
             name: practiceNameInput?.value.trim() || '',
             specialtyId: Number(practiceSpecialtySelect?.value || 0),
-            professionalModuleCode: professionalModuleCodeInput?.value.trim() || '',
+            professionalModuleCode: stripAcademicPrefix(professionalModuleCodeInput?.value, 'ПМ'),
             professionalModuleName: professionalModuleNameInput?.value.trim() || '',
             hours: Number(practiceHoursInput?.value || 0),
             startDate: practiceStartDateInput?.value || null,
@@ -1553,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (studentSortSelect) studentSortSelect.value = assignmentFilters.sort;
 
         if (practiceAssignmentsModalTitle) {
-            practiceAssignmentsModalTitle.textContent = `Назначение студентов: ${details.practiceIndex}`;
+            practiceAssignmentsModalTitle.textContent = `Назначение студентов: ${formatPracticeIndex(details.practiceIndex)}`;
         }
 
         if (practiceAssignmentsModalSubtitle) {
@@ -1839,7 +1865,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const confirmed = await showWarningModal({
             title: 'Удаление производственной практики',
-            subtitle: `${currentDetails.practiceIndex} • ${currentDetails.name}`,
+            subtitle: `${formatPracticeIndex(currentDetails.practiceIndex)} • ${currentDetails.name}`,
             message: 'Это действие удалит карточку практики из рабочего раздела. Отменить его после сохранения не получится.',
             confirmText: 'Удалить практику',
             consequences: [

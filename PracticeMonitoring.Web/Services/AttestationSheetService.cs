@@ -45,13 +45,13 @@ public class AttestationSheetService
 
     public string BuildFileName(DepartmentStaffPracticeDetailsViewModel practice)
     {
-        return $"Аттестационный_лист_{SafeFilePart(practice.PracticeIndex, "practice")}.docx";
+        return $"Аттестационный_лист_{SafeFilePart(StripAcademicPrefix(practice.PracticeIndex, "ПП"), "practice")}.docx";
     }
 
     public string BuildFileName(StudentPracticeDetailsViewModel practice)
     {
         var student = SafeFilePart(practice.StudentFullName, "student");
-        var practiceIndex = SafeFilePart(practice.PracticeIndex, "practice");
+        var practiceIndex = SafeFilePart(StripAcademicPrefix(practice.PracticeIndex, "ПП"), "practice");
 
         return $"Аттестационный_лист_{practiceIndex}_{student}.docx";
     }
@@ -555,6 +555,22 @@ public class AttestationSheetService
         return string.IsNullOrWhiteSpace(value) ? blank : value.Trim();
     }
 
+    private static string StripAcademicPrefix(string? value, string prefix)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+            return normalized;
+
+        if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[prefix.Length..].TrimStart();
+            if (normalized.StartsWith(".", StringComparison.Ordinal))
+                normalized = normalized[1..].TrimStart();
+        }
+
+        return normalized;
+    }
+
     private static IEnumerable<string> SplitLines(string? value)
     {
         var lines = (value ?? string.Empty).Replace("\r", string.Empty).Split('\n');
@@ -622,11 +638,11 @@ public class AttestationSheetService
         {
             return new AttestationSheetData
             {
-                PracticeIndex = practice.PracticeIndex,
+                PracticeIndex = StripAcademicPrefix(practice.PracticeIndex, "ПП"),
                 Name = practice.Name,
                 SpecialtyCode = practice.SpecialtyCode,
                 SpecialtyName = practice.SpecialtyName,
-                ProfessionalModuleCode = practice.ProfessionalModuleCode,
+                ProfessionalModuleCode = StripAcademicPrefix(practice.ProfessionalModuleCode, "ПМ"),
                 ProfessionalModuleName = practice.ProfessionalModuleName,
                 Hours = practice.Hours,
                 StartDate = practice.StartDate,
@@ -647,11 +663,11 @@ public class AttestationSheetService
         {
             return new AttestationSheetData
             {
-                PracticeIndex = practice.PracticeIndex,
+                PracticeIndex = StripAcademicPrefix(practice.PracticeIndex, "ПП"),
                 Name = practice.Name,
                 SpecialtyCode = practice.SpecialtyCode,
                 SpecialtyName = practice.SpecialtyName,
-                ProfessionalModuleCode = practice.ProfessionalModuleCode,
+                ProfessionalModuleCode = StripAcademicPrefix(practice.ProfessionalModuleCode, "ПМ"),
                 ProfessionalModuleName = practice.ProfessionalModuleName,
                 Hours = practice.Hours,
                 StartDate = practice.StartDate,

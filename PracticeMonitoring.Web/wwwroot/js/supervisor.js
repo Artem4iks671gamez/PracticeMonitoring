@@ -205,7 +205,7 @@ function initSupervisorWorkspace(workspace) {
         const practiceFilter = $('#supervisorPracticeFilter');
         if (practiceFilter) {
             practiceFilter.innerHTML = '<option value="all">Все практики</option>' + practices.map(item => `
-                <option value="${item.practiceId}">${escapeHtml(`${item.practiceIndex} ${item.practiceName}`)}</option>
+                <option value="${item.practiceId}">${escapeHtml(`${formatPracticeIndex(item.practiceIndex)} ${item.practiceName}`)}</option>
             `).join('');
         }
 
@@ -266,7 +266,7 @@ function initSupervisorWorkspace(workspace) {
                     <div class="supervisor-student-avatar">${buildAvatar(student)}</div>
                     <div>
                         <h3>${escapeHtml(student.studentFullName)}</h3>
-                        <p>${escapeHtml(student.groupName || 'Без группы')} · ${escapeHtml(student.practiceIndex)} ${escapeHtml(student.practiceName)}</p>
+                        <p>${escapeHtml(student.groupName || 'Без группы')} · ${escapeHtml(formatPracticeIndex(student.practiceIndex))} ${escapeHtml(student.practiceName)}</p>
                         <span>${escapeHtml(student.organizationName || 'Организация не указана')}</span>
                     </div>
                 </div>
@@ -304,7 +304,7 @@ function initSupervisorWorkspace(workspace) {
             <article class="supervisor-practice-card">
                 <div class="supervisor-card-header">
                     <div>
-                        <h3>${escapeHtml(practice.practiceIndex)} ${escapeHtml(practice.practiceName)}</h3>
+                        <h3>${escapeHtml(formatPracticeIndex(practice.practiceIndex))} ${escapeHtml(practice.practiceName)}</h3>
                         <p>${escapeHtml(practice.specialtyCode)} ${escapeHtml(practice.specialtyName)}</p>
                     </div>
                     <strong>${practice.averageProgress}%</strong>
@@ -336,7 +336,7 @@ function initSupervisorWorkspace(workspace) {
             <article class="supervisor-risk-card risk-${escapeHtmlAttribute(risk.riskLevel)}">
                 <div>
                     <strong>${escapeHtml(risk.studentFullName)}</strong>
-                    <p>${escapeHtml(risk.groupName || 'Без группы')} · ${escapeHtml(risk.practiceIndex)} ${escapeHtml(risk.practiceName)}</p>
+                    <p>${escapeHtml(risk.groupName || 'Без группы')} · ${escapeHtml(formatPracticeIndex(risk.practiceIndex))} ${escapeHtml(risk.practiceName)}</p>
                     <span>${escapeHtml(risk.message)}</span>
                 </div>
                 <div>
@@ -362,7 +362,7 @@ function initSupervisorWorkspace(workspace) {
             <article class="supervisor-document-card">
                 <div>
                     <strong>${escapeHtml(student.studentFullName)}</strong>
-                    <span>${escapeHtml(student.practiceIndex)} · ${escapeHtml(student.groupName || 'Без группы')}</span>
+                    <span>${escapeHtml(formatPracticeIndex(student.practiceIndex))} · ${escapeHtml(student.groupName || 'Без группы')}</span>
                 </div>
                 <div class="supervisor-document-checks">
                     ${buildCheck('Организация', student.hasOrganization)}
@@ -402,7 +402,7 @@ function initSupervisorWorkspace(workspace) {
         const details = await response.json();
         activeDetails = details;
         $('#supervisorStudentDetailsTitle').textContent = details.studentFullName || 'Студент';
-        $('#supervisorStudentDetailsSubtitle').textContent = `${details.groupName || 'Без группы'} · ${details.practiceIndex} ${details.practiceName}`;
+        $('#supervisorStudentDetailsSubtitle').textContent = `${details.groupName || 'Без группы'} · ${formatPracticeIndex(details.practiceIndex)} ${details.practiceName}`;
         body.innerHTML = buildDetailsBody(details);
         renderDayReportViewer((details.diaryEntries || []).find(entry => entry.hasDetailedReport) || null);
     }
@@ -802,6 +802,25 @@ function initSupervisorWorkspace(workspace) {
         }
 
         return new Date(value).toLocaleDateString('ru-RU');
+    }
+
+    function stripAcademicPrefix(value, prefix) {
+        let normalized = String(value || '').trim();
+        if (!normalized) return '';
+
+        if (normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
+            normalized = normalized.slice(prefix.length).trimStart();
+            if (normalized.startsWith('.')) {
+                normalized = normalized.slice(1).trimStart();
+            }
+        }
+
+        return normalized;
+    }
+
+    function formatPracticeIndex(value) {
+        const normalized = stripAcademicPrefix(value, 'ПП');
+        return normalized ? `ПП.${normalized}` : '';
     }
 
     function formatDateTime(value) {

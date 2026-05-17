@@ -514,16 +514,16 @@ function initStudentWorkspace(workspace) {
             <article class="student-practice-row" data-assignment-id="${practice.assignmentId}">
                 <div class="student-practice-title-cell">
                     <div class="student-practice-chip-row">
-                        <span class="student-practice-index">${escapeHtml(practice.practiceIndex)}</span>
+                        <span class="student-practice-index">${escapeHtml(formatPracticeIndex(practice.practiceIndex))}</span>
                         <span class="student-practice-state ${practice.isCompleted ? 'completed' : 'active'}">${practice.isCompleted ? 'Завершена' : 'Активна'}</span>
                         ${practice.isDetailsOverdue ? '<span class="student-practice-state warning">Просрочены сведения</span>' : ''}
                     </div>
                     <strong>${escapeHtml(practice.name)}</strong>
-                    <small>${escapeHtml(`${practice.professionalModuleCode || ''} ${practice.professionalModuleName || ''}`.trim())}</small>
+                    <small>${escapeHtml(`${formatProfessionalModuleCode(practice.professionalModuleCode)} ${practice.professionalModuleName || ''}`.trim())}</small>
                 </div>
                 <div class="student-practice-date-cell">
                     <strong>${formatDate(practice.startDate)} - ${formatDate(practice.endDate)}</strong>
-                    <small>${practice.hours || 0} �. � �� ${formatDate(practice.detailsDueDate)} ��������� �����������</small>
+                    <small>${practice.hours || 0} ч. • до ${formatDate(practice.detailsDueDate)} заполнить сведения</small>
                 </div>
                 <div class="student-practice-supervisor-cell">
                     <strong>${escapeHtml(practice.supervisorFullName || 'Не назначен')}</strong>
@@ -576,8 +576,8 @@ function initStudentWorkspace(workspace) {
     }
 
     function renderPracticeModal(details) {
-        $('#studentPracticeModalTitle').textContent = `${details.practiceIndex} ${details.name}`;
-        $('#studentPracticeModalSubtitle').textContent = `${formatDate(details.startDate)} - ${formatDate(details.endDate)} � ${details.hours} �. � ${details.supervisorFullName || '������������ �� ��������'}`;
+        $('#studentPracticeModalTitle').textContent = `${formatPracticeIndex(details.practiceIndex)} ${details.name}`;
+        $('#studentPracticeModalSubtitle').textContent = `${formatDate(details.startDate)} - ${formatDate(details.endDate)} • ${details.hours} ч. • ${details.supervisorFullName || 'руководитель не назначен'}`;
         $('#studentPracticeModalEyebrow').textContent = details.isCompleted ? 'Завершённая практика' : 'Активная практика';
         renderOverview(details);
         renderOrganization(details);
@@ -598,7 +598,7 @@ function initStudentWorkspace(workspace) {
     function renderOverview(details) {
         const rows = [
             ['Специальность', `${details.specialtyCode || ''} ${details.specialtyName || ''}`.trim()],
-            ['Профессиональный модуль', `${details.professionalModuleCode || ''} ${details.professionalModuleName || ''}`.trim()],
+            ['Профессиональный модуль', `${formatProfessionalModuleCode(details.professionalModuleCode)} ${details.professionalModuleName || ''}`.trim()],
             ['Сроки', `${formatDate(details.startDate)} - ${formatDate(details.endDate)}`],
             ['Руководитель', details.supervisorFullName || 'Не назначен'],
             ['Организация', details.organizationName || 'Не указана'],
@@ -621,7 +621,7 @@ function initStudentWorkspace(workspace) {
                 .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
                 .map(item => `
                     <article class="student-compact-card">
-                        <strong>${escapeHtml(item.competencyCode)} � ${escapeHtml(item.competencyDescription)}</strong>
+                        <strong>${escapeHtml(item.competencyCode)} • ${escapeHtml(item.competencyDescription)}</strong>
                         <small>Общая компетенция</small>
                     </article>`)
                 .join('')
@@ -630,7 +630,7 @@ function initStudentWorkspace(workspace) {
         $('#studentPracticeCompetencies').innerHTML = competencies.length
             ? competencies.map(item => `
                 <article class="student-compact-card">
-                    <strong>${escapeHtml(item.competencyCode)} � ${escapeHtml(item.competencyDescription)}</strong>
+                    <strong>${escapeHtml(item.competencyCode)} • ${escapeHtml(item.competencyDescription)}</strong>
                     <p>${escapeHtml(item.workTypes)}</p>
                     <small>${item.hours || 0} ч.</small>
                 </article>`).join('')
@@ -1023,7 +1023,7 @@ function initStudentWorkspace(workspace) {
 
     function renderReportSummary() {
         const stats = getReportStats(state.reportDocument);
-        $('#studentReportPreviewStats').textContent = `${stats.text} ��������� ������ � ${stats.tables} ������ � ${stats.figures} ��������`;
+        $('#studentReportPreviewStats').textContent = `${stats.text} текстовых блоков • ${stats.tables} таблиц • ${stats.figures} рисунков`;
         const entry = getSelectedDiaryEntry();
         $('#studentReportPreviewUpdated').textContent = entry?.updatedAtUtc ? `Обновлено ${formatDateTime(entry.updatedAtUtc)}` : 'Не сохранялся';
         $('#studentReportPreviewExcerpt').textContent = buildReportExcerpt(state.reportDocument);
@@ -1048,7 +1048,7 @@ function initStudentWorkspace(workspace) {
             target.className = 'student-review-card reviewed';
             target.innerHTML = `
                 <strong>Проверено руководителем</strong>
-                <span>������: ${entry.supervisorGrade}${entry.reviewedAtUtc ? ` � ${formatDateTime(entry.reviewedAtUtc)}` : ''}</span>
+                <span>Оценка: ${entry.supervisorGrade}${entry.reviewedAtUtc ? ` • ${formatDateTime(entry.reviewedAtUtc)}` : ''}</span>
                 ${entry.supervisorComment ? `<p>${escapeHtml(entry.supervisorComment)}</p>` : '<p>Комментарий не оставлен.</p>'}`;
             return;
         }
@@ -1075,7 +1075,7 @@ function initStudentWorkspace(workspace) {
         target.hidden = false;
         target.innerHTML = `
             <strong>Комментарий руководителя</strong>
-            <span>${escapeHtml(comment.sectionTitle || '')}${comment.updatedAtUtc ? ` � ${formatDateTime(comment.updatedAtUtc)}` : ''}</span>
+            <span>${escapeHtml(comment.sectionTitle || '')}${comment.updatedAtUtc ? ` • ${formatDateTime(comment.updatedAtUtc)}` : ''}</span>
             <p>${escapeHtml(comment.comment || '')}</p>`;
     }
 
@@ -2249,7 +2249,7 @@ function initStudentWorkspace(workspace) {
                 <article class="student-compact-card">
                     <strong>${escapeHtml(item.title)}</strong>
                     <p>${escapeHtml(item.description || item.fileName)}</p>
-                    <small>${escapeHtml(item.fileName)} � ${formatBytes(item.sizeBytes)} � ${item.isPending ? '��������� ��������' : formatDateTime(item.createdAtUtc)}</small>
+                    <small>${escapeHtml(item.fileName)} • ${formatBytes(item.sizeBytes)} • ${item.isPending ? 'ожидает загрузки' : formatDateTime(item.createdAtUtc)}</small>
                     <div class="student-appendix-actions">
                         ${item.isPending
                             ? '<button type="button" class="student-mini-button" disabled>Скачать</button><button type="button" class="student-mini-button" disabled>Удалить</button>'
@@ -2289,7 +2289,7 @@ function initStudentWorkspace(workspace) {
 
     function updateAppendixFileName() {
         const file = $('#appendixFile')?.files?.[0];
-        $('#appendixFileName').textContent = file ? `${file.name} � ${formatBytes(file.size)}` : '���� �� ������';
+        $('#appendixFileName').textContent = file ? `${file.name} • ${formatBytes(file.size)}` : 'Файл не выбран';
         clearFieldError('AppendixFile');
     }
 
@@ -2513,7 +2513,7 @@ function initStudentWorkspace(workspace) {
             target.innerHTML = `
                 <div class="student-document-readiness">
                     <strong>Данные готовы для формирования DOCX</strong>
-                    <p>������� ������������� ����� ��������, ����� �������� ��������� �������� �� ������� Word.</p>
+                    <p>Документ сформируется после проверки, затем можно скачать результат по шаблону Word.</p>
                 </div>`;
             $('#studentDocumentErrors').hidden = true;
         }
@@ -2929,7 +2929,7 @@ function buildReportExcerpt(reportDocument) {
             return block.content || stripHtml(block.html || '');
         })
         .filter(Boolean)
-        .join(' � ');
+        .join(' • ');
     return text.length > 180 ? `${text.slice(0, 180)}...` : text;
 }
 
@@ -3014,7 +3014,18 @@ function sortPractices(items, sort) {
 }
 
 function buildPracticeSearchText(practice) {
-    return [practice.practiceIndex, practice.name, practice.specialtyCode, practice.specialtyName, practice.professionalModuleCode, practice.professionalModuleName, practice.supervisorFullName, practice.organizationName].filter(Boolean).join(' ').toLowerCase();
+    return [
+        practice.practiceIndex,
+        formatPracticeIndex(practice.practiceIndex),
+        practice.name,
+        practice.specialtyCode,
+        practice.specialtyName,
+        practice.professionalModuleCode,
+        formatProfessionalModuleCode(practice.professionalModuleCode),
+        practice.professionalModuleName,
+        practice.supervisorFullName,
+        practice.organizationName
+    ].filter(Boolean).join(' ').toLowerCase();
 }
 
 function getPracticeDays(startDate, endDate) {
@@ -3091,6 +3102,30 @@ function formatDate(value) {
         return 'Не указано';
     }
     return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+}
+
+function stripAcademicPrefix(value, prefix) {
+    let normalized = String(value || '').trim();
+    if (!normalized) return '';
+
+    if (normalized.toLowerCase().startsWith(prefix.toLowerCase())) {
+        normalized = normalized.slice(prefix.length).trimStart();
+        if (normalized.startsWith('.')) {
+            normalized = normalized.slice(1).trimStart();
+        }
+    }
+
+    return normalized;
+}
+
+function formatPracticeIndex(value) {
+    const normalized = stripAcademicPrefix(value, 'ПП');
+    return normalized ? `ПП.${normalized}` : '';
+}
+
+function formatProfessionalModuleCode(value) {
+    const normalized = stripAcademicPrefix(value, 'ПМ');
+    return normalized ? `ПМ.${normalized}` : '';
 }
 
 function formatDateTime(value) {

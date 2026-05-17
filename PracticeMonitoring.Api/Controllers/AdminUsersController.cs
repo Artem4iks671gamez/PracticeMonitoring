@@ -19,19 +19,22 @@ public class AdminUsersController : ControllerBase
     private readonly AuditLogService _auditLogService;
     private readonly AccountEmailService _accountEmailService;
     private readonly TemporaryPasswordService _temporaryPasswordService;
+    private readonly NotificationService _notificationService;
 
     public AdminUsersController(
         AppDbContext context,
         PasswordService passwordService,
         AuditLogService auditLogService,
         AccountEmailService accountEmailService,
-        TemporaryPasswordService temporaryPasswordService)
+        TemporaryPasswordService temporaryPasswordService,
+        NotificationService notificationService)
     {
         _context = context;
         _passwordService = passwordService;
         _auditLogService = auditLogService;
         _accountEmailService = accountEmailService;
         _temporaryPasswordService = temporaryPasswordService;
+        _notificationService = notificationService;
     }
 
     [HttpGet]
@@ -140,11 +143,32 @@ public class AdminUsersController : ControllerBase
             ? $"{user.Surname} {user.FirstName}"
             : $"{user.Surname} {user.FirstName} {user.Patronymic}";
 
+        string? generatedPassword = null;
+        if (request.ResetPassword)
+        {
+            generatedPassword = _temporaryPasswordService.Generate();
+            user.PasswordHash = _passwordService.HashPassword(user, generatedPassword);
+            user.MustChangePassword = true;
+            changes.Add("Пароль сброшен администратором");
+
+            _notificationService.Add(
+                user.Id,
+                "PasswordChangedByAdmin",
+                "Пароль изменён администратором",
+                "Администратор сгенерировал для вас новый временный пароль. Пароль отправлен на вашу почту, при следующем входе система попросит заменить его.",
+                "/Account/ChangePassword");
+        }
+
         await _context.SaveChangesAsync();
 
         if (wasActive && !user.IsActive)
         {
             await _accountEmailService.SendAccountDisabledAsync(user);
+        }
+
+        if (!string.IsNullOrWhiteSpace(generatedPassword))
+        {
+            await _accountEmailService.SendPasswordChangedByAdminAsync(user, generatedPassword);
         }
 
         if (changes.Count > 0)

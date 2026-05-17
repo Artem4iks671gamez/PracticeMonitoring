@@ -243,6 +243,10 @@
     const modalRoleSelect = document.getElementById('modalRoleSelect');
     const modalPassword = document.getElementById('modalPassword');
     const modalPasswordGroup = document.getElementById('modalPasswordGroup');
+    const modalPasswordCreateInfo = document.getElementById('modalPasswordCreateInfo');
+    const modalPasswordResetControl = document.getElementById('modalPasswordResetControl');
+    const modalPasswordResetInfo = document.getElementById('modalPasswordResetInfo');
+    const modalResetPassword = document.getElementById('modalResetPassword');
 
     const modalSpecialtySelect = document.getElementById('modalSpecialtySelect');
     const modalGroupSelect = document.getElementById('modalGroupSelect');
@@ -446,7 +450,11 @@
             modalEmail.value = card.dataset.email || '';
             modalRoleSelect.value = card.dataset.role || 'Student';
             modalPassword.value = '';
-            modalPasswordGroup.style.display = 'none';
+            modalPasswordGroup.style.display = '';
+            modalPasswordCreateInfo.style.display = 'none';
+            modalPasswordResetControl.style.display = '';
+            modalPasswordResetInfo.style.display = '';
+            modalResetPassword.checked = false;
 
             modalCurrentAvatarUrl.value = card.dataset.avatarUrl || '';
             modalRemoveAvatar.value = 'false';
@@ -486,6 +494,10 @@
             modalRoleSelect.value = role;
             modalPassword.value = '';
             modalPasswordGroup.style.display = '';
+            modalPasswordCreateInfo.style.display = '';
+            modalPasswordResetControl.style.display = 'none';
+            modalPasswordResetInfo.style.display = 'none';
+            modalResetPassword.checked = false;
 
             modalCurrentAvatarUrl.value = '';
             modalRemoveAvatar.value = 'false';

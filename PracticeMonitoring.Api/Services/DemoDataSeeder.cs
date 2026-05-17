@@ -163,9 +163,9 @@ public class DemoDataSeeder
 
     private async Task<ProductionPractice> EnsurePracticeAsync(Specialty specialty, CancellationToken cancellationToken)
     {
-        const string practiceIndex = "ПП.04.01";
+        const string practiceIndex = "04.01";
         const string practiceName = "Разработка модулей информационной системы";
-        const string moduleCode = "ПМ.04";
+        const string moduleCode = "04";
         const string moduleName = "Разработка, администрирование и защита баз данных";
 
         var practice = await _context.ProductionPractices
@@ -173,7 +173,7 @@ public class DemoDataSeeder
             .Include(x => x.GeneralCompetencies)
             .FirstOrDefaultAsync(x =>
                 x.SpecialtyId == specialty.Id &&
-                x.PracticeIndex == practiceIndex &&
+                (x.PracticeIndex == practiceIndex || x.PracticeIndex == "ПП.04.01") &&
                 x.Name == practiceName,
                 cancellationToken);
 

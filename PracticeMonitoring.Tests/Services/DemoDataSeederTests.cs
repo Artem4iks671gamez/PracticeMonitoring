@@ -44,7 +44,7 @@ public class DemoDataSeederTests
         var practice = await context.ProductionPractices
             .Include(x => x.Competencies)
             .Include(x => x.GeneralCompetencies)
-            .SingleAsync(x => x.PracticeIndex == "ПП.04.01" && x.Name == "Разработка модулей информационной системы");
+            .SingleAsync(x => x.PracticeIndex == "04.01" && x.Name == "Разработка модулей информационной системы");
 
         Assert.Equal(144, practice.Hours);
         Assert.Equal(4, practice.Competencies.Count);

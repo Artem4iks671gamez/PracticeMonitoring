@@ -491,7 +491,13 @@
                 <div class="form-group" id="modalPasswordGroup">
                     <label class="form-label" for="modalPassword">Пароль</label>
                     <input class="form-input" type="password" id="modalPassword" name="Password" disabled />
-                    <span class="account-inline-label">Пароль будет сгенерирован автоматически и отправлен на email.</span>
+                    <span class="account-inline-label" id="modalPasswordCreateInfo">Пароль будет сгенерирован автоматически и отправлен на email.</span>
+                    <label class="switch-filter" id="modalPasswordResetControl">
+                        <input type="checkbox" id="modalResetPassword" name="ResetPassword" value="true" />
+                        <span class="switch-slider"></span>
+                        <span class="switch-label">Сгенерировать новый временный пароль</span>
+                    </label>
+                    <span class="account-inline-label" id="modalPasswordResetInfo">Пользователь получит пароль по почте и увидит уведомление в системе.</span>
                 </div>
 
                 <div class="form-group" id="modalSpecialtyGroup">

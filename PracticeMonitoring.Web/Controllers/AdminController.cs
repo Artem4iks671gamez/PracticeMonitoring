@@ -116,7 +116,8 @@ public class AdminController : Controller
             AvatarUrl = avatarUrl,
             RemoveAvatar = model.RemoveAvatar,
             IsActive = model.IsActive,
-            Password = model.Password
+            Password = model.Password,
+            ResetPassword = !model.IsCreateMode && model.ResetPassword
         };
 
         AdminApiResult<AdminUserItemViewModel> result;
@@ -148,7 +149,11 @@ public class AdminController : Controller
 
         TempData[result.Success ? "AdminSuccess" : "AdminError"] =
             result.Success
-                ? (model.IsCreateMode ? "Пользователь успешно создан." : "Пользователь успешно обновлён.")
+                ? (model.IsCreateMode
+                    ? "Пользователь успешно создан."
+                    : (model.ResetPassword
+                        ? "Пользователь успешно обновлён. Новый временный пароль отправлен на email."
+                        : "Пользователь успешно обновлён."))
                 : (result.ErrorMessage ?? "Не удалось выполнить операцию.");
 
         return RedirectToAction(nameof(Index));

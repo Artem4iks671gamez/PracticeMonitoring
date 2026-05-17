@@ -28,4 +28,6 @@ public class AdminUpsertUserRequest
     public bool IsActive { get; set; } = true;
 
     public string? Password { get; set; }
+
+    public bool ResetPassword { get; set; }
 }
