@@ -65,8 +65,8 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to send registration code to {Email}. Check SMTP configuration.", email);
-            return SmtpUnavailable();
+            _logger.LogError(ex, "Failed to send registration code to {Email}. Check email provider configuration.", email);
+            return EmailDeliveryUnavailable(ex);
         }
 
         return Ok(new { message = "Код подтверждения отправлен на email." });
@@ -194,8 +194,8 @@ public class AuthController : ControllerBase
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Failed to send password reset code to {Email}. Check SMTP configuration.", email);
-                return SmtpUnavailable();
+                _logger.LogError(ex, "Failed to send password reset code to {Email}. Check email provider configuration.", email);
+                return EmailDeliveryUnavailable(ex);
             }
         }
 
@@ -305,14 +305,39 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Для JWT logout выполняется на клиенте: удалите токен." });
     }
 
-    private ObjectResult SmtpUnavailable()
+    private ObjectResult EmailDeliveryUnavailable(Exception exception)
     {
         return StatusCode(
             StatusCodes.Status503ServiceUnavailable,
             new
             {
-                message = "Почтовый сервер не настроен или временно недоступен. Проверьте SMTP-переменные окружения у API на Render."
+                message = $"Email delivery failed: {GetPublicEmailDeliveryError(exception)}"
             });
+    }
+
+    private static string GetPublicEmailDeliveryError(Exception exception)
+    {
+        var message = exception.Message;
+
+        if (message.Contains("Smtp:", StringComparison.OrdinalIgnoreCase))
+            return "Unisender__ApiKey is missing or not loaded, so the API tried SMTP. Check Unisender__ApiKey, Unisender__FromEmail and restart the API service on Render.";
+
+        if (message.Contains("Unisender:FromEmail", StringComparison.OrdinalIgnoreCase))
+            return "Unisender__FromEmail is missing.";
+
+        if (message.Contains("unchecked_sender_email", StringComparison.OrdinalIgnoreCase))
+            return "Unisender rejected the sender email as unverified. Check Unisender__FromEmail.";
+
+        if (message.Contains("invalid_api_key", StringComparison.OrdinalIgnoreCase))
+            return "Unisender__ApiKey is invalid.";
+
+        if (message.Contains("retry_later", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("has_been_sent", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Unisender rate-limited a repeated email to the same recipient. Wait at least 60 seconds and try again.";
+        }
+
+        return message;
     }
 
     private async Task<ActionResult?> ValidateStudentRegistrationAsync(RegisterRequest request, CancellationToken cancellationToken)
