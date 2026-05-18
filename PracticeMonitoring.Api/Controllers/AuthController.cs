@@ -20,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly AuditLogService _auditLogService;
     private readonly EmailVerificationService _emailVerificationService;
     private readonly AccountEmailService _accountEmailService;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         AppDbContext context,
@@ -27,7 +28,8 @@ public class AuthController : ControllerBase
         JwtService jwtService,
         AuditLogService auditLogService,
         EmailVerificationService emailVerificationService,
-        AccountEmailService accountEmailService)
+        AccountEmailService accountEmailService,
+        ILogger<AuthController> logger)
     {
         _context = context;
         _passwordService = passwordService;
@@ -35,6 +37,7 @@ public class AuthController : ControllerBase
         _auditLogService = auditLogService;
         _emailVerificationService = emailVerificationService;
         _accountEmailService = accountEmailService;
+        _logger = logger;
     }
 
     [HttpPost("send-registration-code")]
@@ -56,7 +59,15 @@ public class AuthController : ControllerBase
             payloadJson,
             cancellationToken);
 
-        await _accountEmailService.SendRegistrationCodeAsync(email, code, cancellationToken);
+        try
+        {
+            await _accountEmailService.SendRegistrationCodeAsync(email, code, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to send registration code to {Email}. Check SMTP configuration.", email);
+            return SmtpUnavailable();
+        }
 
         return Ok(new { message = "Код подтверждения отправлен на email." });
     }
@@ -177,7 +188,15 @@ public class AuthController : ControllerBase
                 payloadJson: null,
                 cancellationToken);
 
-            await _accountEmailService.SendPasswordResetCodeAsync(email, code, cancellationToken);
+            try
+            {
+                await _accountEmailService.SendPasswordResetCodeAsync(email, code, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Failed to send password reset code to {Email}. Check SMTP configuration.", email);
+                return SmtpUnavailable();
+            }
         }
 
         return Ok(new { message = "Если аккаунт существует, код восстановления отправлен на email." });
@@ -284,6 +303,16 @@ public class AuthController : ControllerBase
     public IActionResult Logout()
     {
         return Ok(new { message = "Для JWT logout выполняется на клиенте: удалите токен." });
+    }
+
+    private ObjectResult SmtpUnavailable()
+    {
+        return StatusCode(
+            StatusCodes.Status503ServiceUnavailable,
+            new
+            {
+                message = "Почтовый сервер не настроен или временно недоступен. Проверьте SMTP-переменные окружения у API на Render."
+            });
     }
 
     private async Task<ActionResult?> ValidateStudentRegistrationAsync(RegisterRequest request, CancellationToken cancellationToken)
