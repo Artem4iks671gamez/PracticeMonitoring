@@ -4,7 +4,9 @@
     ViewData["Title"] = "Админ-панель";
 }
 
-<div class="admin-shell">
+<div class="admin-shell"
+     data-admin-specialties-url="@Url.Action("GetSpecialties", "Admin")"
+     data-admin-groups-url="@Url.Action("GetGroups", "Admin")">
     <section class="admin-hero-card">
         <div>
             <div class="admin-badge">Панель администратора</div>

@@ -26,3 +26,23 @@ public class AdminUserItemViewModel
 
     public string? SpecialtyName { get; set; }
 }
+
+public class AdminSpecialtyOptionViewModel
+{
+    public int Id { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+}
+
+public class AdminGroupOptionViewModel
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public int Course { get; set; }
+
+    public int SpecialtyId { get; set; }
+}

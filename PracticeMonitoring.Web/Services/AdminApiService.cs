@@ -41,6 +41,30 @@ public class AdminApiService
                ?? new List<AdminUserItemViewModel>();
     }
 
+    public async Task<List<AdminSpecialtyOptionViewModel>> GetSpecialtiesAsync()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/Helping/specialties");
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<AdminSpecialtyOptionViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<AdminSpecialtyOptionViewModel>>(json, _jsonOptions)
+               ?? new List<AdminSpecialtyOptionViewModel>();
+    }
+
+    public async Task<List<AdminGroupOptionViewModel>> GetGroupsAsync(int specialtyId)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/Helping/groups?specialtyId={specialtyId}");
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new List<AdminGroupOptionViewModel>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<List<AdminGroupOptionViewModel>>(json, _jsonOptions)
+               ?? new List<AdminGroupOptionViewModel>();
+    }
+
     public async Task<AdminApiResult<AdminUserItemViewModel>> UpdateUserAsync(string token, int id, object requestModel)
     {
         return await SendUserRequestAsync(HttpMethod.Put, $"api/admin/users/{id}", token, requestModel);

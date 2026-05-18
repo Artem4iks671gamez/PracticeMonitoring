@@ -1,4 +1,7 @@
 ﻿document.addEventListener('DOMContentLoaded', function () {
+    const adminShell = document.querySelector('.admin-shell');
+    const specialtiesUrl = adminShell?.dataset.adminSpecialtiesUrl || '/Admin/GetSpecialties';
+    const groupsUrl = adminShell?.dataset.adminGroupsUrl || '/Admin/GetGroups';
     const navButtons = document.querySelectorAll('.admin-nav-button');
     const panels = document.querySelectorAll('.admin-panel');
 
@@ -323,9 +326,14 @@
         };
     }
 
+    function withQuery(url, key, value) {
+        const separator = String(url || '').includes('?') ? '&' : '?';
+        return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+    }
+
     async function loadSpecialties(selectedSpecialtyId, selectedGroupId) {
         try {
-            const response = await fetch(`${window.apiBaseUrl.replace(/\/$/, '')}/api/Helping/specialties`);
+            const response = await fetch(specialtiesUrl, { cache: 'no-store' });
             if (!response.ok) return;
 
             const list = await response.json();
@@ -363,7 +371,7 @@
         }
 
         try {
-            const response = await fetch(`${window.apiBaseUrl.replace(/\/$/, '')}/api/Helping/groups?specialtyId=${encodeURIComponent(specialtyId)}`);
+            const response = await fetch(withQuery(groupsUrl, 'specialtyId', specialtyId), { cache: 'no-store' });
             if (!response.ok) return;
 
             const list = await response.json();

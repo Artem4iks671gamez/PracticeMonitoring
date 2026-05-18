@@ -76,6 +76,29 @@ public class AdminController : Controller
         return View(model);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetSpecialties()
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return Unauthorized();
+
+        return Json(await _adminApiService.GetSpecialtiesAsync());
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetGroups(int specialtyId)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return Unauthorized();
+
+        if (specialtyId <= 0)
+            return Json(Array.Empty<AdminGroupOptionViewModel>());
+
+        return Json(await _adminApiService.GetGroupsAsync(specialtyId));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveUser(AdminSaveUserViewModel model)
