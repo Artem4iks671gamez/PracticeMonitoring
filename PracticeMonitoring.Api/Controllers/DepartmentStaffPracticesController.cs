@@ -73,6 +73,7 @@ public class DepartmentStaffPracticesController : ControllerBase
     public async Task<ActionResult<List<PracticeSelectOptionResponse>>> GetSpecialties()
     {
         var items = await _context.Specialties
+            .Where(x => !x.IsArchived)
             .OrderBy(x => x.Code)
             .ThenBy(x => x.Name)
             .Select(x => new PracticeSelectOptionResponse
@@ -96,7 +97,9 @@ public class DepartmentStaffPracticesController : ControllerBase
                 x.Role.Name == "Student" &&
                 x.IsActive &&
                 x.Group != null &&
-                x.Group.Specialty != null);
+                x.Group.Specialty != null &&
+                !x.Group.IsArchived &&
+                !x.Group.Specialty.IsArchived);
 
         if (specialtyId.HasValue && specialtyId.Value > 0)
         {
@@ -464,7 +467,7 @@ public class DepartmentStaffPracticesController : ControllerBase
         }
         else
         {
-            var specialtyExists = await _context.Specialties.AnyAsync(x => x.Id == request.SpecialtyId);
+            var specialtyExists = await _context.Specialties.AnyAsync(x => x.Id == request.SpecialtyId && !x.IsArchived);
             if (!specialtyExists)
                 AddError(nameof(request.SpecialtyId), "Выбранная специальность не найдена.");
         }
@@ -570,6 +573,7 @@ public class DepartmentStaffPracticesController : ControllerBase
             var student = await _context.Users
                 .Include(x => x.Role)
                 .Include(x => x.Group)
+                    .ThenInclude(x => x!.Specialty)
                 .FirstOrDefaultAsync(x => x.Id == assignment.StudentId);
 
             if (student is null || student.Role.Name != "Student")
@@ -579,6 +583,11 @@ public class DepartmentStaffPracticesController : ControllerBase
             else if (student.Group is null || student.Group.SpecialtyId != specialtyId)
             {
                 AddError($"StudentAssignments[{i}].StudentId", $"Студент {student.FullName} не относится к выбранной специальности.");
+            }
+
+            if (student?.Group is { IsArchived: true } || student?.Group?.Specialty?.IsArchived == true)
+            {
+                AddError($"StudentAssignments[{i}].StudentId", "Группа студента находится в архиве.");
             }
 
             if (assignment.SupervisorId.HasValue)

@@ -1,6 +1,6 @@
-﻿const apiBase = (window.apiBaseUrl || '').replace(/\/$/, '');
-
-console.info('[site.js] apiBase =', apiBase);
+const registerForm = document.getElementById('registerForm');
+const specialtiesUrl = registerForm?.dataset.specialtiesUrl || '/Account/GetSpecialties';
+const groupsUrl = registerForm?.dataset.groupsUrl || '/Account/GetGroups';
 
 function getCustomSelect(selectId) {
     return document.querySelector(`.custom-select[data-target="${selectId}"]`);
@@ -79,15 +79,20 @@ function initCustomSelect(selectId) {
     buildCustomSelect(selectId);
 }
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', e => {
     if (!e.target.closest('.custom-select')) {
         document.querySelectorAll('.custom-select.open').forEach(x => x.classList.remove('open'));
     }
 });
 
+function withQuery(url, key, value) {
+    const separator = String(url || '').includes('?') ? '&' : '?';
+    return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+}
+
 async function loadSpecialties() {
     try {
-        const res = await fetch(`${apiBase}/api/Helping/specialties`);
+        const res = await fetch(specialtiesUrl, { cache: 'no-store' });
         if (!res.ok) {
             console.error('specialties fetch failed', res.status, res.statusText);
             return;
@@ -102,7 +107,7 @@ async function loadSpecialties() {
         list.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s.id;
-            opt.textContent = `${s.code} — ${s.name}`;
+            opt.textContent = `${s.code} - ${s.name}`;
             specialtySelect.appendChild(opt);
         });
 
@@ -143,7 +148,7 @@ async function loadGroups(specialtyId) {
     setCourseValue('');
 
     try {
-        const res = await fetch(`${apiBase}/api/Helping/groups?specialtyId=${encodeURIComponent(specialtyId)}`);
+        const res = await fetch(withQuery(groupsUrl, 'specialtyId', specialtyId), { cache: 'no-store' });
         if (!res.ok) {
             console.error('groups fetch failed', res.status, res.statusText);
             groupSelect.innerHTML = '<option value="">-- нет групп --</option>';
@@ -208,9 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initCustomSelect('specialtySelect');
     initCustomSelect('groupSelect');
 
-    if (window.loadSpecialties) {
-        loadSpecialties();
-    }
+    loadSpecialties();
 });
 
 window.loadSpecialties = loadSpecialties;

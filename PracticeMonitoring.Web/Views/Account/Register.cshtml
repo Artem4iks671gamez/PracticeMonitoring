@@ -21,7 +21,13 @@
 
         <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
 
-        <form asp-action="Register" method="post" class="auth-form" id="registerForm" novalidate>
+        <form asp-action="Register"
+              method="post"
+              class="auth-form"
+              id="registerForm"
+              data-specialties-url="@Url.Action("GetSpecialties", "Account")"
+              data-groups-url="@Url.Action("GetGroups", "Account")"
+              novalidate>
             <div class="form-group">
                 <label asp-for="Surname" class="form-label">Фамилия</label>
                 <input asp-for="Surname" class="form-input" placeholder="Введите фамилию" />

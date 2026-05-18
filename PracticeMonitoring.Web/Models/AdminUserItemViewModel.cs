@@ -34,6 +34,8 @@ public class AdminSpecialtyOptionViewModel
     public string Code { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
+
+    public bool IsArchived { get; set; }
 }
 
 public class AdminGroupOptionViewModel
@@ -45,4 +47,6 @@ public class AdminGroupOptionViewModel
     public int Course { get; set; }
 
     public int SpecialtyId { get; set; }
+
+    public bool IsArchived { get; set; }
 }

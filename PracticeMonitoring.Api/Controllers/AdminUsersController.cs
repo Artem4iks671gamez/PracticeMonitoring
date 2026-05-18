@@ -103,6 +103,9 @@ public class AdminUsersController : ControllerBase
 
             if (group is null)
                 return BadRequest(new { message = "Выбранная группа не найдена." });
+
+            if ((group.IsArchived || group.Specialty.IsArchived) && user.GroupId != group.Id)
+                return BadRequest(new { message = "Выберите активную группу." });
         }
 
         var changes = new List<string>();

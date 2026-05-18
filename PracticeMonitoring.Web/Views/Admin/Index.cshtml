@@ -55,6 +55,10 @@
                         Аккаунты
                     </button>
 
+                    <button type="button" class="admin-nav-button" data-panel="catalog-panel">
+                        Группы и специальности
+                    </button>
+
                     <button type="button" class="admin-nav-button" data-panel="logs-panel">
                         Журнал
                     </button>
@@ -308,6 +312,188 @@
                             </div>
                         </article>
                     }
+                </div>
+            </div>
+
+            <div class="admin-panel" id="catalog-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h2>Группы и специальности</h2>
+                        <p>Справочник для регистрации, аккаунтов студентов и практик.</p>
+                    </div>
+                </div>
+
+                <div class="admin-subtabs catalog-subtabs">
+                    <button type="button" class="admin-subtab-button active" data-catalog-tab="catalog-active-tab">
+                        Активные
+                    </button>
+                    <button type="button" class="admin-subtab-button" data-catalog-tab="catalog-archive-tab">
+                        Архив
+                    </button>
+                </div>
+
+                <div class="catalog-tab-panel active" id="catalog-active-tab">
+                    <div class="catalog-create-band">
+                        <form asp-controller="Admin" asp-action="SaveSpecialty" method="post" class="catalog-inline-form">
+                            @Html.AntiForgeryToken()
+                            <div class="catalog-form-fields">
+                                <div class="form-group">
+                                    <label class="form-label">Код специальности</label>
+                                    <input class="form-input" name="Code" placeholder="09.02.07" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Название специальности</label>
+                                    <input class="form-input" name="Name" placeholder="Информационные системы и программирование" />
+                                </div>
+                            </div>
+                            <button type="submit" class="admin-primary-button catalog-submit-button">Создать специальность</button>
+                        </form>
+                    </div>
+
+                    @if (Model.Catalog.ActiveSpecialties.Count == 0)
+                    {
+                        <div class="admin-console-empty">Активных специальностей пока нет.</div>
+                    }
+                    else
+                    {
+                        <div class="catalog-specialties-list">
+                            @foreach (var specialty in Model.Catalog.ActiveSpecialties)
+                            {
+                                var activeGroups = specialty.Groups.Where(x => !x.IsArchived).OrderBy(x => x.Name).ToList();
+
+                                <article class="catalog-specialty-block">
+                                    <form asp-controller="Admin" asp-action="SaveSpecialty" method="post" class="catalog-specialty-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@specialty.Id" />
+
+                                        <div class="catalog-form-fields">
+                                            <div class="form-group">
+                                                <label class="form-label">Код</label>
+                                                <input class="form-input" name="Code" value="@specialty.Code" />
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Название</label>
+                                                <input class="form-input" name="Name" value="@specialty.Name" />
+                                            </div>
+                                        </div>
+
+                                        <div class="catalog-actions">
+                                            <span class="account-inline-label">@activeGroups.Count активных групп</span>
+                                            <button type="submit" class="admin-secondary-button">Сохранить</button>
+                                        </div>
+                                    </form>
+
+                                    <form asp-controller="Admin" asp-action="ArchiveSpecialty" method="post" class="catalog-archive-action">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@specialty.Id" />
+                                        <button type="submit" class="admin-ghost-button">В архив</button>
+                                    </form>
+
+                                    <div class="catalog-group-create">
+                                        <form asp-controller="Admin" asp-action="SaveGroup" method="post" class="catalog-inline-form">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="SpecialtyId" value="@specialty.Id" />
+                                            <div class="catalog-form-fields catalog-group-fields">
+                                                <div class="form-group">
+                                                    <label class="form-label">Новая группа</label>
+                                                    <input class="form-input" name="Name" placeholder="ВД50-1-22" />
+                                                </div>
+                                                <div class="form-group">
+                                                    <label class="form-label">Курс</label>
+                                                    <input class="form-input" type="number" min="1" max="6" name="Course" value="1" />
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="admin-primary-button catalog-submit-button">Добавить группу</button>
+                                        </form>
+                                    </div>
+
+                                    @if (activeGroups.Count == 0)
+                                    {
+                                        <div class="catalog-empty-row">В этой специальности пока нет активных групп.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="catalog-groups-list">
+                                            @foreach (var group in activeGroups)
+                                            {
+                                                <form asp-controller="Admin" asp-action="SaveGroup" method="post" class="catalog-group-row">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="Id" value="@group.Id" />
+                                                    <input type="hidden" name="SpecialtyId" value="@specialty.Id" />
+                                                    <input class="form-input" name="Name" value="@group.Name" />
+                                                    <input class="form-input catalog-course-input" type="number" min="1" max="6" name="Course" value="@group.Course" />
+                                                    <span class="catalog-students-count">@group.StudentCount студентов</span>
+                                                    <button type="submit" class="admin-secondary-button">Сохранить</button>
+                                                </form>
+
+                                                <form asp-controller="Admin" asp-action="ArchiveGroup" method="post" class="catalog-row-action">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@group.Id" />
+                                                    <button type="submit" class="admin-ghost-button">В архив</button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="catalog-tab-panel" id="catalog-archive-tab">
+                    <div class="catalog-archive-section">
+                        <h3>Архивные специальности</h3>
+                        @if (Model.Catalog.ArchivedSpecialties.Count == 0)
+                        {
+                            <div class="admin-console-empty">Архивных специальностей нет.</div>
+                        }
+                        else
+                        {
+                            <div class="catalog-archive-list">
+                                @foreach (var specialty in Model.Catalog.ArchivedSpecialties)
+                                {
+                                    <div class="catalog-archive-row">
+                                        <div>
+                                            <strong>@specialty.Code</strong> @specialty.Name
+                                            <span class="account-inline-label">@specialty.ArchivedGroupsCount архивных групп</span>
+                                        </div>
+                                        <form asp-controller="Admin" asp-action="RestoreSpecialty" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@specialty.Id" />
+                                            <button type="submit" class="admin-secondary-button">Восстановить</button>
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="catalog-archive-section">
+                        <h3>Архивные группы</h3>
+                        @if (Model.Catalog.ArchivedGroups.Count == 0)
+                        {
+                            <div class="admin-console-empty">Архивных групп нет.</div>
+                        }
+                        else
+                        {
+                            <div class="catalog-archive-list">
+                                @foreach (var group in Model.Catalog.ArchivedGroups)
+                                {
+                                    <div class="catalog-archive-row">
+                                        <div>
+                                            <strong>@group.Name</strong>
+                                            <span class="account-inline-label">@group.SpecialtyCode @group.SpecialtyName, @group.Course курс, @group.StudentCount студентов</span>
+                                        </div>
+                                        <form asp-controller="Admin" asp-action="RestoreGroup" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@group.Id" />
+                                            <button type="submit" class="admin-secondary-button">Восстановить</button>
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
 

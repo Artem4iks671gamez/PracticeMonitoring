@@ -23,5 +23,7 @@ public class AdminUsersPageViewModel
 
     public NotificationsPanelViewModel Notifications { get; set; } = new();
 
+    public AdminCatalogViewModel Catalog { get; set; } = new();
+
     public int UnreadChatsCount => Messaging.Threads.Sum(x => x.UnreadCount);
 }

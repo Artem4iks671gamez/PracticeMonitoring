@@ -20,6 +20,7 @@ public class HelpingController : ControllerBase
     public async Task<ActionResult<IEnumerable<SpecialtyDto>>> GetSpecialties()
     {
         var list = await _context.Specialties
+            .Where(s => !s.IsArchived)
             .OrderBy(s => s.Name)
             .Select(s => new SpecialtyDto { Id = s.Id, Code = s.Code, Name = s.Name })
             .ToListAsync();
@@ -31,7 +32,7 @@ public class HelpingController : ControllerBase
     public async Task<ActionResult<IEnumerable<GroupDto>>> GetGroups(int specialtyId)
     {
         var groups = await _context.Groups
-            .Where(g => g.SpecialtyId == specialtyId)
+            .Where(g => g.SpecialtyId == specialtyId && !g.IsArchived && !g.Specialty.IsArchived)
             .OrderBy(g => g.Name)
             .Select(g => new GroupDto { Id = g.Id, Name = g.Name, Course = g.Course, SpecialtyId = g.SpecialtyId })
             .ToListAsync();

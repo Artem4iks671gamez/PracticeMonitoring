@@ -21,7 +21,7 @@
         });
     });
 
-    const subtabButtons = document.querySelectorAll('.admin-subtab-button');
+    const subtabButtons = document.querySelectorAll('.admin-subtab-button[data-console]');
     const consoles = document.querySelectorAll('.admin-console');
 
     subtabButtons.forEach(button => {
@@ -30,6 +30,25 @@
 
             subtabButtons.forEach(x => x.classList.remove('active'));
             consoles.forEach(x => x.classList.remove('active'));
+
+            button.classList.add('active');
+
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.classList.add('active');
+            }
+        });
+    });
+
+    const catalogTabButtons = document.querySelectorAll('.admin-subtab-button[data-catalog-tab]');
+    const catalogTabPanels = document.querySelectorAll('.catalog-tab-panel');
+
+    catalogTabButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const targetId = button.dataset.catalogTab;
+
+            catalogTabButtons.forEach(x => x.classList.remove('active'));
+            catalogTabPanels.forEach(x => x.classList.remove('active'));
 
             button.classList.add('active');
 
@@ -333,7 +352,8 @@
 
     async function loadSpecialties(selectedSpecialtyId, selectedGroupId) {
         try {
-            const response = await fetch(specialtiesUrl, { cache: 'no-store' });
+            const url = selectedSpecialtyId ? withQuery(specialtiesUrl, 'includeArchived', 'true') : specialtiesUrl;
+            const response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) return;
 
             const list = await response.json();
@@ -342,7 +362,7 @@
             list.forEach(item => {
                 const opt = document.createElement('option');
                 opt.value = item.id;
-                opt.textContent = `${item.code} — ${item.name}`;
+                opt.textContent = `${item.code} - ${item.name}${item.isArchived ? ' (архив)' : ''}`;
                 if (selectedSpecialtyId && Number(selectedSpecialtyId) === item.id) {
                     opt.selected = true;
                 }
@@ -371,7 +391,12 @@
         }
 
         try {
-            const response = await fetch(withQuery(groupsUrl, 'specialtyId', specialtyId), { cache: 'no-store' });
+            let url = withQuery(groupsUrl, 'specialtyId', specialtyId);
+            if (selectedGroupId) {
+                url = withQuery(url, 'includeArchived', 'true');
+            }
+
+            const response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) return;
 
             const list = await response.json();
@@ -380,7 +405,7 @@
             list.forEach(item => {
                 const opt = document.createElement('option');
                 opt.value = item.id;
-                opt.textContent = `${item.name} (курс ${item.course})`;
+                opt.textContent = `${item.name} (курс ${item.course})${item.isArchived ? ' (архив)' : ''}`;
                 opt.dataset.course = item.course;
 
                 if (selectedGroupId && Number(selectedGroupId) === item.id) {

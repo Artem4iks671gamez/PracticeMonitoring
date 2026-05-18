@@ -62,6 +62,7 @@ public class AdminController : Controller
             AdminActionsLogs = await _adminApiService.GetAdminActionsLogsAsync(token),
             UserProfileChangesLogs = await _adminApiService.GetUserProfileChangesLogsAsync(token),
             Users = await _adminApiService.GetUsersAsync(token),
+            Catalog = await _adminApiService.GetCatalogAsync(token),
             Messaging = new MessagingWorkspaceViewModel
             {
                 CurrentUserId = currentUser.Id,
@@ -77,26 +78,34 @@ public class AdminController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetSpecialties()
+    public async Task<IActionResult> GetSpecialties(bool includeArchived = false)
     {
         var role = HttpContext.Session.GetString("Role");
         if (role != "Admin")
             return Unauthorized();
 
-        return Json(await _adminApiService.GetSpecialtiesAsync());
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return Unauthorized();
+
+        return Json(await _adminApiService.GetSpecialtiesAsync(token, includeArchived));
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetGroups(int specialtyId)
+    public async Task<IActionResult> GetGroups(int specialtyId, bool includeArchived = false)
     {
         var role = HttpContext.Session.GetString("Role");
         if (role != "Admin")
+            return Unauthorized();
+
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
             return Unauthorized();
 
         if (specialtyId <= 0)
             return Json(Array.Empty<AdminGroupOptionViewModel>());
 
-        return Json(await _adminApiService.GetGroupsAsync(specialtyId));
+        return Json(await _adminApiService.GetGroupsAsync(token, specialtyId, includeArchived));
     }
 
     [HttpPost]
@@ -182,6 +191,114 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveSpecialty(AdminSaveSpecialtyViewModel model)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        if (string.IsNullOrWhiteSpace(model.Code) || string.IsNullOrWhiteSpace(model.Name))
+        {
+            TempData["AdminError"] = "Заполните код и название специальности.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await _adminApiService.SaveSpecialtyAsync(token, model);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? (model.Id.HasValue ? "Специальность обновлена." : "Специальность создана.")
+            : (result.ErrorMessage ?? "Не удалось сохранить специальность.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ArchiveSpecialty(int id)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        var result = await _adminApiService.ArchiveSpecialtyAsync(token, id);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? "Специальность отправлена в архив."
+            : (result.ErrorMessage ?? "Не удалось отправить специальность в архив.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreSpecialty(int id)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        var result = await _adminApiService.RestoreSpecialtyAsync(token, id);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? "Специальность восстановлена."
+            : (result.ErrorMessage ?? "Не удалось восстановить специальность.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveGroup(AdminSaveGroupViewModel model)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        if (model.SpecialtyId <= 0 || string.IsNullOrWhiteSpace(model.Name) || model.Course <= 0)
+        {
+            TempData["AdminError"] = "Заполните специальность, название группы и курс.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var result = await _adminApiService.SaveGroupAsync(token, model);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? (model.Id.HasValue ? "Группа обновлена." : "Группа создана.")
+            : (result.ErrorMessage ?? "Не удалось сохранить группу.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ArchiveGroup(int id)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        var result = await _adminApiService.ArchiveGroupAsync(token, id);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? "Группа отправлена в архив."
+            : (result.ErrorMessage ?? "Не удалось отправить группу в архив.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreGroup(int id)
+    {
+        var token = GetAdminTokenOrNull();
+        if (token is null)
+            return RedirectToAction("Login", "Account");
+
+        var result = await _adminApiService.RestoreGroupAsync(token, id);
+        TempData[result.Success ? "AdminSuccess" : "AdminError"] = result.Success
+            ? "Группа восстановлена."
+            : (result.ErrorMessage ?? "Не удалось восстановить группу.");
+
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpGet]
     public async Task<IActionResult> DownloadLogs(string category)
     {
@@ -252,5 +369,14 @@ public class AdminController : Controller
 
         return RedirectToAction(nameof(Index));
     }
-}
 
+    private string? GetAdminTokenOrNull()
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Admin")
+            return null;
+
+        var token = HttpContext.Session.GetString("Token");
+        return string.IsNullOrWhiteSpace(token) ? null : token;
+    }
+}

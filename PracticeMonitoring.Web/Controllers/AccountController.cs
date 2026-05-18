@@ -7,10 +7,12 @@ namespace PracticeMonitoring.Web.Controllers;
 public class AccountController : Controller
 {
     private readonly AuthApiService _authApiService;
+    private readonly CatalogApiService _catalogApiService;
 
-    public AccountController(AuthApiService authApiService)
+    public AccountController(AuthApiService authApiService, CatalogApiService catalogApiService)
     {
         _authApiService = authApiService;
+        _catalogApiService = catalogApiService;
     }
 
     [HttpGet]
@@ -58,6 +60,21 @@ public class AccountController : Controller
     public IActionResult Register()
     {
         return View(new RegisterViewModel());
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetSpecialties()
+    {
+        return Json(await _catalogApiService.GetSpecialtiesAsync());
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetGroups(int specialtyId)
+    {
+        if (specialtyId <= 0)
+            return Json(Array.Empty<object>());
+
+        return Json(await _catalogApiService.GetGroupsAsync(specialtyId));
     }
 
     [HttpPost]

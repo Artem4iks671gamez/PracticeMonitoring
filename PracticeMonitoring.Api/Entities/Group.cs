@@ -4,7 +4,8 @@ public class Group
 {
     public int Id { get; set; }
     public string Name { get; set; } = null!;
-    public int Course { get; set; } // целое число
+    public int Course { get; set; }
+    public bool IsArchived { get; set; }
 
     public int SpecialtyId { get; set; }
     public Specialty Specialty { get; set; } = null!;

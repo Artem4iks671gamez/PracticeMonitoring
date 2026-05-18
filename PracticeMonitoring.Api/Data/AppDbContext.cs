@@ -57,6 +57,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Code).IsRequired().HasMaxLength(50);
             entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.IsArchived).IsRequired().HasDefaultValue(false);
         });
 
         modelBuilder.Entity<Group>(entity =>
@@ -65,6 +66,7 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
             entity.Property(x => x.Course).IsRequired();
+            entity.Property(x => x.IsArchived).IsRequired().HasDefaultValue(false);
 
             entity.HasOne(x => x.Specialty)
                 .WithMany(x => x.Groups)

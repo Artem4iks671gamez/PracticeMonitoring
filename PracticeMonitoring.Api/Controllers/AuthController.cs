@@ -92,7 +92,7 @@ public class AuthController : ControllerBase
 
         var group = await _context.Groups
             .Include(g => g.Specialty)
-            .FirstOrDefaultAsync(g => g.Id == request.GroupId!.Value, cancellationToken);
+            .FirstOrDefaultAsync(g => g.Id == request.GroupId!.Value && !g.IsArchived && !g.Specialty.IsArchived, cancellationToken);
 
         if (group is null)
             return BadRequest(new { message = "Выбранная группа не найдена." });
@@ -295,7 +295,7 @@ public class AuthController : ControllerBase
         if (!request.GroupId.HasValue)
             return BadRequest(new { message = "Для регистрации необходимо выбрать группу." });
 
-        var groupExists = await _context.Groups.AnyAsync(g => g.Id == request.GroupId.Value, cancellationToken);
+        var groupExists = await _context.Groups.AnyAsync(g => g.Id == request.GroupId.Value && !g.IsArchived && !g.Specialty.IsArchived, cancellationToken);
         if (!groupExists)
             return BadRequest(new { message = "Выбранная группа не найдена." });
 

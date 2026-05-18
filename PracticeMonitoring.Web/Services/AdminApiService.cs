@@ -41,9 +41,28 @@ public class AdminApiService
                ?? new List<AdminUserItemViewModel>();
     }
 
-    public async Task<List<AdminSpecialtyOptionViewModel>> GetSpecialtiesAsync()
+    public async Task<AdminCatalogViewModel> GetCatalogAsync(string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "api/Helping/specialties");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/admin/catalog/specialties?includeArchived=true");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            return new AdminCatalogViewModel();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return new AdminCatalogViewModel
+        {
+            Specialties = JsonSerializer.Deserialize<List<AdminSpecialtyCatalogViewModel>>(json, _jsonOptions)
+                          ?? new List<AdminSpecialtyCatalogViewModel>()
+        };
+    }
+
+    public async Task<List<AdminSpecialtyOptionViewModel>> GetSpecialtiesAsync(string token, bool includeArchived = false)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/admin/catalog/specialties?includeArchived={includeArchived.ToString().ToLowerInvariant()}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
         var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
             return new List<AdminSpecialtyOptionViewModel>();
@@ -53,9 +72,11 @@ public class AdminApiService
                ?? new List<AdminSpecialtyOptionViewModel>();
     }
 
-    public async Task<List<AdminGroupOptionViewModel>> GetGroupsAsync(int specialtyId)
+    public async Task<List<AdminGroupOptionViewModel>> GetGroupsAsync(string token, int specialtyId, bool includeArchived = false)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/Helping/groups?specialtyId={specialtyId}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/admin/catalog/groups?specialtyId={specialtyId}&includeArchived={includeArchived.ToString().ToLowerInvariant()}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
         var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
             return new List<AdminGroupOptionViewModel>();
@@ -64,6 +85,45 @@ public class AdminApiService
         return JsonSerializer.Deserialize<List<AdminGroupOptionViewModel>>(json, _jsonOptions)
                ?? new List<AdminGroupOptionViewModel>();
     }
+
+    public async Task<AdminApiResult<AdminSpecialtyCatalogViewModel>> SaveSpecialtyAsync(string token, AdminSaveSpecialtyViewModel model)
+    {
+        var payload = new
+        {
+            Code = model.Code,
+            Name = model.Name
+        };
+
+        return model.Id.HasValue && model.Id.Value > 0
+            ? await SendJsonRequestAsync<AdminSpecialtyCatalogViewModel>(HttpMethod.Put, $"api/admin/catalog/specialties/{model.Id.Value}", token, payload)
+            : await SendJsonRequestAsync<AdminSpecialtyCatalogViewModel>(HttpMethod.Post, "api/admin/catalog/specialties", token, payload);
+    }
+
+    public async Task<AdminApiResult<AdminGroupCatalogViewModel>> SaveGroupAsync(string token, AdminSaveGroupViewModel model)
+    {
+        var payload = new
+        {
+            SpecialtyId = model.SpecialtyId,
+            Name = model.Name,
+            Course = model.Course
+        };
+
+        return model.Id.HasValue && model.Id.Value > 0
+            ? await SendJsonRequestAsync<AdminGroupCatalogViewModel>(HttpMethod.Put, $"api/admin/catalog/groups/{model.Id.Value}", token, payload)
+            : await SendJsonRequestAsync<AdminGroupCatalogViewModel>(HttpMethod.Post, "api/admin/catalog/groups", token, payload);
+    }
+
+    public Task<AdminApiResult<object>> ArchiveSpecialtyAsync(string token, int id)
+        => SendJsonRequestAsync<object>(HttpMethod.Post, $"api/admin/catalog/specialties/{id}/archive", token, new { });
+
+    public Task<AdminApiResult<object>> RestoreSpecialtyAsync(string token, int id)
+        => SendJsonRequestAsync<object>(HttpMethod.Post, $"api/admin/catalog/specialties/{id}/restore", token, new { });
+
+    public Task<AdminApiResult<object>> ArchiveGroupAsync(string token, int id)
+        => SendJsonRequestAsync<object>(HttpMethod.Post, $"api/admin/catalog/groups/{id}/archive", token, new { });
+
+    public Task<AdminApiResult<object>> RestoreGroupAsync(string token, int id)
+        => SendJsonRequestAsync<object>(HttpMethod.Post, $"api/admin/catalog/groups/{id}/restore", token, new { });
 
     public async Task<AdminApiResult<AdminUserItemViewModel>> UpdateUserAsync(string token, int id, object requestModel)
     {
@@ -162,6 +222,9 @@ public class AdminApiService
     }
 
     private async Task<AdminApiResult<AdminUserItemViewModel>> SendUserRequestAsync(HttpMethod method, string url, string token, object requestModel)
+        => await SendJsonRequestAsync<AdminUserItemViewModel>(method, url, token, requestModel);
+
+    private async Task<AdminApiResult<T>> SendJsonRequestAsync<T>(HttpMethod method, string url, string token, object requestModel)
     {
         using var request = new HttpRequestMessage(method, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -175,15 +238,17 @@ public class AdminApiService
 
         if (response.IsSuccessStatusCode)
         {
-            return new AdminApiResult<AdminUserItemViewModel>
+            return new AdminApiResult<T>
             {
                 Success = true,
                 StatusCode = (int)response.StatusCode,
-                Data = JsonSerializer.Deserialize<AdminUserItemViewModel>(json, _jsonOptions)
+                Data = string.IsNullOrWhiteSpace(json)
+                    ? default
+                    : JsonSerializer.Deserialize<T>(json, _jsonOptions)
             };
         }
 
-        return new AdminApiResult<AdminUserItemViewModel>
+        return new AdminApiResult<T>
         {
             Success = false,
             StatusCode = (int)response.StatusCode,
