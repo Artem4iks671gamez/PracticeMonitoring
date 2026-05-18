@@ -32,7 +32,7 @@
             <div class="supervisor-avatar">
                 @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
                 {
-                    <img src="@user.AvatarUrl" alt="Аватар руководителя" />
+                    <img src="@user.AvatarUrl" alt="Аватар руководителя" data-avatar-fallback data-avatar-initials="@avatarInitials" />
                 }
                 else
                 {

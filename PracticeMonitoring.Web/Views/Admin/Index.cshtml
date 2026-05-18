@@ -244,7 +244,7 @@
                             <div class="account-card-avatar">
                                 @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
                                 {
-                                    <img src="@user.AvatarUrl" alt="Аватар пользователя" />
+                                    <img src="@user.AvatarUrl" alt="Аватар пользователя" data-avatar-fallback data-avatar-initials="@avatarInitials" />
                                 }
                                 else
                                 {

@@ -291,11 +291,19 @@
             .toUpperCase();
     }
 
+    function escapeHtmlAttribute(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     function setAvatarPreview(url, fullName) {
         if (!modalAvatarPreview) return;
 
         if (url) {
-            modalAvatarPreview.innerHTML = `<img src="${url}" alt="avatar">`;
+            modalAvatarPreview.innerHTML = `<img src="${escapeHtmlAttribute(url)}" alt="avatar" data-avatar-fallback data-avatar-initials="${escapeHtmlAttribute(getInitials(fullName))}">`;
         } else {
             modalAvatarPreview.textContent = getInitials(fullName);
         }

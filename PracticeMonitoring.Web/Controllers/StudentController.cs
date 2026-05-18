@@ -199,6 +199,8 @@ public class StudentController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
     public async Task<IActionResult> UploadAppendix(
         int assignmentId,
         string? title,

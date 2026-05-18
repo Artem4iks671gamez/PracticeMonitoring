@@ -373,7 +373,7 @@
                                     <div class="supervisor-card-avatar">
                                         @if (!string.IsNullOrWhiteSpace(supervisor.AvatarUrl))
                                         {
-                                            <img src="@supervisor.AvatarUrl" alt="Аватар руководителя" />
+                                            <img src="@supervisor.AvatarUrl" alt="Аватар руководителя" data-avatar-fallback data-avatar-initials="@supervisor.FullName" />
                                         }
                                         else
                                         {

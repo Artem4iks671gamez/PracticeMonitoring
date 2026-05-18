@@ -18,6 +18,21 @@ public class StudentController : ControllerBase
 {
     private const long MaxAppendixSizeBytes = 15 * 1024 * 1024;
     private const long MaxDiaryFigureSizeBytes = 8 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedAppendixExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".doc",
+        ".docx",
+        ".pdf",
+        ".zip",
+        ".rar",
+        ".7z",
+        ".txt",
+        ".cs",
+        ".sql",
+        ".png",
+        ".jpg",
+        ".jpeg"
+    };
     private static readonly HashSet<string> AllowedDiaryImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/png",
@@ -384,24 +399,40 @@ public class StudentController : ControllerBase
 
     [HttpPost("practices/{assignmentId:int}/appendices")]
     [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
     public async Task<ActionResult<StudentPracticeAppendixUploadResponse>> UploadAppendix(
         int assignmentId,
         [FromForm] string? title,
         [FromForm] string? description,
         IFormFile? file)
     {
-        var assignment = await LoadStudentAssignmentAsync(assignmentId);
-        if (assignment is null)
-            return NotFound();
+        var studentId = GetCurrentUserId();
+        if (studentId is null)
+            return Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(title))
-            return BadRequest(new { message = "Укажите название приложения." });
+        var assignmentExists = await _context.ProductionPracticeStudentAssignments
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == assignmentId && x.StudentId == studentId.Value);
+
+        if (!assignmentExists)
+            return NotFound();
 
         if (file is null || file.Length == 0)
             return BadRequest(new { message = "Выберите файл приложения." });
 
+        var normalizedTitle = string.IsNullOrWhiteSpace(title)
+            ? Path.GetFileNameWithoutExtension(file.FileName)
+            : title.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+            return BadRequest(new { message = "Укажите название приложения." });
+
         if (file.Length > MaxAppendixSizeBytes)
             return BadRequest(new { message = "Файл приложения не должен превышать 15 МБ." });
+
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(extension) || !AllowedAppendixExtensions.Contains(extension))
+            return BadRequest(new { message = "Выберите допустимый файл: DOCX, PDF, архив, код или изображение." });
 
         await using var stream = file.OpenReadStream();
         using var memoryStream = new MemoryStream();
@@ -409,8 +440,8 @@ public class StudentController : ControllerBase
 
         var appendix = new StudentPracticeAppendix
         {
-            ProductionPracticeStudentAssignmentId = assignment.Id,
-            Title = title.Trim(),
+            ProductionPracticeStudentAssignmentId = assignmentId,
+            Title = normalizedTitle,
             Description = NormalizeOptional(description),
             FileName = Path.GetFileName(file.FileName),
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
@@ -419,7 +450,7 @@ public class StudentController : ControllerBase
             CreatedAtUtc = DateTime.UtcNow
         };
 
-        assignment.Appendices.Add(appendix);
+        _context.StudentPracticeAppendices.Add(appendix);
 
         await _context.SaveChangesAsync();
 
@@ -450,15 +481,16 @@ public class StudentController : ControllerBase
         if (studentId is null)
             return Unauthorized();
 
-        var appendix = await _context.StudentPracticeAppendices
-            .Include(x => x.Assignment)
-            .FirstOrDefaultAsync(x => x.Id == appendixId && x.Assignment.StudentId == studentId.Value);
+        var studentAssignmentIds = _context.ProductionPracticeStudentAssignments
+            .Where(x => x.StudentId == studentId.Value)
+            .Select(x => x.Id);
 
-        if (appendix is null)
+        var deleted = await _context.StudentPracticeAppendices
+            .Where(x => x.Id == appendixId && studentAssignmentIds.Contains(x.ProductionPracticeStudentAssignmentId))
+            .ExecuteDeleteAsync();
+
+        if (deleted == 0)
             return NotFound();
-
-        _context.StudentPracticeAppendices.Remove(appendix);
-        await _context.SaveChangesAsync();
 
         return Ok(new { message = "Приложение удалено." });
     }

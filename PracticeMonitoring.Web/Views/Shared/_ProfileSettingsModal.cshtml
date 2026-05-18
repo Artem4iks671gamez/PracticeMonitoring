@@ -64,7 +64,7 @@
                 <div class="profile-avatar-settings-preview" id="modalAvatarPreview">
                     @if (!string.IsNullOrWhiteSpace(Model.AvatarUrl))
                     {
-                        <img src="@Model.AvatarUrl" alt="Аватар пользователя" />
+                        <img src="@Model.AvatarUrl" alt="Аватар пользователя" data-avatar-fallback data-avatar-initials="@avatarInitials" />
                     }
                     else
                     {

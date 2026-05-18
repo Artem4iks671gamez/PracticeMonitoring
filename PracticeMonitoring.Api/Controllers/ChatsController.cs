@@ -215,72 +215,74 @@ public class ChatsController : ControllerBase
         if (currentUserId is null)
             return Unauthorized();
 
-        var thread = await _context.ChatThreads
-            .Include(x => x.Participants)
-                .ThenInclude(x => x.User)
-                    .ThenInclude(x => x.Role)
-            .Include(x => x.Participants)
-                .ThenInclude(x => x.User)
-                    .ThenInclude(x => x.Group)
-                        .ThenInclude(x => x!.Specialty)
-            .Include(x => x.Messages.OrderBy(m => m.CreatedAtUtc))
-                .ThenInclude(x => x.SenderUser)
-            .Include(x => x.Messages)
-                .ThenInclude(x => x.Attachments)
-            .FirstOrDefaultAsync(x => x.Id == id && x.Participants.Any(p => p.UserId == currentUserId.Value));
+        var response = await _context.ChatThreads
+            .AsNoTracking()
+            .Where(x => x.Id == id && x.Participants.Any(p => p.UserId == currentUserId.Value))
+            .Select(x => new ChatThreadDetailsResponse
+            {
+                Id = x.Id,
+                OtherUser = x.Participants
+                    .Where(p => p.UserId != currentUserId.Value)
+                    .Select(p => new ChatUserShortResponse
+                    {
+                        Id = p.UserId,
+                        FullName = p.User.FullName,
+                        Email = p.User.Email,
+                        Role = p.User.Role!.Name,
+                        AvatarUrl = p.User.AvatarUrl,
+                        Subtitle = p.User.Role!.Name == "Student"
+                            ? p.User.Group != null && p.User.Group.Name != null && p.User.Group.Name != string.Empty
+                                ? "Студент группы " + p.User.Group.Name
+                                : "Студент"
+                            : p.User.Role!.Name == "Supervisor"
+                                ? "Руководитель практики"
+                                : p.User.Role!.Name == "DepartmentStaff"
+                                    ? "Работник отдела"
+                                    : p.User.Role!.Name == "Admin"
+                                        ? "Администратор"
+                                        : ((p.User.Group != null && p.User.Group.Specialty != null ? p.User.Group.Specialty.Code : null) + " " +
+                                           (p.User.Group != null && p.User.Group.Specialty != null ? p.User.Group.Specialty.Name : null)).Trim()
+                    })
+                    .First(),
+                Messages = x.Messages
+                    .OrderBy(m => m.CreatedAtUtc)
+                    .Select(m => new ChatMessageResponse
+                    {
+                        Id = m.Id,
+                        ThreadId = m.ChatThreadId,
+                        SenderUserId = m.SenderUserId,
+                        SenderFullName = m.SenderUser.FullName,
+                        Text = m.Text,
+                        CreatedAtUtc = m.CreatedAtUtc,
+                        Attachments = m.Attachments
+                            .OrderBy(a => a.FileName)
+                            .Select(a => new ChatAttachmentResponse
+                            {
+                                Id = a.Id,
+                                FileName = a.FileName,
+                                ContentType = a.ContentType,
+                                SizeBytes = a.SizeBytes
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync();
 
-        if (thread is null)
+        if (response is null)
             return NotFound();
 
-        var ownParticipant = thread.Participants.First(x => x.UserId == currentUserId.Value);
-        ownParticipant.LastReadAtUtc = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        var readAtUtc = DateTime.UtcNow;
+        await _context.ChatParticipants
+            .Where(x => x.ChatThreadId == id && x.UserId == currentUserId.Value)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.LastReadAtUtc, readAtUtc));
 
-        var otherParticipant = thread.Participants.First(x => x.UserId != currentUserId.Value);
-
-        return Ok(new ChatThreadDetailsResponse
-        {
-            Id = thread.Id,
-            OtherUser = new ChatUserShortResponse
-            {
-                Id = otherParticipant.UserId,
-                FullName = otherParticipant.User.FullName,
-                Email = otherParticipant.User.Email,
-                Role = otherParticipant.User.Role!.Name,
-                AvatarUrl = otherParticipant.User.AvatarUrl,
-                Subtitle = BuildSubtitle(
-                    otherParticipant.User.Role!.Name,
-                    otherParticipant.User.Group?.Name,
-                    otherParticipant.User.Group?.Specialty?.Code,
-                    otherParticipant.User.Group?.Specialty?.Name)
-            },
-            Messages = thread.Messages
-                .OrderBy(x => x.CreatedAtUtc)
-                .Select(x => new ChatMessageResponse
-                {
-                    Id = x.Id,
-                    ThreadId = x.ChatThreadId,
-                    SenderUserId = x.SenderUserId,
-                    SenderFullName = x.SenderUser.FullName,
-                    Text = x.Text,
-                    CreatedAtUtc = x.CreatedAtUtc,
-                    Attachments = x.Attachments
-                        .OrderBy(a => a.FileName)
-                        .Select(a => new ChatAttachmentResponse
-                        {
-                            Id = a.Id,
-                            FileName = a.FileName,
-                            ContentType = a.ContentType,
-                            SizeBytes = a.SizeBytes
-                        })
-                        .ToList()
-                })
-                .ToList()
-        });
+        return Ok(response);
     }
 
     [HttpPost("threads/{id:int}/messages")]
     [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
     public async Task<ActionResult<ChatMessageResponse>> SendMessage(
         int id,
         [FromForm] int? targetUserId,
@@ -294,7 +296,7 @@ public class ChatsController : ControllerBase
             return Unauthorized();
 
         var normalizedText = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
-        var hasFiles = attachments is not null && attachments.Count > 0;
+        var hasFiles = attachments is not null && attachments.Any(x => x.Length > 0);
         if (normalizedText is null && !hasFiles)
             return BadRequest(new { message = "Введите текст сообщения или прикрепите файл." });
 

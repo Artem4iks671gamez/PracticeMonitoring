@@ -2191,11 +2191,20 @@ function initStudentWorkspace(workspace) {
 
         const token = event.currentTarget.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
         const headers = token ? { RequestVerificationToken: token } : {};
-        const response = await fetch(withAssignment(urls.uploadAppendix, state.currentDetails.assignmentId), {
-            method: 'POST',
-            headers,
-            body: new FormData(event.currentTarget)
-        });
+        let response;
+        try {
+            response = await fetch(withAssignment(urls.uploadAppendix, state.currentDetails.assignmentId), {
+                method: 'POST',
+                headers,
+                body: new FormData(event.currentTarget)
+            });
+        } catch {
+            removeAppendixFromState(optimisticAppendix.id);
+            renderAppendices(state.currentDetails?.appendices || []);
+            showStatus('Не удалось загрузить приложение. Проверьте соединение и размер файла.', true);
+            return;
+        }
+
         if (!response.ok) {
             removeAppendixFromState(optimisticAppendix.id);
             renderAppendices(state.currentDetails?.appendices || []);

@@ -49,7 +49,7 @@
                             <div class="messaging-thread-avatar">
                                 @if (!string.IsNullOrWhiteSpace(thread.OtherUser.AvatarUrl))
                                 {
-                                    <img src="@thread.OtherUser.AvatarUrl" alt="Аватар собеседника" />
+                                    <img src="@thread.OtherUser.AvatarUrl" alt="Аватар собеседника" data-avatar-fallback data-avatar-initials="@thread.OtherUser.FullName" />
                                 }
                                 else
                                 {

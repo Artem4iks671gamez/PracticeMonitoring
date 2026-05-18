@@ -64,6 +64,8 @@ public class MessagingController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
     public async Task<IActionResult> SendMessage(int threadId, int? targetUserId, string? text, List<IFormFile>? attachments)
     {
         var token = HttpContext.Session.GetString("Token");

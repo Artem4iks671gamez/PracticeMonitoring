@@ -777,11 +777,12 @@ function initSupervisorWorkspace(workspace) {
     }
 
     function buildAvatar(student) {
+        const initials = (student.studentFullName || '?').trim()[0] || '?';
         if (student.studentAvatarUrl) {
-            return `<img src="${escapeHtmlAttribute(student.studentAvatarUrl)}" alt="Аватар студента" />`;
+            return `<img src="${escapeHtmlAttribute(student.studentAvatarUrl)}" alt="Аватар студента" data-avatar-fallback data-avatar-initials="${escapeHtmlAttribute(initials)}" />`;
         }
 
-        return `<span>${escapeHtml((student.studentFullName || '?').trim()[0] || '?')}</span>`;
+        return `<span>${escapeHtml(initials)}</span>`;
     }
 
     function buildCheck(label, isReady) {

@@ -73,7 +73,7 @@
             <div class="student-avatar student-avatar-compact" id="studentAvatarPreview">
                 @if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
                 {
-                    <img src="@user.AvatarUrl" alt="Аватар студента" />
+                    <img src="@user.AvatarUrl" alt="Аватар студента" data-avatar-fallback data-avatar-initials="@avatarInitials" />
                 }
                 else
                 {

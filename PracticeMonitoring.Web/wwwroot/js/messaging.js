@@ -48,6 +48,8 @@ function initMessagingModule(moduleElement) {
     const attachmentList = moduleElement.querySelector('[data-chat-attachment-list]');
     const sendButton = messageForm?.querySelector('.messaging-send-button');
     const antiForgeryToken = messageForm?.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    const maxAttachmentSize = 10 * 1024 * 1024;
+    const maxMessageFilesSize = 25 * 1024 * 1024;
 
     const state = {
         activeThreadId: 0,
@@ -136,6 +138,25 @@ function initMessagingModule(moduleElement) {
     messageForm?.addEventListener('submit', async event => {
         event.preventDefault();
 
+        const files = Array.from(fileInput?.files || []);
+        const text = String(messageForm.querySelector('[data-chat-text-input]')?.value || '').trim();
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
+        if (!text && files.length === 0) {
+            showStatus('Введите текст сообщения или прикрепите файл.', 'error');
+            return;
+        }
+
+        if (files.some(file => file.size > maxAttachmentSize)) {
+            showStatus('Один из файлов превышает ограничение 10 МБ.', 'error');
+            return;
+        }
+
+        if (totalSize > maxMessageFilesSize) {
+            showStatus('Общий размер файлов в сообщении не должен превышать 25 МБ.', 'error');
+            return;
+        }
+
         const formData = new FormData(messageForm);
         setSendingState(true);
 
@@ -160,6 +181,8 @@ function initMessagingModule(moduleElement) {
             state.draftUser = null;
             await refreshThreads(state.activeThreadId);
             await loadThread(state.activeThreadId, true);
+        } catch {
+            showStatus('Не удалось отправить сообщение. Проверьте соединение и размер файлов.', 'error');
         } finally {
             setSendingState(false);
         }
@@ -462,19 +485,23 @@ function readThreadsFromDom(threadList) {
 }
 
 function buildAvatarMarkup(user, imageClass) {
+    const initials = getInitials(user.fullName || '?');
+
     if (user.avatarUrl) {
-        return `<img class="${imageClass}" src="${escapeHtmlAttribute(user.avatarUrl)}" alt="Аватар" />`;
+        return `<img class="${imageClass}" src="${escapeHtmlAttribute(user.avatarUrl)}" alt="Аватар" data-avatar-fallback data-avatar-initials="${escapeHtmlAttribute(initials)}" />`;
     }
 
-    const initials = (user.fullName || '?')
+    return `<span>${escapeHtml(initials)}</span>`;
+}
+
+function getInitials(value) {
+    return (value || '?')
         .split(' ')
         .filter(Boolean)
         .slice(0, 2)
         .map(part => part[0])
         .join('')
-        .toUpperCase();
-
-    return `<span>${escapeHtml(initials || '?')}</span>`;
+        .toUpperCase() || '?';
 }
 
 function formatListTime(value) {
