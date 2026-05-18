@@ -37,6 +37,7 @@ builder.Services.AddScoped<AccountEmailService>();
 builder.Services.AddScoped<EmailVerificationService>();
 builder.Services.AddScoped<TemporaryPasswordService>();
 builder.Services.AddScoped<DemoDataSeeder>();
+builder.Services.AddScoped<CatalogSeedService>();
 
 builder.Services.AddCors(options =>
 {
@@ -84,11 +85,15 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:AutoMigrate"))
+var autoMigrate = app.Configuration.GetValue<bool?>("Database:AutoMigrate") ?? true;
+if (autoMigrate)
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
+    await dbContext.Database.MigrateAsync();
+
+    var catalogSeeder = scope.ServiceProvider.GetRequiredService<CatalogSeedService>();
+    await catalogSeeder.SeedDefaultsAsync();
 }
 
 if (app.Configuration.GetValue<bool>("DemoData:Seed"))
