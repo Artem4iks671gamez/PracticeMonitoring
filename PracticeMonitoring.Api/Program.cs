@@ -26,7 +26,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
-builder.Services.Configure<UnisenderOptions>(builder.Configuration.GetSection("Unisender"));
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<PasswordService>();

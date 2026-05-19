@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\bin\**;$(MSBuildProjectDirectory)\obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0-android' and '$(OS)' == 'Windows_NT'">
+    <BaseIntermediateOutputPath>C:\pm-mobile-obj\PracticeMonitoring.Mobile\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

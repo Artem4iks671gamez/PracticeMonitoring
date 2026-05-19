@@ -659,7 +659,15 @@ public class StudentController : Controller
 
     private string? GetToken()
     {
-        return HttpContext.Session.GetString("Token");
+        var token = HttpContext.Session.GetString("Token");
+        if (!string.IsNullOrWhiteSpace(token))
+            return token;
+
+        var authorization = HttpContext.Request.Headers.Authorization.ToString();
+        const string bearerPrefix = "Bearer ";
+        return authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+            ? authorization[bearerPrefix.Length..].Trim()
+            : null;
     }
 
     private Task<byte[]> ConvertDocxToPdfAsync(byte[] docxContent, string docxFileName)
