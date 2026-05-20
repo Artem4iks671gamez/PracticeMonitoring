@@ -257,6 +257,13 @@ public class StudentPracticeDiaryEntryRequest
     public List<int> KeptAttachmentIds { get; set; } = new();
 }
 
+public class StudentPracticeDiarySummaryRequest
+{
+    public DateTime WorkDate { get; set; }
+
+    public string? ShortDescription { get; set; }
+}
+
 public class StudentPracticeDiaryFigureRequest
 {
     public string? ClientId { get; set; }

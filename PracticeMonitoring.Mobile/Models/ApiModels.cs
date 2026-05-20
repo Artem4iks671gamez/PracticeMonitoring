@@ -18,9 +18,18 @@ public sealed class ApiResult<T>
 public sealed class AuthResponse
 {
     public string Token { get; set; } = string.Empty;
+    public DateTime TokenExpiresAtUtc { get; set; }
+    public string RefreshToken { get; set; } = string.Empty;
+    public DateTime RefreshTokenExpiresAtUtc { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public bool MustChangePassword { get; set; }
+}
+
+public sealed class PushSettings
+{
+    public bool IsConfigured { get; set; }
+    public bool HasRegisteredDevice { get; set; }
 }
 
 public sealed class CurrentUser
@@ -158,6 +167,16 @@ public sealed class DiaryAttachment
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public sealed class DiaryFigureUpload
+{
+    public string? ClientId { get; set; }
+    public string? Caption { get; set; }
+    public string? FileName { get; set; }
+    public string? ContentType { get; set; }
+    public string? Base64Content { get; set; }
     public int SortOrder { get; set; }
 }
 

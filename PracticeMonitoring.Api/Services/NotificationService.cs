@@ -6,10 +6,12 @@ namespace PracticeMonitoring.Api.Services;
 public class NotificationService
 {
     private readonly AppDbContext _context;
+    private readonly PushNotificationService _pushNotificationService;
 
-    public NotificationService(AppDbContext context)
+    public NotificationService(AppDbContext context, PushNotificationService pushNotificationService)
     {
         _context = context;
+        _pushNotificationService = pushNotificationService;
     }
 
     public void Add(int userId, string category, string title, string message, string? linkUrl = null)
@@ -26,5 +28,16 @@ public class NotificationService
             LinkUrl = string.IsNullOrWhiteSpace(linkUrl) ? null : linkUrl.Trim(),
             CreatedAtUtc = DateTime.UtcNow
         });
+
+        _ = _pushNotificationService.SendToUserAsync(
+            userId,
+            title.Trim(),
+            message.Trim(),
+            new Dictionary<string, string>
+            {
+                ["type"] = "notification",
+                ["category"] = category.Trim(),
+                ["linkUrl"] = linkUrl ?? string.Empty
+            });
     }
 }

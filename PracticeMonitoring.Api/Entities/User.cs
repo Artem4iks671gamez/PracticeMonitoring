@@ -31,4 +31,8 @@ public class User
     public bool IsActive { get; set; } = true;
 
     public bool MustChangePassword { get; set; }
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+    public ICollection<PushDevice> PushDevices { get; set; } = new List<PushDevice>();
 }

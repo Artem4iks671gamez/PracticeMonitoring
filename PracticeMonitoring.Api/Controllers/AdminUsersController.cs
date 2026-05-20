@@ -20,6 +20,7 @@ public class AdminUsersController : ControllerBase
     private readonly AccountEmailService _accountEmailService;
     private readonly TemporaryPasswordService _temporaryPasswordService;
     private readonly NotificationService _notificationService;
+    private readonly ILogger<AdminUsersController> _logger;
 
     public AdminUsersController(
         AppDbContext context,
@@ -27,7 +28,8 @@ public class AdminUsersController : ControllerBase
         AuditLogService auditLogService,
         AccountEmailService accountEmailService,
         TemporaryPasswordService temporaryPasswordService,
-        NotificationService notificationService)
+        NotificationService notificationService,
+        ILogger<AdminUsersController> logger)
     {
         _context = context;
         _passwordService = passwordService;
@@ -35,6 +37,7 @@ public class AdminUsersController : ControllerBase
         _accountEmailService = accountEmailService;
         _temporaryPasswordService = temporaryPasswordService;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -166,7 +169,7 @@ public class AdminUsersController : ControllerBase
 
         if (wasActive && !user.IsActive)
         {
-            await _accountEmailService.SendAccountDisabledAsync(user);
+            await TrySendAccountDisabledEmailAsync(user);
         }
 
         if (!string.IsNullOrWhiteSpace(generatedPassword))
@@ -268,6 +271,22 @@ public class AdminUsersController : ControllerBase
             return null;
 
         return await _context.Users.FirstOrDefaultAsync(x => x.Id == actorId);
+    }
+
+    private async Task TrySendAccountDisabledEmailAsync(User user)
+    {
+        try
+        {
+            await _accountEmailService.SendAccountDisabledAsync(user);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "Account disabled email was not sent for user {UserId} ({Email}). The account status update was kept.",
+                user.Id,
+                user.Email);
+        }
     }
 
     private static AdminUserListItemResponse MapUser(User x)

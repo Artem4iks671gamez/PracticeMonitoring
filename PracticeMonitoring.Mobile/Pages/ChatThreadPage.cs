@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using Microsoft.Maui.Controls.Shapes;
 using PracticeMonitoring.Mobile.Infrastructure;
 using PracticeMonitoring.Mobile.Models;
 using PracticeMonitoring.Mobile.Services;
@@ -9,10 +9,14 @@ namespace PracticeMonitoring.Mobile.Pages;
 public sealed class ChatThreadPage : StudentContentPage
 {
     private readonly ApiClient _api = ServiceHelper.Get<ApiClient>();
-    private readonly ObservableCollection<ChatMessage> _messages = new();
+    private readonly AppSession _session = ServiceHelper.Get<AppSession>();
+    private readonly VerticalStackLayout _messages = new() { Spacing = 8, Padding = new Thickness(16, 12) };
+    private readonly ScrollView _scroll;
     private readonly Entry _text = Ui.Entry("Сообщение");
     private readonly Label _message = ErrorLabel();
+    private readonly Label _attachmentLabel = Ui.Caption(string.Empty);
     private int _threadId;
+    private int _currentUserId;
     private FileResult? _attachment;
 
     public string ThreadId
@@ -24,39 +28,13 @@ public sealed class ChatThreadPage : StudentContentPage
     {
         Title = "Диалог";
 
-        var list = new CollectionView
+        _scroll = new ScrollView
         {
-            ItemsSource = _messages,
-            ItemTemplate = new DataTemplate(() =>
-            {
-                var author = Ui.Eyebrow("");
-                author.SetBinding(Label.TextProperty, nameof(ChatMessage.SenderFullName));
-
-                var text = Ui.Title("", 15);
-                text.SetBinding(Label.TextProperty, nameof(ChatMessage.Text));
-
-                var date = Ui.Caption("");
-                date.SetBinding(Label.TextProperty, new Binding(nameof(ChatMessage.CreatedAtUtc), stringFormat: "{0:dd.MM.yyyy HH:mm}"));
-
-                return Ui.Card(new VerticalStackLayout
-                {
-                    Spacing = 5,
-                    Children = { author, text, date }
-                });
-            })
+            BackgroundColor = Ui.PageBackground,
+            Content = _messages
         };
 
-        var attach = Ui.SecondaryButton("Файл");
-        attach.Clicked += async (_, _) => _attachment = await FilePicker.Default.PickAsync();
-
-        var send = Ui.PrimaryButton("Отправить");
-        send.Clicked += async (_, _) => await SendAsync();
-
-        var inputPanel = Ui.Card(new VerticalStackLayout
-        {
-            Spacing = 10,
-            Children = { _text, Ui.ActionRow(attach, send) }
-        }, new Thickness(12));
+        var inputPanel = Composer();
         Grid.SetRow(inputPanel, 1);
 
         Content = new Grid
@@ -69,15 +47,7 @@ public sealed class ChatThreadPage : StudentContentPage
             BackgroundColor = Ui.PageBackground,
             Children =
             {
-                new ScrollView
-                {
-                    Content = new VerticalStackLayout
-                    {
-                        Padding = 16,
-                        Spacing = 10,
-                        Children = { _message, list }
-                    }
-                },
+                _scroll,
                 inputPanel
             }
         };
@@ -92,13 +62,53 @@ public sealed class ChatThreadPage : StudentContentPage
         await LoadAsync();
     }
 
+    private View Composer()
+    {
+        var attach = Ui.SecondaryButton("+");
+        attach.WidthRequest = 48;
+        attach.Clicked += async (_, _) =>
+        {
+            _attachment = await FilePicker.Default.PickAsync();
+            _attachmentLabel.Text = _attachment is null ? string.Empty : $"Файл: {_attachment.FileName}";
+            _attachmentLabel.IsVisible = _attachment is not null;
+        };
+
+        var send = Ui.PrimaryButton("Отправить");
+        send.WidthRequest = 118;
+        send.Clicked += async (_, _) => await SendAsync();
+
+        var row = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            ColumnSpacing = 8
+        };
+        AddGrid(row, attach, 0, 0);
+        AddGrid(row, _text, 1, 0);
+        AddGrid(row, send, 2, 0);
+
+        _attachmentLabel.IsVisible = false;
+
+        return Ui.Card(new VerticalStackLayout
+        {
+            Spacing = 8,
+            Children = { _message, _attachmentLabel, row }
+        }, new Thickness(12, 10));
+    }
+
     private async Task LoadAsync()
     {
         if (_threadId <= 0)
             return;
 
+        await EnsureCurrentUserAsync();
+
         var result = await _api.GetThreadAsync(_threadId);
-        _messages.Clear();
+        _messages.Children.Clear();
         if (!result.Success || result.Data is null)
         {
             ShowError(_message, ErrorText(result, "Не удалось загрузить диалог."));
@@ -106,8 +116,68 @@ public sealed class ChatThreadPage : StudentContentPage
         }
 
         Title = result.Data.OtherUser.FullName;
-        foreach (var item in result.Data.Messages.OrderBy(x => x.CreatedAtUtc))
-            _messages.Add(item);
+        ShowError(_message, string.Empty);
+
+        if (result.Data.Messages.Count == 0)
+        {
+            _messages.Children.Add(Ui.EmptyState("Сообщений пока нет", "Напишите первое сообщение в этом диалоге."));
+        }
+        else
+        {
+            foreach (var item in result.Data.Messages.OrderBy(x => x.CreatedAtUtc))
+                _messages.Children.Add(MessageBubble(item));
+        }
+
+        await Task.Delay(50);
+        await _scroll.ScrollToAsync(_messages, ScrollToPosition.End, animated: false);
+    }
+
+    private View MessageBubble(ChatMessage item)
+    {
+        var own = _currentUserId > 0 && item.SenderUserId == _currentUserId;
+        var content = new VerticalStackLayout { Spacing = 4 };
+
+        if (!own)
+            content.Children.Add(Ui.Eyebrow(item.SenderFullName));
+
+        if (!string.IsNullOrWhiteSpace(item.Text))
+        {
+            content.Children.Add(new Label
+            {
+                Text = item.Text,
+                TextColor = own ? Colors.White : Ui.Text,
+                FontSize = 15,
+                LineBreakMode = LineBreakMode.WordWrap
+            });
+        }
+
+        foreach (var attachment in item.Attachments)
+            content.Children.Add(Ui.Caption($"Файл: {attachment.FileName}"));
+
+        content.Children.Add(new Label
+        {
+            Text = item.CreatedAtUtc.ToLocalTime().ToString("dd.MM HH:mm"),
+            TextColor = own ? Color.FromArgb("#DCE6FF") : Ui.Faint,
+            FontSize = 11,
+            HorizontalTextAlignment = own ? TextAlignment.End : TextAlignment.Start
+        });
+
+        var bubble = new Border
+        {
+            BackgroundColor = own ? Ui.Primary : Ui.SurfaceRaised,
+            Stroke = own ? Ui.Primary : Ui.Border,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 8 },
+            Padding = new Thickness(12, 9),
+            MaximumWidthRequest = 320,
+            Content = content
+        };
+
+        return new HorizontalStackLayout
+        {
+            HorizontalOptions = own ? LayoutOptions.End : LayoutOptions.Start,
+            Children = { bubble }
+        };
     }
 
     private async Task SendAsync()
@@ -115,7 +185,14 @@ public sealed class ChatThreadPage : StudentContentPage
         if (!await RequireStudentAsync())
             return;
 
-        var result = await _api.SendMessageAsync(_threadId, _text.Text ?? string.Empty, _attachment);
+        var text = _text.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text) && _attachment is null)
+        {
+            ShowError(_message, "Введите сообщение или прикрепите файл.");
+            return;
+        }
+
+        var result = await _api.SendMessageAsync(_threadId, text, _attachment);
         if (!result.Success)
         {
             ShowError(_message, ErrorText(result, "Не удалось отправить сообщение."));
@@ -124,6 +201,34 @@ public sealed class ChatThreadPage : StudentContentPage
 
         _text.Text = string.Empty;
         _attachment = null;
+        _attachmentLabel.Text = string.Empty;
+        _attachmentLabel.IsVisible = false;
         await LoadAsync();
+    }
+
+    private async Task EnsureCurrentUserAsync()
+    {
+        if (_currentUserId > 0)
+            return;
+
+        if (_session.CurrentUser is not null)
+        {
+            _currentUserId = _session.CurrentUser.Id;
+            return;
+        }
+
+        var result = await _api.GetCurrentUserAsync();
+        if (result.Success && result.Data is not null)
+        {
+            _session.CurrentUser = result.Data;
+            _currentUserId = result.Data.Id;
+        }
+    }
+
+    private static void AddGrid(Grid grid, View view, int column, int row)
+    {
+        Grid.SetColumn(view, column);
+        Grid.SetRow(view, row);
+        grid.Children.Add(view);
     }
 }

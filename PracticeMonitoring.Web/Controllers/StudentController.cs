@@ -288,9 +288,26 @@ public class StudentController : Controller
         if (practice is null)
             return NotFound();
 
+        var missing = _practiceReportDocumentService.Validate(practice);
+        if (missing.Count > 0)
+        {
+            return Json(new
+            {
+                missing
+            });
+        }
+
         return Json(new
         {
-            missing = _practiceReportDocumentService.Validate(practice)
+            fileName = _practiceReportDocumentService.BuildFileName(practice),
+            pdfFileName = _practiceReportDocumentService.BuildPdfFileName(practice),
+            archiveFileName = _practiceReportDocumentService.BuildArchiveFileName(practice),
+            previewFileName = _practiceReportDocumentService.BuildPdfFileName(practice),
+            previewUrl = Url.Action(nameof(PreviewPracticeReportPdf), "Student", new { assignmentId }),
+            docxUrl = Url.Action(nameof(DownloadPracticeReport), "Student", new { assignmentId }),
+            pdfUrl = Url.Action(nameof(DownloadPracticeReportPdf), "Student", new { assignmentId }),
+            archiveUrl = Url.Action(nameof(DownloadPracticeReportArchive), "Student", new { assignmentId }),
+            missing
         });
     }
 
@@ -492,6 +509,42 @@ public class StudentController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> PreviewPracticeReportPdf(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        var result = await _practiceReportDocumentService.BuildDocxAsync(
+            practice,
+            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId),
+            appendixId => _studentApiService.DownloadAppendixAsync(token, appendixId));
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = "PDF отчёта нельзя показать: заполнены не все обязательные разделы.",
+                missing = result.Missing
+            });
+        }
+
+        try
+        {
+            var pdf = await ConvertDocxToPdfAsync(result.Content, result.FileName);
+            return File(pdf, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return PdfConversionFailed(ex);
+        }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> DownloadPracticeReportPdf(int assignmentId)
     {
         var token = GetToken();
@@ -525,6 +578,53 @@ public class StudentController : Controller
         {
             return PdfConversionFailed(ex);
         }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadPracticeReportArchive(int assignmentId)
+    {
+        var token = GetToken();
+        if (token is null)
+            return Unauthorized();
+
+        var practice = await _studentApiService.GetPracticeAsync(token, assignmentId);
+        if (practice is null)
+            return NotFound();
+
+        var result = await _practiceReportDocumentService.BuildDocxAsync(
+            practice,
+            attachmentId => _studentApiService.DownloadDiaryAttachmentAsync(token, attachmentId),
+            appendixId => _studentApiService.DownloadAppendixAsync(token, appendixId));
+
+        if (!result.Success)
+        {
+            return BadRequest(new
+            {
+                message = "Архив отчёта нельзя сформировать: заполнены не все обязательные разделы.",
+                missing = result.Missing
+            });
+        }
+
+        using var archiveStream = new MemoryStream();
+        using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddZipEntry(archive, result.FileName, result.Content);
+
+            try
+            {
+                var pdf = await ConvertDocxToPdfAsync(result.Content, result.FileName);
+                AddZipEntry(archive, _practiceReportDocumentService.BuildPdfFileName(practice), pdf);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return PdfConversionFailed(ex);
+            }
+        }
+
+        return File(
+            archiveStream.ToArray(),
+            "application/zip",
+            _practiceReportDocumentService.BuildArchiveFileName(practice));
     }
 
     [HttpGet]
@@ -670,19 +770,36 @@ public class StudentController : Controller
             : null;
     }
 
-    private Task<byte[]> ConvertDocxToPdfAsync(byte[] docxContent, string docxFileName)
+    private async Task<byte[]> ConvertDocxToPdfAsync(byte[] docxContent, string docxFileName)
     {
-        return _docxPdfConversionService.ConvertDocxToPdfAsync(
-            docxContent,
-            docxFileName,
-            HttpContext.RequestAborted);
+        try
+        {
+            return await _docxPdfConversionService.ConvertDocxToPdfAsync(
+                docxContent,
+                docxFileName,
+                HttpContext.RequestAborted);
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("PDF conversion was cancelled because the preview request was closed.");
+        }
     }
 
     private ObjectResult PdfConversionFailed(InvalidOperationException exception)
     {
+        if (exception.Message.Contains("preview request was closed", StringComparison.OrdinalIgnoreCase))
+        {
+            return StatusCode(499, new
+            {
+                message = "PDF preview request was cancelled.",
+                details = exception.Message
+            });
+        }
+
         return StatusCode(StatusCodes.Status500InternalServerError, new
         {
-            message = exception.Message
+            message = "PDF не удалось сформировать: на сервере не найден или недоступен LibreOffice/soffice. Скачайте DOCX или установите LibreOffice на сервер.",
+            details = exception.Message
         });
     }
 

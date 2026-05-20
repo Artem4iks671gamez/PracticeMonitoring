@@ -32,10 +32,11 @@ public class JwtServiceTests
         };
 
         var token = new JwtService(configuration).GenerateToken(user);
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.Token);
 
         Assert.Equal("PracticeMonitoring.Api", jwt.Issuer);
         Assert.Equal("PracticeMonitoring.Client", jwt.Audiences.Single());
+        Assert.True(token.ExpiresAtUtc > DateTime.UtcNow);
         Assert.Contains(jwt.Claims, x => x.Type == ClaimTypes.NameIdentifier && x.Value == "42");
         Assert.Contains(jwt.Claims, x => x.Type == ClaimTypes.Email && x.Value == "student@example.com");
         Assert.Contains(jwt.Claims, x => x.Type == ClaimTypes.Role && x.Value == "Student");

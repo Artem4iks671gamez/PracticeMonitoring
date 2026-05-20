@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PracticeMonitoring.Api.Data;
 using PracticeMonitoring.Api.Dtos;
 using PracticeMonitoring.Api.Entities;
+using PracticeMonitoring.Api.Services;
 
 namespace PracticeMonitoring.Api.Controllers;
 
@@ -15,10 +16,12 @@ public class ChatsController : ControllerBase
 {
     private const long MaxAttachmentSizeBytes = 10 * 1024 * 1024;
     private readonly AppDbContext _context;
+    private readonly PushNotificationService _pushNotificationService;
 
-    public ChatsController(AppDbContext context)
+    public ChatsController(AppDbContext context, PushNotificationService pushNotificationService)
     {
         _context = context;
+        _pushNotificationService = pushNotificationService;
     }
 
     [HttpGet("threads")]
@@ -182,16 +185,40 @@ public class ChatsController : ControllerBase
             return Forbid();
 
         var existingThread = await _context.ChatThreads
-            .AsNoTracking()
-            .Where(x => x.Participants.Count == 2 &&
-                        x.Participants.Any(p => p.UserId == currentUserId.Value) &&
-                        x.Participants.Any(p => p.UserId == request.TargetUserId))
-            .Select(x => x.Id)
-            .FirstOrDefaultAsync();
+            .Include(x => x.Participants)
+            .FirstOrDefaultAsync(x => x.Participants.Count == 2 &&
+                                      x.Participants.Any(p => p.UserId == currentUserId.Value) &&
+                                      x.Participants.Any(p => p.UserId == request.TargetUserId));
+
+        if (existingThread is null)
+        {
+            var createdAtUtc = DateTime.UtcNow;
+            existingThread = new ChatThread
+            {
+                CreatedAtUtc = createdAtUtc,
+                Participants =
+                {
+                    new ChatParticipant
+                    {
+                        UserId = currentUserId.Value,
+                        JoinedAtUtc = createdAtUtc,
+                        LastReadAtUtc = createdAtUtc
+                    },
+                    new ChatParticipant
+                    {
+                        UserId = request.TargetUserId,
+                        JoinedAtUtc = createdAtUtc
+                    }
+                }
+            };
+
+            _context.ChatThreads.Add(existingThread);
+            await _context.SaveChangesAsync();
+        }
 
         return Ok(new ChatThreadListItemResponse
         {
-            Id = existingThread,
+            Id = existingThread.Id,
             OtherUser = new ChatUserShortResponse
             {
                 Id = targetUser.Id,
@@ -394,6 +421,25 @@ public class ChatsController : ControllerBase
             .Where(x => x.Id == currentUserId.Value)
             .Select(x => x.FullName)
             .FirstAsync();
+
+        var recipientIds = thread.Participants
+            .Where(x => x.UserId != currentUserId.Value)
+            .Select(x => x.UserId)
+            .Distinct()
+            .ToList();
+        var pushBody = BuildLastMessagePreview(message.Text, message.Attachments.Count);
+        foreach (var recipientId in recipientIds)
+        {
+            _ = _pushNotificationService.SendToUserAsync(
+                recipientId,
+                $"Новое сообщение от {senderFullName}",
+                pushBody,
+                new Dictionary<string, string>
+                {
+                    ["type"] = "chat",
+                    ["threadId"] = message.ChatThreadId.ToString()
+                });
+        }
 
         return Ok(new ChatMessageResponse
         {

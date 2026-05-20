@@ -14,6 +14,8 @@ public class AppDbContext : DbContext
     public DbSet<Specialty> Specialties => Set<Specialty>();
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
 
     public DbSet<ProductionPractice> ProductionPractices => Set<ProductionPractice>();
     public DbSet<ProductionPracticeCompetency> ProductionPracticeCompetencies => Set<ProductionPracticeCompetency>();
@@ -117,6 +119,50 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(x => x.Category);
             entity.HasIndex(x => x.CreatedAtUtc);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.ExpiresAtUtc).IsRequired();
+            entity.Property(x => x.RevokedAtUtc);
+            entity.Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
+            entity.Property(x => x.DeviceName).HasMaxLength(200);
+            entity.Property(x => x.UserAgent).HasMaxLength(500);
+            entity.Property(x => x.IpAddress).HasMaxLength(80);
+
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.ExpiresAtUtc });
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.RefreshTokens)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PushDevice>(entity =>
+        {
+            entity.ToTable("push_devices");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.TokenEncrypted).IsRequired();
+            entity.Property(x => x.Platform).IsRequired().HasMaxLength(40);
+            entity.Property(x => x.DeviceName).HasMaxLength(200);
+            entity.Property(x => x.IsEnabled).IsRequired().HasDefaultValue(true);
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.Property(x => x.LastSeenAtUtc);
+
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.IsEnabled });
+
+            entity.HasOne(x => x.User)
+                .WithMany(x => x.PushDevices)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ProductionPractice>(entity =>

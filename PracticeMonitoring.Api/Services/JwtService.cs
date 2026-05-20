@@ -15,7 +15,7 @@ public class JwtService
         _configuration = configuration;
     }
 
-    public string GenerateToken(User user)
+    public JwtTokenResult GenerateToken(User user)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
 
@@ -35,14 +35,17 @@ public class JwtService
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
+        var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiresMinutes);
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(expiresMinutes),
+            expires: expiresAtUtc,
             signingCredentials: credentials
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new JwtTokenResult(new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
     }
 }
+
+public sealed record JwtTokenResult(string Token, DateTime ExpiresAtUtc);

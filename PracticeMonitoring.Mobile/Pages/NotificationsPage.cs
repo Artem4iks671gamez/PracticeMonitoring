@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using PracticeMonitoring.Mobile;
 using PracticeMonitoring.Mobile.Infrastructure;
 using PracticeMonitoring.Mobile.Models;
 using PracticeMonitoring.Mobile.Services;
@@ -102,6 +103,9 @@ public sealed class NotificationsPage : StudentContentPage
 
             foreach (var item in result.Data.OrderByDescending(x => x.CreatedAtUtc))
                 _items.Add(item);
+
+            if (Shell.Current is AppShell shell)
+                await shell.RefreshNotificationBadgeAsync();
 
             ShowError(_message, _items.Count == 0 ? "Уведомлений пока нет." : string.Empty);
         });

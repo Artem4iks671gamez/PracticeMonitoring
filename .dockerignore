@@ -2,7 +2,13 @@
 **/obj/
 **/.vs/
 **/.git/
-**/artifacts/
-**/*.user
-**/*.suo
-**/wwwroot/uploads/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.rsuser
+*.log
+.env
+.env.*
+deploy/.env
+deploy/.env.*

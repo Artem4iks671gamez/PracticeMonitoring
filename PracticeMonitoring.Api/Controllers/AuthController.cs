@@ -17,6 +17,7 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _context;
     private readonly PasswordService _passwordService;
     private readonly JwtService _jwtService;
+    private readonly RefreshTokenService _refreshTokenService;
     private readonly AuditLogService _auditLogService;
     private readonly EmailVerificationService _emailVerificationService;
     private readonly AccountEmailService _accountEmailService;
@@ -26,6 +27,7 @@ public class AuthController : ControllerBase
         AppDbContext context,
         PasswordService passwordService,
         JwtService jwtService,
+        RefreshTokenService refreshTokenService,
         AuditLogService auditLogService,
         EmailVerificationService emailVerificationService,
         AccountEmailService accountEmailService,
@@ -34,6 +36,7 @@ public class AuthController : ControllerBase
         _context = context;
         _passwordService = passwordService;
         _jwtService = jwtService;
+        _refreshTokenService = refreshTokenService;
         _auditLogService = auditLogService;
         _emailVerificationService = emailVerificationService;
         _accountEmailService = accountEmailService;
@@ -133,15 +136,7 @@ public class AuthController : ControllerBase
 
         await _auditLogService.LogRegisteredUserAsync(user);
 
-        var token = _jwtService.GenerateToken(user);
-
-        return Ok(new AuthResponse
-        {
-            Token = token,
-            FullName = user.FullName,
-            Role = user.Role!.Name,
-            MustChangePassword = user.MustChangePassword
-        });
+        return Ok(await IssueAuthResponseAsync(user, cancellationToken));
     }
 
     [HttpPost("login")]
@@ -163,15 +158,36 @@ public class AuthController : ControllerBase
         if (!user.IsActive)
             return Unauthorized(new { message = "Аккаунт отключён. Обратитесь к администратору." });
 
-        var token = _jwtService.GenerateToken(user);
+        return Ok(await IssueAuthResponseAsync(user, HttpContext.RequestAborted));
+    }
 
-        return Ok(new AuthResponse
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh(RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            return Unauthorized(new { message = "Refresh-токен не передан." });
+
+        var tokenHash = _refreshTokenService.HashToken(request.RefreshToken);
+        var storedToken = await _context.RefreshTokens
+            .Include(x => x.User)
+                .ThenInclude(x => x.Role)
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+
+        if (storedToken is null ||
+            storedToken.RevokedAtUtc.HasValue ||
+            storedToken.ExpiresAtUtc <= DateTime.UtcNow ||
+            !storedToken.User.IsActive)
         {
-            Token = token,
-            FullName = user.FullName,
-            Role = user.Role!.Name,
-            MustChangePassword = user.MustChangePassword
-        });
+            return Unauthorized(new { message = "Сессия истекла. Войдите заново." });
+        }
+
+        var issuedRefreshToken = _refreshTokenService.Create(storedToken.User, HttpContext);
+        storedToken.RevokedAtUtc = DateTime.UtcNow;
+        storedToken.ReplacedByTokenHash = issuedRefreshToken.Entity.TokenHash;
+        _context.RefreshTokens.Add(issuedRefreshToken.Entity);
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return Ok(BuildAuthResponse(storedToken.User, issuedRefreshToken));
     }
 
     [HttpPost("forgot-password")]
@@ -226,6 +242,9 @@ public class AuthController : ControllerBase
 
         user.PasswordHash = _passwordService.HashPassword(user, request.NewPassword);
         user.MustChangePassword = false;
+        await _context.RefreshTokens
+            .Where(x => x.UserId == user.Id && x.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
         return Ok(new { message = "Пароль изменён. Теперь можно войти." });
@@ -254,6 +273,9 @@ public class AuthController : ControllerBase
 
         user.PasswordHash = _passwordService.HashPassword(user, request.NewPassword);
         user.MustChangePassword = false;
+        await _context.RefreshTokens
+            .Where(x => x.UserId == user.Id && x.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
         return Ok(new { message = "Пароль изменён." });
@@ -298,11 +320,42 @@ public class AuthController : ControllerBase
         });
     }
 
-    [Authorize]
+    [AllowAnonymous]
     [HttpPost("logout")]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout(LogoutRequest request, CancellationToken cancellationToken)
     {
-        return Ok(new { message = "Для JWT logout выполняется на клиенте: удалите токен." });
+        if (!string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            var tokenHash = _refreshTokenService.HashToken(request.RefreshToken);
+            await _context.RefreshTokens
+                .Where(x => x.TokenHash == tokenHash && x.RevokedAtUtc == null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAtUtc, DateTime.UtcNow), cancellationToken);
+        }
+
+        return Ok(new { message = "Сессия завершена." });
+    }
+
+    private async Task<AuthResponse> IssueAuthResponseAsync(User user, CancellationToken cancellationToken)
+    {
+        var issuedRefreshToken = _refreshTokenService.Create(user, HttpContext);
+        _context.RefreshTokens.Add(issuedRefreshToken.Entity);
+        await _context.SaveChangesAsync(cancellationToken);
+        return BuildAuthResponse(user, issuedRefreshToken);
+    }
+
+    private AuthResponse BuildAuthResponse(User user, IssuedRefreshToken issuedRefreshToken)
+    {
+        var accessToken = _jwtService.GenerateToken(user);
+        return new AuthResponse
+        {
+            Token = accessToken.Token,
+            TokenExpiresAtUtc = accessToken.ExpiresAtUtc,
+            RefreshToken = issuedRefreshToken.RawToken,
+            RefreshTokenExpiresAtUtc = issuedRefreshToken.Entity.ExpiresAtUtc,
+            FullName = user.FullName,
+            Role = user.Role!.Name,
+            MustChangePassword = user.MustChangePassword
+        };
     }
 
     private ObjectResult SmtpUnavailable(Exception exception)

@@ -8,6 +8,8 @@ public partial class AppShell : Shell
 {
     private readonly AppSession _session = ServiceHelper.Get<AppSession>();
     private readonly ApiClient _api = ServiceHelper.Get<ApiClient>();
+    private readonly PushRegistrationService _pushRegistration = ServiceHelper.Get<PushRegistrationService>();
+    private ShellContent? _notificationsTab;
     private bool _initialized;
     private bool _studentAreaVisible;
 
@@ -24,11 +26,19 @@ public partial class AppShell : Shell
     public async Task SignInToStudentAreaAsync()
     {
         ShowStudentArea();
+        await _pushRegistration.EnsureRegisteredAsync();
+        await RefreshNotificationBadgeAsync();
         await GoToAsync($"//{nameof(DashboardPage)}");
     }
 
     public async Task SignOutToLoginAsync()
     {
+        if (_session.IsAuthenticated)
+        {
+            await _pushRegistration.DisableAsync();
+            await _api.LogoutAsync(_session.RefreshToken);
+        }
+
         _session.SignOut();
         ShowAuthArea();
         await GoToAsync($"//{nameof(LoginPage)}");
@@ -63,7 +73,8 @@ public partial class AppShell : Shell
         tabs.Items.Add(CreateContent<DashboardPage>("Главная", nameof(DashboardPage)));
         tabs.Items.Add(CreateContent<PracticesPage>("Практики", nameof(PracticesPage)));
         tabs.Items.Add(CreateContent<ChatsPage>("Чаты", nameof(ChatsPage)));
-        tabs.Items.Add(CreateContent<NotificationsPage>("Уведомл.", nameof(NotificationsPage)));
+        _notificationsTab = CreateContent<NotificationsPage>("🔔", nameof(NotificationsPage));
+        tabs.Items.Add(_notificationsTab);
         tabs.Items.Add(CreateContent<ProfilePage>("Профиль", nameof(ProfilePage)));
 
         Items.Add(tabs);
@@ -85,6 +96,8 @@ public partial class AppShell : Shell
             {
                 _session.CurrentUser = me.Data;
                 ShowStudentArea();
+                await _pushRegistration.EnsureRegisteredAsync();
+                await RefreshNotificationBadgeAsync();
                 await GoToAsync($"//{nameof(DashboardPage)}");
                 return;
             }
@@ -127,5 +140,21 @@ public partial class AppShell : Shell
         SetTabBarForegroundColor(this, Ui.PrimarySoft);
         SetTabBarTitleColor(this, Ui.PrimarySoft);
         SetTabBarUnselectedColor(this, Ui.Muted);
+    }
+
+    public async Task RefreshNotificationBadgeAsync()
+    {
+        if (_notificationsTab is null || !_studentAreaVisible || string.IsNullOrWhiteSpace(_session.Token))
+            return;
+
+        var result = await _api.GetNotificationsAsync();
+        if (!result.Success || result.Data is null)
+        {
+            _notificationsTab.Title = "🔔";
+            return;
+        }
+
+        var unread = result.Data.Count(x => !x.IsRead);
+        _notificationsTab.Title = unread > 0 ? $"🔔 {Math.Min(unread, 99)}" : "🔔";
     }
 }

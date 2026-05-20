@@ -9,13 +9,8 @@ public sealed class ApiClient
 {
     private const string ApiBaseUrlKey = "api_base_url";
     private const string WebBaseUrlKey = "web_base_url";
-#if ANDROID
-    private const string DefaultApiBaseUrl = "https://10.0.2.2:7178/";
-    private const string DefaultWebBaseUrl = "https://10.0.2.2:7128/";
-#else
-    private const string DefaultApiBaseUrl = "https://localhost:7178/";
-    private const string DefaultWebBaseUrl = "https://localhost:7128/";
-#endif
+    private const string DefaultApiBaseUrl = "http://artem13371337.fvds.ru:7178/";
+    private const string DefaultWebBaseUrl = "http://artem13371337.fvds.ru/";
     private readonly AppSession _session;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -42,6 +37,16 @@ public sealed class ApiClient
     public Task<ApiResult<AuthResponse>> LoginAsync(string email, string password)
     {
         return PostJsonAsync<AuthResponse>("api/Auth/login", new { Email = email, Password = password }, requiresAuth: false);
+    }
+
+    public Task<ApiResult<AuthResponse>> RefreshTokenAsync(string refreshToken)
+    {
+        return PostJsonAsync<AuthResponse>("api/Auth/refresh", new { RefreshToken = refreshToken }, requiresAuth: false);
+    }
+
+    public Task<ApiResult<object>> LogoutAsync(string? refreshToken)
+    {
+        return PostJsonAsync<object>("api/Auth/logout", new { RefreshToken = refreshToken }, requiresAuth: false);
     }
 
     public Task<ApiResult<object>> SendRegistrationCodeAsync(RegisterRequest request)
@@ -87,6 +92,17 @@ public sealed class ApiClient
         });
     }
 
+    public async Task<ApiResult<CurrentUser>> UploadAvatarAsync(FileResult file)
+    {
+        using var form = new MultipartFormDataContent();
+        await using var stream = await file.OpenReadAsync();
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+        form.Add(fileContent, "file", file.FileName);
+
+        return await SendFormAsync<CurrentUser>("api/Profile/me/avatar", form);
+    }
+
     public Task<ApiResult<List<SpecialtyOption>>> GetSpecialtiesAsync()
     {
         return GetAsync<List<SpecialtyOption>>("api/Helping/specialties", requiresAuth: false);
@@ -127,15 +143,36 @@ public sealed class ApiClient
         });
     }
 
-    public Task<ApiResult<PracticeDetails>> SaveDiaryEntryAsync(int assignmentId, DiaryEntry entry, IEnumerable<int>? keptAttachmentIds = null)
+    public Task<ApiResult<PracticeDetails>> SaveDiaryEntryAsync(
+        int assignmentId,
+        DiaryEntry entry,
+        IEnumerable<int>? keptAttachmentIds = null,
+        IEnumerable<DiaryFigureUpload>? figures = null)
     {
         return PutJsonAsync<PracticeDetails>($"api/Student/practices/{assignmentId}/diary", new
         {
             entry.WorkDate,
             entry.ShortDescription,
             entry.DetailedReport,
-            Figures = Array.Empty<object>(),
+            Figures = figures?.Select(x => new
+            {
+                x.ClientId,
+                x.Caption,
+                x.FileName,
+                x.ContentType,
+                x.Base64Content,
+                x.SortOrder
+            }).ToArray() ?? Array.Empty<object>(),
             KeptAttachmentIds = keptAttachmentIds?.ToArray() ?? entry.Attachments.Select(x => x.Id).ToArray()
+        });
+    }
+
+    public Task<ApiResult<PracticeDetails>> SaveDiarySummaryAsync(int assignmentId, DateTime workDate, string shortDescription)
+    {
+        return PutJsonAsync<PracticeDetails>($"api/Student/practices/{assignmentId}/diary-summary", new
+        {
+            WorkDate = workDate,
+            ShortDescription = shortDescription
         });
     }
 
@@ -199,6 +236,21 @@ public sealed class ApiClient
     public Task<ApiResult<object>> MarkAllNotificationsReadAsync()
     {
         return PostJsonAsync<object>("api/Notifications/read-all", new { });
+    }
+
+    public Task<ApiResult<PushSettings>> GetPushSettingsAsync()
+    {
+        return GetAsync<PushSettings>("api/PushDevices/settings");
+    }
+
+    public Task<ApiResult<object>> RegisterPushDeviceAsync(string token, string platform, string? deviceName)
+    {
+        return PostJsonAsync<object>("api/PushDevices/register", new { Token = token, Platform = platform, DeviceName = deviceName });
+    }
+
+    public Task<ApiResult<object>> DisablePushDeviceAsync(string token, string platform, string? deviceName)
+    {
+        return PostJsonAsync<object>("api/PushDevices/disable", new { Token = token, Platform = platform, DeviceName = deviceName });
     }
 
     public Task<ApiResult<List<ChatThreadItem>>> GetThreadsAsync()
@@ -275,9 +327,45 @@ public sealed class ApiClient
 
     private async Task<ApiResult<T>> SendAsync<T>(HttpMethod method, string relativeUrl, HttpContent? content, bool requiresAuth)
     {
+        byte[]? body = null;
+        string? contentType = null;
+        if (content is not null)
+        {
+            body = await content.ReadAsByteArrayAsync();
+            contentType = content.Headers.ContentType?.ToString();
+        }
+
+        var result = await SendOnceAsync<T>(method, relativeUrl, body, contentType, requiresAuth);
+        if (requiresAuth && result.StatusCode == 401 && await TryRefreshTokenAsync())
+            result = await SendOnceAsync<T>(method, relativeUrl, body, contentType, requiresAuth);
+
+        return result;
+    }
+
+    private async Task<ApiResult<T>> SendOnceAsync<T>(HttpMethod method, string relativeUrl, byte[]? body, string? contentType, bool requiresAuth)
+    {
         using var request = CreateRequest(method, ApiBaseUrl, relativeUrl, requiresAuth);
-        request.Content = content;
+        if (body is not null)
+        {
+            request.Content = new ByteArrayContent(body);
+            if (!string.IsNullOrWhiteSpace(contentType))
+                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        }
+
         return await SendRequestAsync<T>(request);
+    }
+
+    private async Task<bool> TryRefreshTokenAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_session.RefreshToken))
+            return false;
+
+        var result = await RefreshTokenAsync(_session.RefreshToken);
+        if (!result.Success || result.Data is null)
+            return false;
+
+        await _session.SignInAsync(result.Data);
+        return true;
     }
 
     private async Task<ApiResult<T>> SendRequestAsync<T>(HttpRequestMessage request)

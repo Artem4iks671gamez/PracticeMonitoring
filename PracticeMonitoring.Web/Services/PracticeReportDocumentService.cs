@@ -944,10 +944,20 @@ public class PracticeReportDocumentService
         }
     }
 
-    private static string BuildFileName(StudentPracticeDetailsViewModel practice)
+    public string BuildFileName(StudentPracticeDetailsViewModel practice)
     {
         var safeIndex = string.Concat(StripAcademicPrefix(practice.PracticeIndex, "ПП").Where(ch => char.IsLetterOrDigit(ch) || ch is '.' or '-' or '_'));
         return $"Отчет_практики_{(string.IsNullOrWhiteSpace(safeIndex) ? "practice" : safeIndex)}.docx";
+    }
+
+    public string BuildPdfFileName(StudentPracticeDetailsViewModel practice)
+    {
+        return Path.ChangeExtension(BuildFileName(practice), ".pdf");
+    }
+
+    public string BuildArchiveFileName(StudentPracticeDetailsViewModel practice)
+    {
+        return Path.ChangeExtension(BuildFileName(practice), ".zip");
     }
 
     private static string StripAcademicPrefix(string? value, string prefix)

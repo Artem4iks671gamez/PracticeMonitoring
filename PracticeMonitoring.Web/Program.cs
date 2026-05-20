@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using PracticeMonitoring.Web.Services;
 using QuestPDF.Infrastructure;
 
@@ -63,6 +64,16 @@ builder.Services.AddScoped<PracticeDiaryDocumentService>();
 builder.Services.AddScoped<PracticeReportDocumentService>();
 builder.Services.AddScoped<DocxPdfConversionService>();
 
+if (builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -70,6 +81,9 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+if (app.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+    app.UseForwardedHeaders();
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

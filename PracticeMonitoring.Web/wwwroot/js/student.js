@@ -23,7 +23,8 @@ function initStudentWorkspace(workspace) {
         downloadPracticeDiary: workspace.dataset.downloadPracticeDiaryUrl || '',
         practiceReportPreview: workspace.dataset.practiceReportPreviewUrl || '',
         downloadPracticeReport: workspace.dataset.downloadPracticeReportUrl || '',
-        downloadPracticeReportPdf: workspace.dataset.downloadPracticeReportPdfUrl || ''
+        downloadPracticeReportPdf: workspace.dataset.downloadPracticeReportPdfUrl || '',
+        downloadPracticeReportArchive: workspace.dataset.downloadPracticeReportArchiveUrl || ''
     };
 
     const $ = selector => workspace.querySelector(selector);
@@ -45,7 +46,11 @@ function initStudentWorkspace(workspace) {
         sourcesEditMode: false,
         introductionEditCompletedByAssignment: new Set(),
         technicalEditCompletedByAssignment: new Set(),
-        attestationPreviewUrls: null
+        attestationPreviewUrls: null,
+        attestationPreviewFileNames: null,
+        documentPreviewRequestId: 0,
+        documentPreviewFrameLoadId: 0,
+        documentPreviewAbortController: null
     };
 
     const technicalComputerLabel = 'Компьютер';
@@ -151,8 +156,7 @@ function initStudentWorkspace(workspace) {
         $('#downloadAttestationPdfButton')?.addEventListener('click', () => downloadAttestationFromPreview('pdf'));
         $('#downloadAttestationArchiveButton')?.addEventListener('click', () => downloadAttestationFromPreview('archive'));
         $('#downloadPracticeDiaryButton')?.addEventListener('click', openPracticeDiaryPreview);
-        $('#downloadPracticeReportButton')?.addEventListener('click', downloadPracticeReport);
-        $('#downloadPracticeReportPdfButton')?.addEventListener('click', downloadPracticeReportPdf);
+        $('#downloadPracticeReportButton')?.addEventListener('click', openPracticeReportPreview);
         $('#editSourcesButton')?.addEventListener('click', () => {
             state.sourcesEditMode = true;
             renderSources(state.currentDetails?.sources || []);
@@ -2341,62 +2345,162 @@ function initStudentWorkspace(workspace) {
         });
     }
 
+    async function openPracticeReportPreview() {
+        return openDocumentPreview({
+            endpoint: urls.practiceReportPreview,
+            title: 'Отчёт по практике',
+            fallbackFileName: 'Предпросмотр отчёта по практике',
+            missingMessage: 'Для формирования отчёта практики нужны обязательные разделы.',
+            statusMessage: 'Заполните обязательные разделы отчёта практики.',
+            requestErrorMessage: 'Не удалось открыть предпросмотр отчёта практики.',
+            renderErrors: error => renderDocumentErrors(error, 'Не удалось сформировать отчёт практики.'),
+            clearErrors: () => {
+                const target = $('#studentDocumentErrors');
+                if (target) {
+                    target.hidden = true;
+                }
+            }
+        });
+    }
+
     async function openDocumentPreview(options) {
         if (!state.currentDetails || !options.endpoint) {
             return;
         }
 
-        const response = await fetch(`${options.endpoint}?assignmentId=${encodeURIComponent(state.currentDetails.assignmentId)}`, { cache: 'no-store' });
-        if (!response.ok) {
-            const error = await safeReadJson(response);
-            options.renderErrors(error);
-            showStatus(error?.message || options.requestErrorMessage, true);
-            return;
-        }
+        state.documentPreviewAbortController?.abort();
+        const requestId = ++state.documentPreviewRequestId;
+        const assignmentId = state.currentDetails.assignmentId;
+        const controller = new AbortController();
+        state.documentPreviewAbortController = controller;
 
-        const data = await response.json();
-        if (Array.isArray(data.missing) && data.missing.length) {
-            options.renderErrors({
-                message: options.missingMessage,
-                missing: data.missing
+        try {
+            const response = await fetch(`${options.endpoint}?assignmentId=${encodeURIComponent(assignmentId)}`, {
+                cache: 'no-store',
+                signal: controller.signal
             });
-            showStatus(options.statusMessage, true);
+
+            if (!isCurrentDocumentPreviewRequest(requestId, assignmentId)) {
+                return;
+            }
+
+            if (!response.ok) {
+                const error = await safeReadJson(response);
+                if (!isCurrentDocumentPreviewRequest(requestId, assignmentId)) {
+                    return;
+                }
+                options.renderErrors(error);
+                showStatus(error?.message || options.requestErrorMessage, true);
+                return;
+            }
+
+            const data = await response.json();
+            if (!isCurrentDocumentPreviewRequest(requestId, assignmentId)) {
+                return;
+            }
+
+            if (Array.isArray(data.missing) && data.missing.length) {
+                options.renderErrors({
+                    message: options.missingMessage,
+                    missing: data.missing
+                });
+                showStatus(options.statusMessage, true);
+                return;
+            }
+
+            state.attestationPreviewUrls = {
+                docx: data.docxUrl,
+                pdf: data.pdfUrl,
+                archive: data.archiveUrl || ''
+            };
+            state.attestationPreviewFileNames = {
+                docx: data.fileName || 'document.docx',
+                pdf: data.pdfFileName || 'document.pdf',
+                archive: data.archiveFileName || 'documents.zip'
+            };
+
+            const title = $('#studentAttestationPreviewTitle');
+            if (title) {
+                title.textContent = options.title;
+            }
+
+            const fileName = $('#studentAttestationPreviewFileName');
+            if (fileName) {
+                fileName.textContent = data.previewFileName || data.pdfFileName || data.fileName || options.fallbackFileName;
+            }
+
+            const archiveButton = $('#downloadAttestationArchiveButton');
+            if (archiveButton) {
+                archiveButton.hidden = !data.archiveUrl;
+            }
+
+            const previewErrors = $('#studentPreviewDownloadErrors');
+            if (previewErrors) {
+                previewErrors.hidden = true;
+                previewErrors.innerHTML = '';
+            }
+
+            options.clearErrors();
+            hideStatus();
+            $('#studentAttestationPreviewModal').hidden = false;
+            document.body.style.overflow = 'hidden';
+            showDocumentPreviewLoading();
+            loadPreviewFrame(data, requestId, assignmentId);
+        } catch (error) {
+            if (isAbortError(error)) {
+                return;
+            }
+
+            if (!isCurrentDocumentPreviewRequest(requestId, assignmentId)) {
+                return;
+            }
+
+            hideDocumentPreviewLoading();
+            options.renderErrors({ message: options.requestErrorMessage });
+            showStatus(options.requestErrorMessage, true);
+        } finally {
+            if (state.documentPreviewAbortController === controller) {
+                state.documentPreviewAbortController = null;
+            }
+        }
+    }
+
+    function loadPreviewFrame(data, requestId, assignmentId) {
+        const frame = $('#studentAttestationPdfFrame');
+        if (!frame) {
             return;
         }
 
-        state.attestationPreviewUrls = {
-            docx: data.docxUrl,
-            pdf: data.pdfUrl,
-            archive: data.archiveUrl || ''
+        const frameLoadId = ++state.documentPreviewFrameLoadId;
+        frame.onload = () => {
+            if (frameLoadId === state.documentPreviewFrameLoadId && isCurrentDocumentPreviewRequest(requestId, assignmentId)) {
+                hideDocumentPreviewLoading();
+            }
         };
 
-        const title = $('#studentAttestationPreviewTitle');
-        if (title) {
-            title.textContent = options.title;
+        if (data.previewHtml) {
+            frame.removeAttribute('src');
+            frame.srcdoc = buildPreviewFrameHtml(data.previewHtml);
+            return;
         }
 
-        const fileName = $('#studentAttestationPreviewFileName');
-        if (fileName) {
-            fileName.textContent = data.pdfFileName || data.fileName || options.fallbackFileName;
+        if (!data.previewUrl) {
+            hideDocumentPreviewLoading();
+            frame.removeAttribute('srcdoc');
+            frame.src = 'about:blank';
+            return;
         }
 
-        const archiveButton = $('#downloadAttestationArchiveButton');
-        if (archiveButton) {
-            archiveButton.hidden = !data.archiveUrl;
-        }
-
-        const frame = $('#studentAttestationPdfFrame');
-        if (frame) {
-            frame.src = buildPdfFrameUrl(data.previewUrl || '');
-        }
-
-        options.clearErrors();
-        hideStatus();
-        $('#studentAttestationPreviewModal').hidden = false;
-        document.body.style.overflow = 'hidden';
+        frame.removeAttribute('srcdoc');
+        frame.src = buildPdfFrameUrl(data.previewUrl);
     }
 
     function closeAttestationPreview() {
+        state.documentPreviewAbortController?.abort();
+        state.documentPreviewAbortController = null;
+        state.documentPreviewRequestId++;
+        state.documentPreviewFrameLoadId++;
+
         const modal = $('#studentAttestationPreviewModal');
         if (modal) {
             modal.hidden = true;
@@ -2404,20 +2508,72 @@ function initStudentWorkspace(workspace) {
 
         const frame = $('#studentAttestationPdfFrame');
         if (frame) {
+            frame.onload = null;
             frame.src = 'about:blank';
+            frame.removeAttribute('srcdoc');
         }
 
+        hideDocumentPreviewLoading();
         state.attestationPreviewUrls = null;
+        state.attestationPreviewFileNames = null;
+        const previewErrors = $('#studentPreviewDownloadErrors');
+        if (previewErrors) {
+            previewErrors.hidden = true;
+            previewErrors.innerHTML = '';
+        }
         document.body.style.overflow = $('#studentPracticeModal')?.hidden ? '' : 'hidden';
     }
 
-    function downloadAttestationFromPreview(format) {
+    function isCurrentDocumentPreviewRequest(requestId, assignmentId) {
+        return requestId === state.documentPreviewRequestId &&
+            String(state.currentDetails?.assignmentId || '') === String(assignmentId);
+    }
+
+    function showDocumentPreviewLoading() {
+        const loading = $('#studentDocumentPreviewLoading');
+        if (loading) {
+            loading.hidden = false;
+        }
+    }
+
+    function hideDocumentPreviewLoading() {
+        const loading = $('#studentDocumentPreviewLoading');
+        if (loading) {
+            loading.hidden = true;
+        }
+    }
+
+    function isAbortError(error) {
+        return error?.name === 'AbortError';
+    }
+
+    async function downloadAttestationFromPreview(format) {
         const url = state.attestationPreviewUrls?.[format];
         if (!url) {
             return;
         }
 
-        window.location.href = url;
+        const response = await fetch(url);
+        if (!response.ok) {
+            const error = await safeReadJson(response);
+            const previewErrors = $('#studentPreviewDownloadErrors');
+            if (previewErrors) {
+                previewErrors.hidden = false;
+                previewErrors.innerHTML = buildDocumentErrorsHtml(error, 'Не удалось скачать документ.');
+            }
+            showStatus(error?.message || 'Не удалось скачать документ.', true);
+            return;
+        }
+
+        const previewErrors = $('#studentPreviewDownloadErrors');
+        if (previewErrors) {
+            previewErrors.hidden = true;
+            previewErrors.innerHTML = '';
+        }
+
+        await downloadBlobResponse(
+            response,
+            state.attestationPreviewFileNames?.[format] || `document.${format === 'archive' ? 'zip' : format}`);
     }
 
     function buildPdfFrameUrl(previewUrl) {
@@ -2512,6 +2668,37 @@ function initStudentWorkspace(workspace) {
         showStatus('PDF отчёта практики сформирован.', false);
     }
 
+    function buildPreviewFrameHtml(previewHtml) {
+        return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+html,body{margin:0;background:#f3f5f9;color:#111827;font-family:Arial, sans-serif;}
+body{padding:24px;}
+.student-practice-report-preview,.attestation-preview-sheet{max-width:900px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;box-shadow:0 18px 45px rgba(17,24,39,.12);padding:36px;line-height:1.5;}
+.student-practice-report-preview-title,.attestation-preview-title{font-size:26px;font-weight:800;text-align:center;margin-bottom:18px;}
+.student-practice-report-preview-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:18px 0 24px;}
+.student-practice-report-preview-row{display:grid;grid-template-columns:170px 1fr;gap:10px;border-bottom:1px solid #e5e7eb;padding:7px 0;}
+.student-practice-report-preview-row span{color:#64748b;}
+.student-practice-report-preview-section{margin-top:20px;}
+.student-practice-report-preview-section h4{margin:0 0 8px;font-size:18px;}
+.student-practice-report-preview-section p{white-space:pre-wrap;margin:0;}
+.student-practice-report-preview-section ol{margin:8px 0 0 22px;padding:0;}
+.attestation-preview-header{text-align:center;font-size:14px;margin-bottom:24px;}
+.attestation-preview-subtitle{text-align:center;margin-bottom:24px;}
+.attestation-preview-line,.attestation-preview-line-caption,.attestation-preview-paragraph{font-family:'Times New Roman',serif;font-size:16px;}
+.attestation-preview-line{text-align:center;margin-top:24px;}
+.attestation-preview-line-caption{text-align:center;font-size:13px;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;margin:16px 0;}
+td,th{border:1px solid #111827;padding:7px;vertical-align:top;}
+@media(max-width:720px){body{padding:10px}.student-practice-report-preview,.attestation-preview-sheet{padding:18px}.student-practice-report-preview-meta{grid-template-columns:1fr}.student-practice-report-preview-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>${previewHtml || ''}</body>
+</html>`;
+    }
+
     async function downloadBlobResponse(response, fallbackFileName) {
         const blob = await response.blob();
         const link = document.createElement('a');
@@ -2551,10 +2738,10 @@ function initStudentWorkspace(workspace) {
             });
         } else {
             setPracticeReportButtonState(true, '');
-            target.innerHTML = `
+            target.innerHTML = data.previewHtml || `
                 <div class="student-document-readiness">
-                    <strong>Данные готовы для формирования DOCX</strong>
-                    <p>Документ сформируется после проверки, затем можно скачать результат по шаблону Word.</p>
+                    <strong>Данные готовы для формирования документа</strong>
+                    <p>Откройте предпросмотр, чтобы скачать DOCX, PDF или архив.</p>
                 </div>`;
             $('#studentDocumentErrors').hidden = true;
         }
@@ -2617,7 +2804,7 @@ function initStudentWorkspace(workspace) {
     }
 
     function setPracticeReportButtonState(enabled, title) {
-        ['#downloadPracticeReportButton', '#downloadPracticeReportPdfButton']
+        ['#downloadPracticeReportButton']
             .map(selector => $(selector))
             .filter(Boolean)
             .forEach(button => {

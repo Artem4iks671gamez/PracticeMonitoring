@@ -373,6 +373,7 @@ secrets.json
 *.secrets.json
 .env
 .env.*
+.deploy-ssh/
 /PracticeMonitoring.Web/Templates
 !/PracticeMonitoring.Web/templates/
 /PracticeMonitoring.Web/templates/*

@@ -67,7 +67,8 @@
      data-download-practice-diary-url="@Url.Action("DownloadPracticeDiary", "Student")"
      data-practice-report-preview-url="@Url.Action("GetPracticeReportPreview", "Student")"
      data-download-practice-report-url="@Url.Action("DownloadPracticeReport", "Student")"
-     data-download-practice-report-pdf-url="@Url.Action("DownloadPracticeReportPdf", "Student")">
+     data-download-practice-report-pdf-url="@Url.Action("DownloadPracticeReportPdf", "Student")"
+     data-download-practice-report-archive-url="@Url.Action("DownloadPracticeReportArchive", "Student")">
     <section class="student-hero-card">
         <div class="student-identity">
             <div class="student-avatar student-avatar-compact" id="studentAvatarPreview">
@@ -541,7 +542,6 @@
                             <button type="button" class="student-primary-button" id="downloadAttestationButton">Сформировать аттестационный лист</button>
                             <button type="button" class="student-primary-button" id="downloadPracticeDiaryButton">Сформировать дневник практики</button>
                             <button type="button" class="student-primary-button" id="downloadPracticeReportButton">Сформировать отчёт практики</button>
-                            <button type="button" class="student-primary-button" id="downloadPracticeReportPdfButton">Сформировать отчёт PDF</button>
                         </div>
                         <div class="student-document-errors" id="studentAttestationErrors" hidden></div>
                         <div class="student-document-errors" id="studentDocumentErrors" hidden></div>
@@ -560,14 +560,19 @@
                 <div>
                     <span class="student-report-workspace-eyebrow">Предпросмотр документа</span>
                     <h2 id="studentAttestationPreviewTitle">Аттестационный лист</h2>
-                    <p id="studentAttestationPreviewFileName">PDF-предпросмотр</p>
+                    <p id="studentAttestationPreviewFileName">Предпросмотр документа</p>
                 </div>
                 <button type="button" class="student-modal-close" id="closeAttestationPreviewButton">×</button>
             </header>
 
             <div class="student-attestation-preview-body">
-                <iframe id="studentAttestationPdfFrame" title="PDF-предпросмотр документа"></iframe>
+                <iframe id="studentAttestationPdfFrame" title="Предпросмотр документа"></iframe>
+                <div class="student-document-preview-loading" id="studentDocumentPreviewLoading" hidden>
+                    <div class="student-document-preview-spinner" aria-hidden="true"></div>
+                    <span>Загрузка документа...</span>
+                </div>
             </div>
+            <div class="student-document-errors" id="studentPreviewDownloadErrors" hidden></div>
 
             <footer class="student-attestation-preview-actions">
                 <button type="button" class="student-secondary-button" id="downloadAttestationDocxButton">Скачать DOCX</button>

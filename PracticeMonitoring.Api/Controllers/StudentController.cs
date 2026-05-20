@@ -263,6 +263,62 @@ public class StudentController : ControllerBase
         return details is null ? NotFound() : Ok(details);
     }
 
+    [HttpPut("practices/{assignmentId:int}/diary-summary")]
+    public async Task<ActionResult<StudentPracticeDetailsResponse>> SaveDiarySummary(
+        int assignmentId,
+        StudentPracticeDiarySummaryRequest request)
+    {
+        var assignment = await LoadStudentAssignmentAsync(assignmentId);
+        if (assignment is null)
+            return NotFound();
+
+        var errors = ValidateDiarySummary(request, assignment.ProductionPractice);
+        if (errors.Count > 0)
+            return BadRequest(new { message = "Проверьте запись дневника.", errors });
+
+        var workDate = ToUtcDate(request.WorkDate);
+        var entry = assignment.DiaryEntries.FirstOrDefault(x => x.WorkDate.Date == workDate.Date);
+        var isNewEntry = entry is null;
+        var previousShortDescription = entry?.ShortDescription ?? string.Empty;
+        var now = DateTime.UtcNow;
+
+        if (entry is null)
+        {
+            entry = new StudentPracticeDiaryEntry
+            {
+                ProductionPracticeStudentAssignmentId = assignment.Id,
+                WorkDate = workDate,
+                DetailedReport = string.Empty,
+                CreatedAtUtc = now
+            };
+            assignment.DiaryEntries.Add(entry);
+        }
+
+        entry.ShortDescription = request.ShortDescription!.Trim();
+        entry.IsReviewed = false;
+        entry.SupervisorGrade = null;
+        entry.SupervisorComment = null;
+        entry.ReviewedAtUtc = null;
+        entry.ReviewedBySupervisorId = null;
+        entry.UpdatedAtUtc = now;
+
+        var shortDescriptionChanged = !string.Equals(previousShortDescription, entry.ShortDescription, StringComparison.Ordinal);
+        if (assignment.SupervisorId.HasValue && (isNewEntry || shortDescriptionChanged))
+        {
+            _notificationService.Add(
+                assignment.SupervisorId.Value,
+                "StudentDiary",
+                isNewEntry ? "Студент заполнил день дневника" : "Студент обновил день дневника",
+                $"{assignment.Student.FullName} сохранил краткую запись дневника за {workDate:dd.MM.yyyy} по практике {assignment.ProductionPractice.PracticeIndex} \"{assignment.ProductionPractice.Name}\".",
+                $"/Supervisor/Index?assignmentId={assignment.Id}");
+        }
+
+        await _context.SaveChangesAsync();
+
+        var details = await LoadStudentPracticeDetailsResponseAsync(assignmentId);
+        return details is null ? NotFound() : Ok(details);
+    }
+
     [HttpPost("practices/{assignmentId:int}/diary-attachments")]
     public async Task<ActionResult<StudentPracticeDiaryAttachmentUploadResponse>> UploadDiaryAttachment(
         int assignmentId,
@@ -810,6 +866,32 @@ public class StudentController : ControllerBase
                 errors[$"Figures[{i}].ContentType"] = new[] { "К дневнику можно прикреплять только изображения." };
             }
         }
+
+        return errors;
+    }
+
+    private static Dictionary<string, string[]> ValidateDiarySummary(
+        StudentPracticeDiarySummaryRequest request,
+        ProductionPractice practice)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var workDate = ToUtcDate(request.WorkDate);
+
+        if (request.WorkDate == default)
+        {
+            errors[nameof(request.WorkDate)] = new[] { "Укажите дату рабочего дня." };
+        }
+        else if (workDate.Date < practice.StartDate.Date || workDate.Date > practice.EndDate.Date)
+        {
+            errors[nameof(request.WorkDate)] = new[] { "Дата записи должна попадать в период практики." };
+        }
+        else if (workDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            errors[nameof(request.WorkDate)] = new[] { "Дневник заполняется за рабочий день. Для выходных запись не требуется." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ShortDescription))
+            errors[nameof(request.ShortDescription)] = new[] { "Заполните краткое описание для дневника." };
 
         return errors;
     }

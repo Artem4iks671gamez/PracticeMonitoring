@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PracticeMonitoring.Api.Data;
@@ -28,11 +30,21 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddHttpClient();
 
+var dataProtectionKeysDirectory = builder.Configuration["DataProtection:KeysDirectory"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysDirectory))
+{
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDirectory));
+}
+
 builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<DatabaseBackupService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddSingleton<PushNotificationService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<AccountEmailService>();
 builder.Services.AddScoped<EmailVerificationService>();
@@ -50,6 +62,16 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
+if (builder.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -110,7 +132,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+if (app.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+    app.UseForwardedHeaders();
+
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
 app.UseCors("FrontendPolicy");
 

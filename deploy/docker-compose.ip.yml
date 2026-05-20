@@ -1,0 +1,78 @@
+name: practice-monitoring-ip
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data-v18:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: PracticeMonitoring.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__ExpiresMinutes: ${JWT_EXPIRES_MINUTES}
+      Jwt__RefreshTokenExpiresDays: ${JWT_REFRESH_TOKEN_EXPIRES_DAYS}
+      DataProtection__KeysDirectory: /app/keys
+      Database__AutoMigrate: ${DATABASE_AUTO_MIGRATE}
+      DemoData__Seed: ${DEMO_DATA_SEED}
+      Firebase__ProjectId: ${FIREBASE_PROJECT_ID}
+      Firebase__ServiceAccountJson: ${FIREBASE_SERVICE_ACCOUNT_JSON}
+      Firebase__ServiceAccountPath: ${FIREBASE_SERVICE_ACCOUNT_PATH}
+      PgTools__PgDumpPath: pg_dump
+      PgTools__PgRestorePath: pg_restore
+      Smtp__Host: ${SMTP_HOST}
+      Smtp__Port: ${SMTP_PORT}
+      Smtp__UseSsl: ${SMTP_USE_SSL}
+      Smtp__Username: ${SMTP_USERNAME}
+      Smtp__Password: ${SMTP_PASSWORD}
+      Smtp__FromEmail: ${SMTP_FROM_EMAIL}
+      Smtp__FromName: ${SMTP_FROM_NAME}
+      AllowedHosts: "*"
+    volumes:
+      - api-uploads:/app/wwwroot/uploads
+      - api-keys:/app/keys
+    ports:
+      - "7178:8080"
+
+  web:
+    build:
+      context: ..
+      dockerfile: PracticeMonitoring.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ApiSettings__BaseUrl: http://api:8080/
+      OfficeConverter__SofficePath: /usr/bin/soffice
+      AllowedHosts: "*"
+    volumes:
+      - web-uploads:/app/wwwroot/uploads
+    ports:
+      - "80:8080"
+
+volumes:
+  postgres-data-v18:
+  api-uploads:
+  api-keys:
+  web-uploads:

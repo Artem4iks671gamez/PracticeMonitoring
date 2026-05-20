@@ -16,6 +16,23 @@ public sealed class FileStorageService
     public async Task OpenAsync(FileDownload file)
     {
         var path = await SaveToCacheAsync(file);
-        await Launcher.Default.OpenAsync(new OpenFileRequest(file.FileName, new ReadOnlyFile(path)));
+        try
+        {
+            await Launcher.Default.OpenAsync(new OpenFileRequest(file.FileName, new ReadOnlyFile(path)));
+        }
+        catch
+        {
+            await ShareAsync(file);
+        }
+    }
+
+    public async Task ShareAsync(FileDownload file)
+    {
+        var path = await SaveToCacheAsync(file);
+        await Share.Default.RequestAsync(new ShareFileRequest
+        {
+            Title = file.FileName,
+            File = new ShareFile(path)
+        });
     }
 }

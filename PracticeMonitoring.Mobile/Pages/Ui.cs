@@ -300,6 +300,25 @@ public static class Ui
         return grid;
     }
 
+    public static void Detach(View view)
+    {
+        switch (view.Parent)
+        {
+            case Layout layout:
+                layout.Children.Remove(view);
+                break;
+            case ContentView contentView when contentView.Content == view:
+                contentView.Content = null;
+                break;
+            case ScrollView scrollView when scrollView.Content == view:
+                scrollView.Content = null;
+                break;
+            case Border border when border.Content == view:
+                border.Content = null;
+                break;
+        }
+    }
+
     public static string Date(DateTime date) => date.ToString("dd.MM.yyyy");
 }
 

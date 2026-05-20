@@ -25,6 +25,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppSession>();
         builder.Services.AddSingleton<ApiClient>();
         builder.Services.AddSingleton<FileStorageService>();
+        builder.Services.AddSingleton<PushRegistrationService>();
 
         var app = builder.Build();
         ServiceHelper.Services = app.Services;
